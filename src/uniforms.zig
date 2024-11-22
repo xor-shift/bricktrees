@@ -5,17 +5,24 @@ const sdl = @import("sdl.zig");
 
 const Self = @This();
 
-dims: [2]usize = .{ 0, 0 },
-location: blas.Vec3d = blas.vec3d(7.9545981307778195, 6.059075793279358, 7.151635256867796),
-mouse_delta_sum: blas.Vec2d = blas.vec2d(0, 0),
-rotation: blas.Vec3d = blas.vec3d(-0.42962824881448974, 0.31153445378859734, 0),
+dims: blas.Vec2uz = blas.explode(usize, 2, 0),
+fov: f64 = std.math.pi / 6.0 * 2.0,
 
+// location: blas.Vec3d = blas.explode(f64, 3, 0),
+// rotation: blas.Vec3d = blas.explode(f64, 3, 0),
+location: blas.Vec3d = blas.vec3d(-17.86689026827083, 49.50384779276, -35.692589014885414),
+rotation: blas.Vec3d = blas.vec3d(0.6079563561113581, 0.6195918844579866, 0),
+// location: blas.Vec3d = blas.vec3d(7.9545981307778195, 6.059075793279358, 7.151635256867796),
+// rotation: blas.Vec3d = blas.vec3d(-0.42962824881448974, 0.31153445378859734, 0),
+
+mouse_delta_sum: blas.Vec2d = blas.explode(f64, 2, 0),
 capturing_mouse: bool = false,
 
 pub const Serialized = extern struct {
     width: u32,
     height: u32,
-    _padding_0: [2]u32 = undefined,
+    fov: f32,
+    _padding_0: [1]u32 = undefined,
 
     location: [3]f32,
     _padding_1: f32 = undefined,
@@ -24,7 +31,8 @@ pub const Serialized = extern struct {
 };
 
 pub fn serialize(self: Self) Serialized {
-    const rotation = blas.rotation_matrix_3d_affine(f64, self.rotation.el[0], self.rotation.el[1], self.rotation.el[2]).lossy_cast(f32);
+    const transform = blas.rotation_matrix_3d_affine(f64, self.rotation.el[0], self.rotation.el[1], self.rotation.el[2]).lossy_cast(f32);
+    // const transform = blas.identity(f32, 4);
 
     std.log.debug("@ {d}, {d}, {d}; rot: {d}, {d}, {d}", .{
         self.location.el[0], self.location.el[1], self.location.el[2],
@@ -32,14 +40,15 @@ pub fn serialize(self: Self) Serialized {
     });
 
     return .{
-        .width = @intCast(self.dims[0]),
-        .height = @intCast(self.dims[1]),
+        .width = @intCast(self.dims.width()),
+        .height = @intCast(self.dims.height()),
+        .fov = @floatCast(self.fov),
         .location = self.location.lossy_cast(f32).el,
-        .rotation_matrix = rotation.el,
+        .rotation_matrix = transform.el,
     };
 }
 
-pub fn resize(self: *Self, dims: [2]usize) void {
+pub fn resize(self: *Self, dims: blas.Vec2uz) void {
     self.dims = dims;
 }
 
@@ -47,7 +56,8 @@ pub fn pre_frame(self: *Self, delta_ms: f64) void {
     const g_state = &@import("main.zig").g_state;
 
     if (self.capturing_mouse) {
-        g_state.window.set_cursor_pos(.{ @as(f32, @floatFromInt(self.dims[0])) / 2, @as(f32, @floatFromInt(self.dims[1])) / 2 });
+        const cursor_pos = blas.divms(self.dims.lossy_cast(f32), 2);
+        g_state.window.set_cursor_pos(cursor_pos);
 
         const radians_per_pixel: f64 = 1.0 / (1080.0 / 2.0) * 3.1415926535897932384626433 / 2.0;
         const radians = blas.mulms(self.mouse_delta_sum, radians_per_pixel);
@@ -117,6 +127,11 @@ pub fn event(self: *Self, ev: sdl.c.SDL_Event) void {
 
             const movement = blas.vec2f(motion_event.xrel, motion_event.yrel);
             self.mouse_delta_sum.add(movement.lossy_cast(f64));
+        },
+        sdl.c.SDL_EVENT_MOUSE_WHEEL => {
+            const scroll_event = ev.wheel;
+
+            self.fov += @as(f64, @floatCast(-scroll_event.y)) * std.math.pi / 150.0;
         },
         else => {},
     }

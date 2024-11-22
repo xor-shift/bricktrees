@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const blas = @import("blas/blas.zig");
 const sdl = @import("sdl.zig");
 const wgpu = @import("wgpu/wgpu.zig");
 
@@ -30,7 +31,7 @@ pub fn init(alloc: std.mem.Allocator) !State {
         .video = true,
     });
 
-    const window = try sdl.Window.init("Test", 640, 360);
+    const window = try sdl.Window.init("Test", 1280, 720);
     const surface = try window.get_surface(instance);
     std.log.debug("surface: {?p}", .{surface.handle});
 
@@ -64,7 +65,7 @@ pub fn init(alloc: std.mem.Allocator) !State {
         .queue = queue,
     };
 
-    try ret.resize(640, 360);
+    try ret.resize(blas.vec2uz(640, 360));
 
     return ret;
 }
@@ -74,15 +75,15 @@ pub fn deinit(self: State) void {
     sdl.deinit();
 }
 
-pub fn resize(self: *State, width: usize, height: usize) !void {
+pub fn resize(self: *State, dims: blas.Vec2uz) !void {
     try self.surface.configure(.{
         .device = self.device,
         .format = .BGRA8Unorm,
         .usage = .{ .render_attachment = true },
         .view_formats = &.{.BGRA8UnormSrgb},
-        .width = @intCast(width),
-        .height = @intCast(height),
+        .width = @intCast(dims.width()),
+        .height = @intCast(dims.height()),
     });
 
-    try self.window.resize(width, height);
+    try self.window.resize(dims);
 }

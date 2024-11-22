@@ -2,6 +2,15 @@ const Matrix = @import("blas.zig").Matrix;
 const Vector = @import("blas.zig").Vector;
 const mulmm = @import("blas.zig").mulmm;
 
+pub fn identity(comptime T: type, comptime Dims: usize) Matrix(T, Dims, Dims) {
+    var ret: Matrix(T, Dims, Dims) = undefined;
+
+    @memset(&ret.el, 0);
+    for (0..Dims) |i| ret.set(i, i, 1);
+
+    return ret;
+}
+
 pub fn rotation_matrix_2d(comptime T: type, theta: T) Matrix(T, 2, 2) {
     const sint = @sin(theta);
     const cost = @cos(theta);

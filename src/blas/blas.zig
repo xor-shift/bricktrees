@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub usingnamespace @import("defns.zig");
 pub usingnamespace @import("special_mat.zig");
+pub usingnamespace @import("elementwise.zig");
 
 pub fn Traits(comptime Mat: type) type {
     return struct {
@@ -47,6 +48,19 @@ pub fn Matrix(comptime T: type, comptime Rows: usize, comptime Cols: usize) type
         pub fn set(self: *Self, row: usize, col: usize, val: T) void {
             self.el[row * Cols + col] = val;
         }
+
+        // zig fmt: off
+        pub fn width(self: Self) T { return self.el[0]; }
+        pub fn height(self: Self) T { return self.el[1]; }
+        pub fn x(self: Self) T { return self.el[0]; }
+        pub fn y(self: Self) T { return self.el[1]; }
+        pub fn z(self: Self) T { return self.el[2]; }
+        pub fn w(self: Self) T { return self.el[3]; }
+        pub fn r(self: Self) T { return self.el[0]; }
+        pub fn g(self: Self) T { return self.el[1]; }
+        pub fn b(self: Self) T { return self.el[2]; }
+        pub fn a(self: Self) T { return self.el[3]; }
+        // zig fmt: on
 
         pub fn lossy_cast(self: Self, comptime U: type) Matrix(U, Rows, Cols) {
             var ret: Matrix(U, Rows, Cols) = undefined;
@@ -117,46 +131,6 @@ pub fn mulmm(lhs: anytype, rhs: anytype) Traits(@TypeOf(lhs)).Resize(@TypeOf(lhs
         @as(u256, @bitCast([4]usize{ 2, 2, 2, 2 })) => @import("opt.zig").mul_strassen_2x2_2x2(&ret, lhs, rhs),
         else => mul_naive(&ret, lhs, rhs),
     }
-
-    return ret;
-}
-
-fn ewop(lhs: anytype, rhs: @TypeOf(lhs), comptime fun: fn (lhs: @TypeOf(lhs).ValueType, rhs: @TypeOf(lhs).ValueType) @TypeOf(lhs).ValueType) Traits(@TypeOf(lhs)).EquivMat {
-    const MatTraits = Traits(@TypeOf(lhs));
-    var ret: MatTraits.EquivMat = undefined;
-
-    for (0..MatTraits.rows) |row| for (0..MatTraits.cols) |col| {
-        ret.set(row, col, fun(lhs.get(row, col), rhs.get(row, col)));
-    };
-
-    return ret;
-}
-
-pub fn mulew(lhs: anytype, rhs: @TypeOf(lhs)) Traits(@TypeOf(lhs)).EquivMat {
-    const T = @TypeOf(lhs).ValueType;
-    return ewop(lhs, rhs, struct {
-        fn aufruf(lhs_v: T, rhs_v: T) T {
-            return lhs_v * rhs_v;
-        }
-    }.aufruf);
-}
-
-pub fn add(lhs: anytype, rhs: @TypeOf(lhs)) Traits(@TypeOf(lhs)).EquivMat {
-    const T = @TypeOf(lhs).ValueType;
-    return ewop(lhs, rhs, struct {
-        fn aufruf(lhs_v: T, rhs_v: T) T {
-            return lhs_v + rhs_v;
-        }
-    }.aufruf);
-}
-
-pub fn mulms(lhs: anytype, rhs: @TypeOf(lhs).ValueType) Traits(@TypeOf(lhs)).EquivMat {
-    const MatTraits = Traits(@TypeOf(lhs));
-    var ret: MatTraits.EquivMat = undefined;
-
-    for (0..MatTraits.rows) |row| for (0..MatTraits.cols) |col| {
-        ret.set(row, col, lhs.get(row, col) * rhs);
-    };
 
     return ret;
 }

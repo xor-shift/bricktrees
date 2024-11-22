@@ -25,6 +25,8 @@ pub const BindingResource = union(enum) {
 
     Sampler: Sampler,
     TextureView: TextureView,
+
+    TextureViewArray: []TextureView,
 };
 
 pub const Entry = struct {
@@ -46,6 +48,7 @@ pub const Entry = struct {
             },
             .Sampler => |v| ret.sampler = v.handle,
             .TextureView => |v| ret.textureView = v.handle,
+            .TextureViewArray => |_| std.debug.panic("NYI", .{}),
         }
 
         return ret;

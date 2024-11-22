@@ -5,8 +5,9 @@ const blas = @import("blas/blas.zig");
 pub const sdl = @import("sdl.zig");
 pub const wgpu = @import("wgpu/wgpu.zig");
 
-const State = @import("state.zig");
+const Map = @import("map.zig");
 const NewUniforms = @import("uniforms.zig");
+const State = @import("state.zig");
 
 const Vertex = extern struct {
     pos: [3]f32,
@@ -110,7 +111,7 @@ const Computer = struct {
     radiance_texture: wgpu.Texture = .{},
     radiance_texture_view: wgpu.TextureView = .{},
 
-    fn init(alloc: std.mem.Allocator, uniform_stuff: UniformStuff) !Computer {
+    fn init(uniform_stuff: UniformStuff, map: Map, alloc: std.mem.Allocator) !Computer {
         const shader = try g_state.device.create_shader_module_wgsl_from_file("compute shader", "src/compute.wgsl", alloc);
 
         const geometry_bgl = try g_state.device.create_bind_group_layout(.{
@@ -154,7 +155,7 @@ const Computer = struct {
 
         const pipeline_layout = try g_state.device.create_pipeline_layout(.{
             .label = "visualiser pipeline layout",
-            .bind_group_layouts = &.{ uniform_stuff.bgl_uniform, geometry_bgl },
+            .bind_group_layouts = &.{ uniform_stuff.bgl_uniform, geometry_bgl, map.map_bgl },
         });
         std.log.debug("compute pipeline_layout: {?p}", .{pipeline_layout.handle});
 
@@ -172,13 +173,12 @@ const Computer = struct {
             .geometry_bgl = geometry_bgl,
         };
 
-        const dims = try g_state.window.get_size();
-        try ret.resize(dims[0], dims[1]);
+        try ret.resize(try g_state.window.get_size());
 
         return ret;
     }
 
-    fn resize(self: *Computer, width: usize, height: usize) !void {
+    fn resize(self: *Computer, dims: blas.Vec2uz) !void {
         for (0..2) |i| {
             if (self.geometry_textures[i].handle != null) self.geometry_textures[i].release();
             self.geometry_textures[i] = try g_state.device.create_texture(.{
@@ -190,8 +190,8 @@ const Computer = struct {
                 },
                 .dimension = .D2,
                 .size = .{
-                    .width = @intCast(width),
-                    .height = @intCast(height),
+                    .width = @intCast(dims.width()),
+                    .height = @intCast(dims.height()),
                     .depth_or_array_layers = 1,
                 },
                 .format = .RGBA32Uint,
@@ -216,8 +216,8 @@ const Computer = struct {
             },
             .dimension = .D2,
             .size = .{
-                .width = @intCast(width),
-                .height = @intCast(height),
+                .width = @intCast(dims.width()),
+                .height = @intCast(dims.height()),
                 .depth_or_array_layers = 1,
             },
             .format = .RGBA8Unorm,
@@ -250,7 +250,7 @@ const Computer = struct {
         });
     }
 
-    fn render(self: Computer, uniform_stuff: UniformStuff, encoder: wgpu.CommandEncoder, target: wgpu.TextureView) !void {
+    fn render(self: Computer, uniform_stuff: UniformStuff, map: Map, encoder: wgpu.CommandEncoder, target: wgpu.TextureView) !void {
         _ = target;
 
         const compute_pass = try encoder.begin_compute_pass(.{
@@ -260,12 +260,12 @@ const Computer = struct {
         compute_pass.set_pipeline(self.pipeline);
         compute_pass.set_bind_group(0, uniform_stuff.bg_uniform, null);
         compute_pass.set_bind_group(1, self.geometry_bg, null);
+        compute_pass.set_bind_group(2, map.map_bg, null);
 
         const dims = try g_state.window.get_size();
-        const wg_sz: [2]usize = .{ 8, 8 };
-        const width = (dims[0] + wg_sz[0] - 1) / wg_sz[0];
-        const height = (dims[1] + wg_sz[1] - 1) / wg_sz[1];
-        compute_pass.dispatch_workgroups(.{ @intCast(width), @intCast(height), 1 });
+        const wg_sz = blas.vec2uz(8, 8);
+        const wg_count = blas.divew(blas.sub(blas.add(dims, wg_sz), blas.vec2uz(1, 1)), wg_sz);
+        compute_pass.dispatch_workgroups(.{ @intCast(wg_count.width()), @intCast(wg_count.height()), 1 });
 
         compute_pass.end();
         compute_pass.release();
@@ -397,15 +397,13 @@ const Visualiser = struct {
             .vertex_buffer = vertex_buffer,
         };
 
-        const dims = try g_state.window.get_size();
-        try ret.resize(dims[0], dims[1]);
+        try ret.resize(try g_state.window.get_size());
 
         return ret;
     }
 
-    fn resize(self: *Visualiser, width: usize, height: usize) !void {
-        _ = width;
-        _ = height;
+    fn resize(self: *Visualiser, dims: blas.Vec2uz) !void {
+        _ = dims;
 
         if (self.texture_bg.handle != null) {
             self.texture_bg.release();
@@ -433,20 +431,6 @@ const Visualiser = struct {
                 },
             },
         });
-
-        // const texture_data = try alloc.alloc(u8, 640 * 360 * 4);
-        // defer alloc.free(texture_data);
-        // g_state.queue.write_texture(.{
-        //     .texture = texture,
-        // }, texture_data, .{
-        //     .width = 640,
-        //     .height = 360,
-        //     .depth_or_array_layers = 1,
-        // }, .{
-        //     .offset = 0,
-        //     .rows_per_image = 360,
-        //     .bytes_per_row = 640 * 4,
-        // });
 
         self.texture_bg = bg_textures;
     }
@@ -485,8 +469,9 @@ pub fn main() !void {
     g_state = try State.init(alloc);
     defer g_state.deinit();
 
+    const map = try Map.init(alloc);
     const uniform_stuff = try UniformStuff.init();
-    var computer = try Computer.init(alloc, uniform_stuff);
+    var computer = try Computer.init(uniform_stuff, map, alloc);
     var visualiser = try Visualiser.init(uniform_stuff, &computer, alloc);
 
     var uniforms: NewUniforms = .{};
@@ -506,12 +491,12 @@ pub fn main() !void {
                 sdl.c.SDL_EVENT_QUIT => break :outer,
                 sdl.c.SDL_EVENT_WINDOW_RESIZED => {
                     const event = ev.window;
-                    const dims: [2]usize = .{ @intCast(event.data1), @intCast(event.data2) };
+                    const dims = blas.vec2uz(@intCast(event.data1), @intCast(event.data2));
 
                     uniforms.resize(dims);
-                    try g_state.resize(dims[0], dims[1]);
-                    try computer.resize(dims[0], dims[1]);
-                    try visualiser.resize(dims[0], dims[1]);
+                    try g_state.resize(dims);
+                    try computer.resize(dims);
+                    try visualiser.resize(dims);
                 },
                 sdl.c.SDL_EVENT_KEY_DOWN => {
                     switch (ev.key.key) {
@@ -547,7 +532,7 @@ pub fn main() !void {
         const command_encoder = try g_state.device.create_command_encoder(null);
         // std.log.debug("command_encoder: {p}", .{command_encoder.handle.?});
 
-        try computer.render(uniform_stuff, command_encoder, current_texture_view);
+        try computer.render(uniform_stuff, map, command_encoder, current_texture_view);
         try visualiser.render(uniform_stuff, command_encoder, current_texture_view);
 
         current_texture_view.release();

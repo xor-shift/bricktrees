@@ -89,12 +89,27 @@ pub const Entry = struct {
     binding: u32,
     visibility: ShaderStage,
     layout: BindingLayout,
+    /// this value being != `null` indicates an array binding type
+    count: ?usize = null,
 
-    pub fn get(self: Entry) Entry.NativeType {
+    pub fn get(self: Entry, helper: *ConversionHelper) Entry.NativeType {
         var ret: Entry.NativeType = .{
+            .nextInChain = null,
             .binding = self.binding,
             .visibility = auto.get_flags(self.visibility),
         };
+
+        if (self.count) |count| {
+            const extras = helper.create(c.WGPUBindGroupLayoutEntryExtras);
+            extras.* = .{
+                .chain = .{
+                    .next = null,
+                    .sType = c.WGPUSType_BindGroupLayoutEntryExtras,
+                },
+                .count = @intCast(count),
+            };
+            ret.nextInChain = &extras.chain;
+        }
 
         switch (self.layout) {
             .Buffer => |v| ret.buffer = v.get(),
@@ -117,7 +132,7 @@ pub const Descriptor = struct {
         return .{
             .nextInChain = null,
             .entryCount = self.entries.len,
-            .entries = helper.array_helper(false, Entry, self.entries),
+            .entries = helper.array_helper(true, Entry, self.entries),
         };
     }
 };
