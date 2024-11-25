@@ -83,6 +83,7 @@ pub fn resize(self: *State, dims: blas.Vec2uz) !void {
         .view_formats = &.{.BGRA8UnormSrgb},
         .width = @intCast(dims.width()),
         .height = @intCast(dims.height()),
+        .present_mode = .Fifo,
     });
 
     try self.window.resize(dims);

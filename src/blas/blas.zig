@@ -52,6 +52,7 @@ pub fn Matrix(comptime T: type, comptime Rows: usize, comptime Cols: usize) type
         // zig fmt: off
         pub fn width(self: Self) T { return self.el[0]; }
         pub fn height(self: Self) T { return self.el[1]; }
+        pub fn depth(self: Self) T { return self.el[2]; }
         pub fn x(self: Self) T { return self.el[0]; }
         pub fn y(self: Self) T { return self.el[1]; }
         pub fn z(self: Self) T { return self.el[2]; }

@@ -8,10 +8,13 @@ const Self = @This();
 dims: blas.Vec2uz = blas.explode(usize, 2, 0),
 fov: f64 = std.math.pi / 6.0 * 2.0,
 
-// location: blas.Vec3d = blas.explode(f64, 3, 0),
-// rotation: blas.Vec3d = blas.explode(f64, 3, 0),
-location: blas.Vec3d = blas.vec3d(-17.86689026827083, 49.50384779276, -35.692589014885414),
-rotation: blas.Vec3d = blas.vec3d(0.6079563561113581, 0.6195918844579866, 0),
+display_mode: u32 = 0,
+debug_capture_point: u32 = 0,
+
+location: blas.Vec3d = blas.explode(f64, 3, 0),
+rotation: blas.Vec3d = blas.explode(f64, 3, 0),
+// location: blas.Vec3d = blas.vec3d(-17.86689026827083, 49.50384779276, -35.692589014885414),
+// rotation: blas.Vec3d = blas.vec3d(0.6079563561113581, 0.6195918844579866, 0),
 // location: blas.Vec3d = blas.vec3d(7.9545981307778195, 6.059075793279358, 7.151635256867796),
 // rotation: blas.Vec3d = blas.vec3d(-0.42962824881448974, 0.31153445378859734, 0),
 
@@ -22,10 +25,11 @@ pub const Serialized = extern struct {
     width: u32,
     height: u32,
     fov: f32,
-    _padding_0: [1]u32 = undefined,
+    display_mode: u32,
 
     location: [3]f32,
-    _padding_1: f32 = undefined,
+
+    debug_capture_point: u32,
 
     rotation_matrix: [16]f32,
 };
@@ -34,15 +38,14 @@ pub fn serialize(self: Self) Serialized {
     const transform = blas.rotation_matrix_3d_affine(f64, self.rotation.el[0], self.rotation.el[1], self.rotation.el[2]).lossy_cast(f32);
     // const transform = blas.identity(f32, 4);
 
-    std.log.debug("@ {d}, {d}, {d}; rot: {d}, {d}, {d}", .{
-        self.location.el[0], self.location.el[1], self.location.el[2],
-        self.rotation.el[0], self.rotation.el[1], self.rotation.el[2],
-    });
-
     return .{
         .width = @intCast(self.dims.width()),
         .height = @intCast(self.dims.height()),
         .fov = @floatCast(self.fov),
+
+        .display_mode = self.display_mode,
+        .debug_capture_point = self.debug_capture_point,
+
         .location = self.location.lossy_cast(f32).el,
         .rotation_matrix = transform.el,
     };
@@ -82,7 +85,7 @@ pub fn pre_frame(self: *Self, delta_ms: f64) void {
     };
 
     // units per second
-    const velocity: f64 = if (sdl.get_key_status(sdl.c.SDLK_LCTRL)) 15 else 7.5;
+    const velocity: f64 = if (sdl.get_key_status(sdl.c.SDLK_LCTRL)) 100.0 else 7.5;
 
     var direction = blas.vec3d(0, 0, 0);
 
@@ -117,10 +120,32 @@ pub fn event(self: *Self, ev: sdl.c.SDL_Event) void {
         sdl.c.SDL_EVENT_KEY_DOWN => {
             const key_event = ev.key;
 
-            if (key_event.key == sdl.c.SDLK_ESCAPE) {
-                self.capturing_mouse = false;
-                sdl.set_cursor_visibility(true) catch {};
+            switch (key_event.key) {
+                sdl.c.SDLK_ESCAPE => {
+                    self.capturing_mouse = false;
+                    sdl.set_cursor_visibility(true) catch {};
+                },
+
+                sdl.c.SDLK_R => self.display_mode += 1,
+                sdl.c.SDLK_F => if (self.display_mode != 0) {
+                    self.display_mode -= 1;
+                },
+                sdl.c.SDLK_T => self.debug_capture_point += 1,
+                sdl.c.SDLK_G => if (self.debug_capture_point != 0) {
+                    self.debug_capture_point -= 1;
+                },
+
+                sdl.c.SDLK_F3 => {},
+
+                else => {},
             }
+            std.log.debug("position: {d}, {d}, {d}", .{
+                self.location.el[0], self.location.el[1], self.location.el[2],
+            });
+            std.log.debug("rotation: {d}, {d}, {d}", .{
+                self.rotation.el[0], self.rotation.el[1], self.rotation.el[2],
+            });
+            std.log.debug("display mode: {d} at depth {d}", .{ self.display_mode, self.debug_capture_point });
         },
         sdl.c.SDL_EVENT_MOUSE_MOTION => {
             const motion_event = ev.motion;

@@ -549,7 +549,7 @@ pub fn main() !void {
         const frame_time = @as(f64, @floatFromInt(frame_timer.lap())) / @as(f64, @floatFromInt(std.time.ns_per_ms));
 
         ms_spent_last_frame = frame_time + inter_frame_time;
-        std.log.debug("{d}ms between frames, {d}ms during frame", .{ inter_frame_time, frame_time });
+        // std.log.debug("{d}ms between frames, {d}ms during frame", .{ inter_frame_time, frame_time });
     }
 }
 
