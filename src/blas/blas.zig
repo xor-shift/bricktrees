@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = std.builtin;
 
 pub usingnamespace @import("defns.zig");
 pub usingnamespace @import("special_mat.zig");
@@ -32,6 +33,13 @@ pub fn Traits(comptime Mat: type) type {
 
 pub fn Matrix(comptime T: type, comptime Rows: usize, comptime Cols: usize) type {
     return struct {
+        pub fn format(value: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = value;
+            _ = fmt;
+            _ = options;
+            _ = writer;
+        }
+
         const Self = @This();
 
         pub const ValueType = T;
@@ -138,20 +146,20 @@ pub fn mulmm(lhs: anytype, rhs: anytype) Traits(@TypeOf(lhs)).Resize(@TypeOf(lhs
 
 test "matrix multiplication" {
     const lhs: Matrix(u32, 2, 3) = .{ .el = .{
-        .{ 1, 2, 3 },
-        .{ 4, 5, 6 },
+        1, 2, 3,
+        4, 5, 6,
     } };
 
     const rhs: Matrix(u32, 3, 2) = .{ .el = .{
-        .{ 1, 2 },
-        .{ 3, 4 },
-        .{ 5, 6 },
+        1, 2,
+        3, 4,
+        5, 6,
     } };
 
     const res: Matrix(u32, 2, 2) = mulmm(lhs, rhs);
     const expected: Matrix(u32, 2, 2) = .{ .el = .{
-        .{ 22, 28 },
-        .{ 49, 64 },
+        22, 28,
+        49, 64,
     } };
     try std.testing.expectEqual(expected, res);
 }
@@ -200,6 +208,75 @@ pub fn normalized(mat: anytype) Traits(@TypeOf(mat)).EquivMat {
 
     for (0..MatTraits.rows) |row| for (0..MatTraits.cols) |col| {
         ret.set(row, col, mat.get(row, col) / len);
+    };
+
+    return ret;
+}
+
+pub fn reduce(vec: anytype, op: builtin.ReduceOp) @TypeOf(vec).ValueType {
+    const Vec = @TypeOf(vec);
+    const T = Vec.ValueType;
+
+    if (Vec.cols != 1) {
+        @compileError("only vectors can be reduced");
+    }
+
+    const is_int = @typeInfo(T) == .Int;
+    const is_float = @typeInfo(T) == .Float;
+
+    if (!is_int and !is_float) {
+        @compileError("only vectors with a ValueType that is either a float or an integer can be reduced");
+    }
+
+    const identity: T = switch (op) {
+        .And => if (is_int) std.math.maxInt(T) else @compileError("a reduction with .And can only be done on vectors with a ValueType that is an integer"),
+        .Or => if (is_int) 0 else @compileError("a reduction with .Or can only be done on vectors with a ValueType that is an integer"),
+        .Xor => if (is_int) 0 else @compileError("a reduction with .Xor can only be done on vectors with a ValueType that is an integer"),
+        .Min => if (is_int) std.math.maxInt(T) else std.math.inf(T),
+        .Max => if (is_int) std.math.minInt(T) else -std.math.inf(T),
+        .Add => 0,
+        .Mul => 1,
+    };
+
+    var ret: T = identity;
+    for (0..Vec.rows) |i| ret = switch (op) {
+        .And => ret & vec.get(0, i),
+        .Or => ret | vec.get(0, i),
+        .Xor => ret ^ vec.get(0, i),
+        .Min => @min(ret, vec.get(0, i)),
+        .Max => @max(ret, vec.get(0, i)),
+        .Add => ret + vec.get(0, i),
+        .Mul => ret * vec.get(0, i),
+    };
+
+    return ret;
+}
+
+pub fn less_than(lhs: anytype, rhs: @TypeOf(lhs)) Traits(@TypeOf(lhs)).Rebind(bool) {
+    const Mat = @TypeOf(lhs);
+    const Rebound = Traits(Mat).Rebind(bool);
+
+    var ret: Rebound = undefined;
+
+    for (0..Mat.rows) |row| for (0..Mat.cols) |col| {
+        const lhs_val = lhs.get(row, col);
+        const rhs_val = rhs.get(row, col);
+        ret.set(row, col, lhs_val < rhs_val);
+    };
+
+    return ret;
+}
+
+pub fn all(mat: anytype) bool {
+    const Mat = @TypeOf(mat);
+
+    if (Mat.ValueType != bool) {
+        @compileError("all(mat: Mat) can only be called for all Mat where Mat.ValueType == bool");
+    }
+
+    var ret = true;
+    for (0..Mat.rows) |row| for (0..Mat.cols) |col| {
+        ret = ret and mat.get(row, col);
     };
 
     return ret;

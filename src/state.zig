@@ -33,13 +33,11 @@ pub fn init(alloc: std.mem.Allocator) !State {
 
     const window = try sdl.Window.init("Test", 1280, 720);
     const surface = try window.get_surface(instance);
-    std.log.debug("surface: {?p}", .{surface.handle});
 
     const adapter = try instance.request_adapter_sync(.{
         .compatible_surface = surface,
         .backend_type = .Vulkan,
     });
-    std.log.debug("adapter: {?p}", .{adapter.handle});
 
     const device = try adapter.request_device_sync(.{
         .label = "device",
@@ -47,10 +45,8 @@ pub fn init(alloc: std.mem.Allocator) !State {
             wgpu.FeatureName.BGRA8UnormStorage,
         },
     });
-    std.log.debug("device: {?p}", .{device.handle});
 
     const queue = try device.get_queue();
-    std.log.debug("queue: {?p}", .{queue.handle});
 
     var ret: State = .{
         .alloc = alloc,

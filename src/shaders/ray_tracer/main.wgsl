@@ -24,10 +24,12 @@ struct Ray {
 };
 
 struct Intersection {
-    color: vec3<f32>,
     voxel_coords: vec3<u32>,
     local_coords: vec3<f32>,
-    distance: f32,
+    material: u32,
+    chunkmap_iterations: u32,
+    mipmap_iterations: u32,
+    voxel_iterations: u32,
 };
 
 fn generate_ray_basic(pixel: vec2<u32>) -> vec3<f32> {
@@ -62,35 +64,9 @@ fn slab(origin: vec3<f32>, direction: vec3<f32>, min: vec3<f32>, max: vec3<f32>,
     return t_min <= t_max;
 }
 
+const sentinel_chunk_id = 255u;
 const chunk_sz: vec3<i32> = vec3<i32>(64);
 const chunkmap_offset: vec3<i32> = vec3<i32>(-2);
-
-fn get_debug_color(v: u32) -> vec3<f32> {
-    var colors = array<vec3<f32>, 7>(
-        // vec3<f32>(0, 0, 0),
-        vec3<f32>(1, 0, 0),
-        vec3<f32>(0, 1, 0),
-        vec3<f32>(1, 1, 0),
-        vec3<f32>(0, 0, 1),
-        vec3<f32>(1, 0, 1),
-        vec3<f32>(0, 1, 1),
-        vec3<f32>(1, 1, 1),
-    );
-
-    return colors[v % 7];
-}
-
-fn debug_vec(ident: u32, value: vec3<f32>, iteration: u32, out_isection: ptr<function, Intersection>) -> bool {
-    if (uniforms.display_mode != ident) { return false; }
-    if (uniforms.debug_capture_point != iteration) { return false; }
-
-    (*out_isection).color = value;
-
-    return true;
-}
-
-fn debug_bool(ident: u32, value: bool, iteration: u32, out_isection: ptr<function, Intersection>) -> bool { return debug_vec(ident, vec3<f32>(select(0., 1., value)), iteration, out_isection); }
-fn debug_u32(ident: u32, value: u32, iteration: u32, out_isection: ptr<function, Intersection>) -> bool { return debug_vec(ident, vec3<f32>(get_debug_color(value)), iteration, out_isection); }
 
 /// adjusts the ray such that it is (at worst, barely) inside the chunkmap
 fn prepare_ray(ray: Ray, out_ray: ptr<function, Ray>) -> bool {
@@ -154,19 +130,50 @@ fn get_material(chunk_index: u32, cl_coords: vec3<i32>) -> u32 {
     ), chunk_index, 0).x;
 }
 
+fn mipmap_indices(cl_voxel_coords: vec3<u32>) -> array<u32, 5> {
+    var ret: array<u32, 5>;
+
+    // short name
+    let v = cl_voxel_coords;
+
+    var mip_offset = 0u;
+    for (var i = 0u; i < 5u; i++) {
+        let shift = 5 - i;
+
+        let level_x = (v.x >> shift);
+        let level_y = (v.y >> shift);
+        let level_z = (v.z >> shift);
+
+        let level_offset =
+            (level_z << ((i + 1) * 2)) |
+            (level_y << (i + 1)) |
+            level_x;
+
+        ret[i] = mip_offset + level_offset;
+
+        let local_mip_offset = 1u << (i * 3u + 3u);
+
+        mip_offset += local_mip_offset;
+    }
+
+    return ret;
+}
+
 struct StackElement {
     continue_at: vec3<i32>,
     should_break_out: bool,
 }
 
-const do_debug: bool = false;
-
 fn intersect_new(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
     let chunkmap_sz = vec3<i32>(textureDimensions(chunkmap));
 
+    (*out_isection).chunkmap_iterations = 0u;
+    (*out_isection).mipmap_iterations = 0u;
+    (*out_isection).voxel_iterations = 0u;
+
     var ray: Ray;
     if (!prepare_ray(ray_arg, &ray)) {
-        if (do_debug) { debug_bool(1u, true, 0u, out_isection); }
+        if (do_debug) { debug_bool(5u, true, 0u, out_isection); }
         return false;
     }
 
@@ -174,7 +181,9 @@ fn intersect_new(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> boo
         vec3<i32>(-1), vec3<i32>(1),
         ray.direction >= vec3<f32>(0),
     ));
-    if (do_debug && debug_vec(2u, vec3<f32>(iteration_direction + vec3<i32>(1)) / 2, 0u, out_isection)) { return false; }
+    if (do_debug) {
+        if (debug_vec(6u, vec3<f32>(iteration_direction + vec3<i32>(1)) / 2, 0u, out_isection)) { return false; }
+    }
 
     var cml_point = ray.origin - vec3<f32>(chunk_sz * chunkmap_offset);
     var chunk_index: u32;
@@ -195,23 +204,27 @@ fn intersect_new(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> boo
         iter += 1u;
         //if (iter == 255u) { return false; }
 
+        if (level == 1u)      { (*out_isection).chunkmap_iterations += 1u; }
+        else if (level == 7u) { (*out_isection).mipmap_iterations += 1u;   }
+        else                  { (*out_isection).voxel_iterations += 1u;    }
+
         let frame = stack[level - 1u];
 
         if (frame.should_break_out) { level -= 1u; continue; }
 
-        let box_coord = frame.continue_at;
+        let cml_box_coord = frame.continue_at;
         let box_size = box_size_at_level(level);
-        let box_origin = box_coord * box_size;
+        let box_origin = cml_box_coord * box_size;
         let bl_point = cml_point - vec3<f32>(box_origin);
         var t_delta: f32;
         let shortest_axis = get_shortest_axis(ray.direction, vec3<f32>(box_size), bl_point, iteration_direction, &t_delta);
-        let next_box_coord = iteration_direction * shortest_axis + box_coord;
+        let next_cml_box_coord = iteration_direction * shortest_axis + cml_box_coord;
         let next_cml_point = cml_point + t_delta * ray.direction * 1.00001;
         var should_break_out: bool; if (level == 1u) {
-            should_break_out = any(next_box_coord < vec3<i32>(0)) || any(next_box_coord >= chunkmap_sz);
+            should_break_out = any(next_cml_box_coord < vec3<i32>(0)) || any(next_cml_box_coord >= chunkmap_sz);
         } else {
-            let cur_even = (box_coord % 2) == vec3<i32>(0);
-            let next_even = (next_box_coord % 2) == vec3<i32>(0);
+            let cur_even = (cml_box_coord % 2) == vec3<i32>(0);
+            let next_even = (next_cml_box_coord % 2) == vec3<i32>(0);
             let comparison_typ = iteration_direction == vec3<i32>(1);
             let regular_result = !cur_even && next_even;
             let inverted_result = cur_even && !next_even;
@@ -221,70 +234,50 @@ fn intersect_new(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> boo
 
         if (do_debug) {
             if (debug_vec(1u, cml_point / 64., iter, out_isection)) { return false; }
-            if (debug_vec(2u, vec3<f32>(box_coord) / 8., iter, out_isection)) { return false; }
+            if (debug_vec(2u, vec3<f32>(cml_box_coord) / 8., iter, out_isection)) { return false; }
             if (debug_vec(3u, vec3<f32>(box_origin) / 256., iter, out_isection)) { return false; }
             if (debug_vec(4u, vec3<f32>(bl_point) / f32(box_size), iter, out_isection)) { return false; }
-            if (debug_vec(5u, vec3<f32>(shortest_axis), iter, out_isection)) { return false; }
-            if (debug_bool(6u, should_break_out, iter, out_isection)) { return false; }
-            if (debug_vec(7u, next_cml_point / 64., iter, out_isection)) { return false; }
-            if (debug_vec(8u, vec3<f32>(next_box_coord) / 8., iter, out_isection)) { return false; }
+            if (debug_u32(5u, chunk_index, iter, out_isection)) { return false; }
+            if (debug_vec(6u, vec3<f32>(shortest_axis), iter, out_isection)) { return false; }
+            if (debug_bool(7u, should_break_out, iter, out_isection)) { return false; }
+            if (debug_vec(8u, next_cml_point / 64., iter, out_isection)) { return false; }
+            if (debug_vec(9u, vec3<f32>(next_cml_box_coord) / 8., iter, out_isection)) { return false; }
         }
 
         var recurse: bool; if (level == 1u) {
-            chunk_index = textureLoad(chunkmap, box_coord, 0).x;
-            recurse = chunk_index != 0;
+            chunk_index = textureLoad(chunkmap, cml_box_coord, 0).x;
+            recurse = chunk_index != sentinel_chunk_id;
         } else if (level == 7u) {
             recurse = false;
-            let material = get_material(chunk_index - 1u, box_coord % 64);
-            // if (debug_u32(9u, material, iter, out_isection)) { return false; }
+            let material = get_material(chunk_index, cml_box_coord % 64);
             if (material != 0u) {
-                (*out_isection).color = bl_point;
+                (*out_isection).voxel_coords = vec3<u32>(cml_box_coord);
+                (*out_isection).local_coords = bl_point;
+                (*out_isection).material = material;
                 return true;
             }
         } else {
-            let cl_voxel_coord = box_coord % 64;
-            var cl_mip_indices = array<i32, 5>(
-                  ((cl_voxel_coord.z & 0x20) >> 3)
-                | ((cl_voxel_coord.y & 0x20) >> 4)
-                | ((cl_voxel_coord.x & 0x20) >> 5)
-                , ((cl_voxel_coord.z & 0x10) >> 2)
-                | ((cl_voxel_coord.y & 0x10) >> 3)
-                | ((cl_voxel_coord.x & 0x10) >> 4)
-                , ((cl_voxel_coord.z & 0x08) >> 1)
-                | ((cl_voxel_coord.y & 0x08) >> 2)
-                | ((cl_voxel_coord.x & 0x08) >> 3)
-                , ((cl_voxel_coord.z & 0x04)     )
-                | ((cl_voxel_coord.y & 0x04) >> 1)
-                | ((cl_voxel_coord.x & 0x04) >> 2)
-                , ((cl_voxel_coord.z & 0x02) << 1)
-                | ((cl_voxel_coord.y & 0x02)     )
-                | ((cl_voxel_coord.x & 0x02) >> 1)
-             // , ((cl_voxel_coord.z & 0x01) << 2)
-             // | ((cl_voxel_coord.y & 0x01) << 1)
-             // | ((cl_voxel_coord.x & 0x01)     )
-            );
-            // if (debug_u32(3u, u32(cl_mip_indices[1]), no_iterations, out_isection)) { return false; }
+            var indices = mipmap_indices(vec3<u32>(box_origin) % 64);
+            let mipmap_index = indices[level - 2u];
 
-            let mip_level = level - 2u;
-            var global_offset = 0u;
-            for (var i = 0u; i < mip_level; i++) {
-                global_offset += u32(cl_mip_indices[i]);
-                if (i == 0u) { global_offset += 1u; }
-                else         { global_offset += 8u <<i; }
-            }
             let mip_byte = textureLoad(chunk_mipmaps, vec2<u32>(
-                global_offset, chunk_index - 1u,
+                mipmap_index / 8u, chunk_index,
             ), 0).x;
-            let local_offset = u32(cl_mip_indices[mip_level]);
-            let mip_valid = ((mip_byte >> local_offset) & 1) != 0;
+
+            if (do_debug && debug_bool(9u, (mipmap_index / 8u) == 1u, iter, out_isection)) { return false; }
+
+            let mip_valid = ((mip_byte >> (mipmap_index % 8u)) & 1u) != 0u;
+            //let mip_valid = mip_byte != 0u;
+
+            if (do_debug && debug_bool(10u, mip_valid, iter, out_isection)) { return false; }
 
             recurse = mip_valid;
         }
 
-        stack[level - 1u] = StackElement(next_box_coord, should_break_out);
+        stack[level - 1u] = StackElement(next_cml_box_coord, should_break_out);
 
         if (do_debug) {
-            if (debug_bool(9u, recurse, iter, out_isection)) { return false; }
+            if (debug_bool(15u, recurse, iter, out_isection)) { return false; }
         }
 
         if (!recurse) {
@@ -297,7 +290,7 @@ fn intersect_new(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> boo
 
         let next_box_size = box_size_at_level(level + 1u);
         stack[level] = StackElement(
-            box_coord * box_size / next_box_size + clamp(vec3<i32>(floor(bl_point / vec3<f32>(box_size) * 2)), vec3<i32>(0), vec3<i32>(1)),
+            cml_box_coord * box_size / next_box_size + clamp(vec3<i32>(floor(bl_point / vec3<f32>(box_size) * 2)), vec3<i32>(0), vec3<i32>(1)),
             false,
         );
         level += 1u;
@@ -336,10 +329,29 @@ fn intersect_new(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> boo
     var intersection: Intersection;
     let res = intersect_new(ray, &intersection);
 
-    if (uniforms.display_mode == 0u) {
-        textureStore(texture_radiance, pixel, vec4<f32>(vec3<f32>(select(0., 1., res)), 1.));
+    var color_to_write: vec3<f32>;
+
+    let min_iter = 0u;
+    let min_color = vec3<f32>(0., 1., 0.);
+    let max_iter = 150u;
+    let max_color = vec3<f32>(1., 0., 0.);
+    let iter_sum = intersection.chunkmap_iterations + intersection.mipmap_iterations + intersection.voxel_iterations;
+    let iter_param = f32(clamp(iter_sum, min_iter, max_iter) - min_iter) / f32(max_iter - min_iter);
+    let iter_color = (min_color * (1. - iter_param)) + (max_color * iter_param);
+
+    if (uniforms.debug_capture_point == 0u) {
+        switch (uniforms.display_mode) {
+            case 0u: { color_to_write = vec3<f32>(select(0., 1., res)); }
+            case 1u: { color_to_write = intersection.local_coords; }
+            case 2u: { color_to_write = vec3<f32>(intersection.voxel_coords % 64) / 64; }
+            case 3u: { color_to_write = get_debug_color(intersection.material); }
+            case 4u: { color_to_write = iter_color; }
+            default: { color_to_write = intersection.local_coords; }
+        }
     } else {
-        textureStore(texture_radiance, pixel, vec4<f32>(intersection.color, 1.));
+        color_to_write = intersection.local_coords;
     }
+
+    textureStore(texture_radiance, pixel, vec4<f32>(color_to_write, 1.));
 }
 

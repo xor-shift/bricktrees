@@ -74,7 +74,6 @@ const UniformStuff = struct {
             },
             .size = @sizeOf(NewUniforms.Serialized),
         });
-        std.log.debug("buffer: {?p}", .{buffer.handle});
 
         const bg_uniform = try g_state.device.create_bind_group(.{
             .label = "test bg",
@@ -112,7 +111,7 @@ const Computer = struct {
     radiance_texture_view: wgpu.TextureView = .{},
 
     fn init(uniform_stuff: UniformStuff, map: Map, alloc: std.mem.Allocator) !Computer {
-        const shader = try g_state.device.create_shader_module_wgsl_from_file("compute shader", "src/compute.wgsl", alloc);
+        const shader = try g_state.device.create_shader_module_wgsl_from_file("compute shader", "run/shaders/ray_tracer.wgsl", alloc);
 
         const geometry_bgl = try g_state.device.create_bind_group_layout(.{
             .label = "compute geometry bgl",
@@ -157,14 +156,12 @@ const Computer = struct {
             .label = "visualiser pipeline layout",
             .bind_group_layouts = &.{ uniform_stuff.bgl_uniform, geometry_bgl, map.map_bgl },
         });
-        std.log.debug("compute pipeline_layout: {?p}", .{pipeline_layout.handle});
 
         const pipeline = try g_state.device.create_compute_pipeline(.{ .label = "compute pipeline", .layout = pipeline_layout, .compute = .{
             .module = shader,
             .entry_point = "cs_main",
             .constants = &.{},
         } });
-        std.log.debug("compute pipeline: {?p}", .{pipeline.handle});
 
         var ret: Computer = .{
             .shader = shader,
@@ -199,11 +196,9 @@ const Computer = struct {
                 .sampleCount = 1,
                 .view_formats = &.{},
             });
-            std.log.debug("compute geometry texture #{d}: {any}", .{ i, self.geometry_textures[i] });
 
             if (self.geometry_texture_views[i].handle != null) self.geometry_texture_views[i].release();
             self.geometry_texture_views[i] = try self.geometry_textures[0].create_view(null);
-            std.log.debug("compute geometry texture view #{d}: {any}", .{ i, self.geometry_texture_views[i] });
         }
 
         if (self.radiance_texture.handle != null) self.radiance_texture.release();
@@ -225,10 +220,8 @@ const Computer = struct {
             .sampleCount = 1,
             .view_formats = &.{},
         });
-        std.log.debug("compute radiance texture: {any}", .{self.radiance_texture});
 
         self.radiance_texture_view = try self.radiance_texture.create_view(null);
-        std.log.debug("compute radiance texture view: {any}", .{self.radiance_texture_view});
 
         self.geometry_bg = try g_state.device.create_bind_group(.{
             .label = "compute bind group",
@@ -287,7 +280,7 @@ const Visualiser = struct {
     vertex_buffer: wgpu.Buffer,
 
     fn init(uniform_stuff: UniformStuff, computer: *Computer, alloc: std.mem.Allocator) !Visualiser {
-        const shader = try g_state.device.create_shader_module_wgsl_from_file("visualiser shader", "src/main.wgsl", alloc);
+        const shader = try g_state.device.create_shader_module_wgsl_from_file("visualiser shader", "run/shaders/visualiser.wgsl", alloc);
 
         const bgl_textures = try g_state.device.create_bind_group_layout(.{
             .label = "textures' bgl",
@@ -339,7 +332,6 @@ const Visualiser = struct {
             .label = "visualiser pipeline layout",
             .bind_group_layouts = &.{ uniform_stuff.bgl_uniform, bgl_textures },
         });
-        std.log.debug("visualiser pipeline_layout: {?p}", .{pipeline_layout.handle});
 
         const render_pipeline = try g_state.device.create_render_pipeline(.{
             .label = "visulaiser pipeline",
@@ -363,7 +355,6 @@ const Visualiser = struct {
                 .topology = .TriangleList,
             },
         });
-        std.log.debug("visualiser pipeline: {?p}", .{render_pipeline.handle});
 
         const sampler = try g_state.device.create_sampler(.{});
 
@@ -444,7 +435,6 @@ const Visualiser = struct {
                 .clear_value = .{ .r = 0.0, .g = 0.0, .b = 0.5, .a = 1.0 },
             }},
         });
-        // std.log.debug("render_pass: {p}", .{render_pass.handle.?});
 
         render_pass.set_pipeline(self.render_pipeline);
         render_pass.set_vertex_buffer(0, self.vertex_buffer, 0, @sizeOf(Vertex) * 6);
@@ -469,7 +459,9 @@ pub fn main() !void {
     g_state = try State.init(alloc);
     defer g_state.deinit();
 
-    const map = try Map.init(alloc);
+    var map = try Map.init(alloc);
+    defer map.deinit();
+
     const uniform_stuff = try UniformStuff.init();
     var computer = try Computer.init(uniform_stuff, map, alloc);
     var visualiser = try Visualiser.init(uniform_stuff, &computer, alloc);
@@ -512,6 +504,7 @@ pub fn main() !void {
             }
         }
 
+        map.pre_frame(ms_spent_last_frame);
         uniforms.pre_frame(ms_spent_last_frame);
 
         const current_texture = g_state.surface.get_current_texture() catch |e| {
@@ -522,15 +515,12 @@ pub fn main() !void {
                 return e;
             }
         };
-        // std.log.debug("current_texture: {p}, (suboptimal: {d})", .{ current_texture.texture.handle.?, @intFromBool(current_texture.suboptimal) });
 
         const current_texture_view = try current_texture.texture.create_view(.{
             .label = "current render texture view",
         });
-        // std.log.debug("current_texture_view: {p}", .{current_texture_view.handle.?});
 
         const command_encoder = try g_state.device.create_command_encoder(null);
-        // std.log.debug("command_encoder: {p}", .{command_encoder.handle.?});
 
         try computer.render(uniform_stuff, map, command_encoder, current_texture_view);
         try visualiser.render(uniform_stuff, command_encoder, current_texture_view);
