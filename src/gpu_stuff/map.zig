@@ -1,7 +1,11 @@
 const std = @import("std");
 
-const blas = @import("blas/blas.zig");
-const wgpu = @import("wgpu/wgpu.zig");
+const blas = @import("../blas/blas.zig");
+const wgpu = @import("../wgpu/wgpu.zig");
+
+const Chunk = @import("../ctf_2fort/chunk.zig");
+
+const g_state = &@import("../main.zig").g_state;
 
 const Self = @This();
 
@@ -18,34 +22,7 @@ const GPUChunk = struct {
     coords: blas.Vec3z,
     invalidated: bool = false,
 
-    voxels: []u32 = &.{},
-    mip: []u8 = &.{},
-
-    fn mipmap_indices(coords: blas.Vec3uz) [5]usize {
-        var ret: [5]usize = undefined;
-
-        var mip_offset: usize = 0;
-        for (0..5) |i| {
-            const shift = 5 - i;
-
-            const level_x = (coords.x() >> @as(u6, @intCast(shift)));
-            const level_y = (coords.y() >> @as(u6, @intCast(shift)));
-            const level_z = (coords.z() >> @as(u6, @intCast(shift)));
-
-            const level_offset =
-                (level_z << @as(u6, @intCast((i + 1) * 2))) |
-                (level_y << @as(u6, @intCast(i + 1))) |
-                level_x;
-
-            ret[i] = mip_offset + level_offset;
-
-            const local_mip_offset = @as(usize, 1) << @as(u6, @intCast(i * 3 + 3));
-
-            mip_offset += local_mip_offset;
-        }
-
-        return ret;
-    }
+    inner: Chunk,
 
     pub fn get_mipmap_texture_size() usize {
         var no_elems: usize = 0;
@@ -56,7 +33,6 @@ const GPUChunk = struct {
     const mipmap_texture_size = get_mipmap_texture_size();
 
     fn create_chunk_store_texture() wgpu.Error!wgpu.Texture {
-        const g_state = &@import("main.zig").g_state;
         return try g_state.device.create_texture(.{
             .label = "chunk store texture for chunk type 0",
             .usage = .{
@@ -77,7 +53,6 @@ const GPUChunk = struct {
     }
 
     fn create_mipmap_store_texture() wgpu.Error!wgpu.Texture {
-        const g_state = &@import("main.zig").g_state;
         return try g_state.device.create_texture(.{
             .label = "mipmap texture",
             .usage = .{
@@ -99,30 +74,24 @@ const GPUChunk = struct {
     }
 
     fn deinit(self: GPUChunk, alloc: std.mem.Allocator) void {
-        alloc.free(self.voxels);
-        alloc.free(self.mip);
+        self.inner.deinit(alloc);
     }
 
     fn init(alloc: std.mem.Allocator, global_chunk_coord: blas.Vec3z) !GPUChunk {
         const ret: GPUChunk = .{
             .coords = global_chunk_coord,
             .invalidated = false,
-            .voxels = try alloc.alloc(u32, blas.reduce(constants.chunk_dims, .Mul)),
-            .mip = try alloc.alloc(u8, mipmap_texture_size),
+            .inner = try Chunk.init(alloc),
         };
-        @memset(ret.voxels, 0);
-        @memset(ret.mip, 0);
 
         return ret;
     }
 
     fn upload_to_index(self: *GPUChunk, map: Self, index: usize) void {
-        const g_state = &@import("main.zig").g_state;
-
         g_state.queue.write_texture(.{
             .texture = map.chunk_store_texture,
             .origin = .{ .x = 0, .y = 0, .z = @intCast(index) },
-        }, std.mem.sliceAsBytes(self.voxels), .{
+        }, std.mem.sliceAsBytes(self.inner.flat_blocks_slice()), .{
             .width = @intCast(chunk_texture_dims.width()),
             .height = @intCast(chunk_texture_dims.height()),
             .depth_or_array_layers = 1,
@@ -135,7 +104,7 @@ const GPUChunk = struct {
         g_state.queue.write_texture(.{
             .texture = map.mipmap_store_texture,
             .origin = .{ .x = 0, .y = @intCast(index), .z = 0 },
-        }, self.mip, .{
+        }, self.inner.mips.*[0..], .{
             .width = @intCast(mipmap_texture_size),
             .height = 1,
             .depth_or_array_layers = 1,
@@ -151,42 +120,12 @@ const GPUChunk = struct {
     fn set(self: *GPUChunk, local_coords: blas.Vec3uz, material: u32) void {
         self.invalidated = true;
 
-        const idx =
-            local_coords.x() +
-            local_coords.z() * constants.chunk_dims.x() +
-            local_coords.y() * (constants.chunk_dims.x() * constants.chunk_dims.z());
-
-        self.voxels[idx] = material;
-
-        for (mipmap_indices(local_coords)) |level_offset| {
-            const byte_offset = level_offset / 8;
-            const bit_offset = @as(u3, @intCast(level_offset % 8));
-
-            // std.log.debug("setting byte {d}, bit {d}", .{ byte_offset, bit_offset });
-
-            self.mip[byte_offset] |= @as(u8, 1) << bit_offset;
-        }
+        self.inner.set(local_coords, .{
+            .block_id = @intCast(material),
+            .block_state = 0,
+        }, false);
     }
 };
-
-test "mipmap indices" {
-    const table = [_]std.meta.Tuple(&.{ blas.Vec3uz, [5]usize }){
-        .{ blas.vec3uz(0, 0, 0), [5]usize{ 0, 1, 9, 73, 585 } },
-        .{ blas.vec3uz(2, 0, 0), [5]usize{ 0, 1, 9, 73, 586 } },
-    };
-
-    for (0.., table) |i, test_pair| {
-        const coords = test_pair.@"0";
-        const expected = test_pair.@"1";
-        const got = GPUChunk.mipmap_indices(coords);
-        if (!std.mem.eql(usize, &expected, &got)) {
-            std.log.err("test #{d}, coordinates ({d}, {d}, {d}): expected: {any}, got: {any}", .{
-                i,        coords.x(), coords.y(), coords.z(),
-                expected, got,
-            });
-        }
-    }
-}
 
 const Chunkmap = struct {
     origin: blas.Vec3z,
@@ -255,8 +194,6 @@ pub fn set_position(self: *Self, position: blas.Vec3d) !void {
 }
 
 pub fn set_render_distance(self: *Self, render_distance: usize) !void {
-    const g_state = &@import("main.zig").g_state;
-
     if (self.render_distance != 0) {
         self.alloc.free(self.local_chunkmap);
         self.local_chunkmap = undefined;
@@ -324,8 +261,6 @@ pub fn set_render_distance(self: *Self, render_distance: usize) !void {
 }
 
 pub fn init(alloc: std.mem.Allocator) !Self {
-    const g_state = &@import("main.zig").g_state;
-
     const map_bgl = try g_state.device.create_bind_group_layout(.{
         .label = "compute map bgl",
         .entries = &.{
@@ -413,8 +348,6 @@ pub fn deinit(self: *Self) void {
 }
 
 fn upload_chunkmap(self: *Self) void {
-    const g_state = &@import("main.zig").g_state;
-
     const dimensions = get_chunkmap_dimensions(self.render_distance);
 
     self.chunkmap_invalidated = false;

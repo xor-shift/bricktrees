@@ -1,7 +1,9 @@
 const std = @import("std");
 
-const blas = @import("blas/blas.zig");
-const sdl = @import("sdl.zig");
+const blas = @import("../blas/blas.zig");
+const sdl = @import("../sdl.zig");
+
+const g_state = &@import("../main.zig").g_state;
 
 const Self = @This();
 
@@ -56,8 +58,6 @@ pub fn resize(self: *Self, dims: blas.Vec2uz) void {
 }
 
 pub fn pre_frame(self: *Self, delta_ms: f64) void {
-    const g_state = &@import("main.zig").g_state;
-
     if (self.capturing_mouse) {
         const cursor_pos = blas.divms(self.dims.lossy_cast(f32), 2);
         g_state.window.set_cursor_pos(cursor_pos);

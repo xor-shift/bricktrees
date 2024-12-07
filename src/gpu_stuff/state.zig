@@ -1,8 +1,8 @@
 const std = @import("std");
 
-const blas = @import("blas/blas.zig");
-const sdl = @import("sdl.zig");
-const wgpu = @import("wgpu/wgpu.zig");
+const blas = @import("../blas/blas.zig");
+const sdl = @import("../sdl.zig");
+const wgpu = @import("../wgpu/wgpu.zig");
 
 const State = @This();
 
@@ -21,8 +21,6 @@ surface: wgpu.Surface,
 adapter: wgpu.Adapter,
 device: wgpu.Device,
 queue: wgpu.Queue,
-
-resize_notify: std.ArrayListUnmanaged(ResizeNotify) = .{},
 
 pub fn init(alloc: std.mem.Allocator) !State {
     const instance = wgpu.Instance.init();

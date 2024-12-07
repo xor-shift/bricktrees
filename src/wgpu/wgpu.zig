@@ -1,9 +1,11 @@
 const std = @import("std");
-const future = @import("../future.zig");
 const builtin = @import("builtin");
+
+const future = @import("../core/future.zig");
 
 const auto = @import("auto.zig");
 const common = @import("common.zig");
+
 //pub usingnamespace @import("enums.zig");
 pub usingnamespace @import("generated/enums.zig");
 pub usingnamespace @import("generated/bitflags.zig");

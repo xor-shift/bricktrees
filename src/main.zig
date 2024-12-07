@@ -1,13 +1,16 @@
 const std = @import("std");
-const future = @import("future.zig");
+
 const blas = @import("blas/blas.zig");
+const future = @import("core/future.zig");
+const mpsc = @import("core/mpsc.zig");
 
 pub const sdl = @import("sdl.zig");
 pub const wgpu = @import("wgpu/wgpu.zig");
 
-const Map = @import("map.zig");
-const NewUniforms = @import("uniforms.zig");
-const State = @import("state.zig");
+const Map = @import("gpu_stuff/map.zig");
+const NewUniforms = @import("gpu_stuff/uniforms.zig");
+const State = @import("gpu_stuff/state.zig");
+const Registry = @import("ctf_2fort/registry.zig");
 
 const Vertex = extern struct {
     pos: [3]f32,
@@ -546,4 +549,7 @@ pub fn main() !void {
 test {
     std.testing.refAllDecls(@This());
     std.testing.refAllDecls(blas);
+    std.testing.refAllDecls(mpsc);
+    std.testing.refAllDecls(@import("ctf_2fort/chunk.zig"));
+    std.testing.refAllDecls(@import("ctf_2fort/util.zig"));
 }
