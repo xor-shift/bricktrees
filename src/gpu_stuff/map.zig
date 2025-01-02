@@ -88,6 +88,8 @@ const GPUChunk = struct {
     }
 
     fn upload_to_index(self: *GPUChunk, map: Self, index: usize) void {
+        self.inner.upload();
+
         g_state.queue.write_texture(.{
             .texture = map.chunk_store_texture,
             .origin = .{ .x = 0, .y = 0, .z = @intCast(index) },
@@ -121,8 +123,7 @@ const GPUChunk = struct {
         self.invalidated = true;
 
         self.inner.set(local_coords, .{
-            .block_id = @intCast(material),
-            .block_state = 0,
+            .raw = material,
         }, false);
     }
 };
@@ -154,6 +155,9 @@ local_chunkmap: []u16 = undefined,
 chunkmap_texture: wgpu.Texture = .{},
 chunkmap_texture_view: wgpu.TextureView = .{},
 map_bg: wgpu.BindGroup = .{},
+
+new_bgl: wgpu.BindGroupLayout = .{},
+new_bg: wgpu.BindGroup = .{},
 
 fn get_chunkmap_dimensions(render_distance: usize) blas.Vec3uz {
     const sidelength = render_distance * 2 + 1;

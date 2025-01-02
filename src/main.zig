@@ -10,34 +10,6 @@ pub const wgpu = @import("wgpu/wgpu.zig");
 const Map = @import("gpu_stuff/map.zig");
 const NewUniforms = @import("gpu_stuff/uniforms.zig");
 const State = @import("gpu_stuff/state.zig");
-const Registry = @import("ctf_2fort/registry.zig");
-
-const Vertex = extern struct {
-    pos: [3]f32,
-    uv: [2]f32,
-
-    fn describe() wgpu.VertexBufferLayout {
-        comptime std.debug.assert(@sizeOf(Vertex) == @sizeOf(f32) * 5);
-        comptime std.debug.assert(@alignOf(Vertex) == @alignOf(f32));
-
-        return .{
-            .array_stride = @intCast(@sizeOf(Vertex)),
-            .step_mode = .Vertex,
-            .attributes = &.{
-                .{
-                    .format = .Float32x3,
-                    .offset = 0,
-                    .shader_location = 0,
-                },
-                .{
-                    .format = .Float32x2,
-                    .offset = @sizeOf([3]f32),
-                    .shader_location = 1,
-                },
-            },
-        };
-    }
-};
 
 pub var g_state: State = undefined;
 
@@ -280,8 +252,6 @@ const Visualiser = struct {
     texture_bg: wgpu.BindGroup = .{},
     sampler: wgpu.Sampler,
 
-    vertex_buffer: wgpu.Buffer,
-
     fn init(uniform_stuff: UniformStuff, computer: *Computer, alloc: std.mem.Allocator) !Visualiser {
         const shader = try g_state.device.create_shader_module_wgsl_from_file("visualiser shader", "run/shaders/visualiser.wgsl", alloc);
 
@@ -342,7 +312,7 @@ const Visualiser = struct {
             .vertex = .{
                 .module = shader,
                 .entry_point = "vs_main",
-                .buffers = &.{Vertex.describe()},
+                .buffers = &.{},
             },
             .fragment = .{
                 .module = shader,
@@ -361,23 +331,6 @@ const Visualiser = struct {
 
         const sampler = try g_state.device.create_sampler(.{});
 
-        const vertex_buffer = try g_state.device.create_buffer(.{
-            .label = "vertex buffer",
-            .usage = .{
-                .copy_dst = true,
-                .vertex = true,
-            },
-            .size = @sizeOf(Vertex) * 6,
-        });
-        g_state.queue.write_buffer(vertex_buffer, 0, std.mem.sliceAsBytes(&[_]Vertex{
-            .{ .pos = .{ -1.0, 1.0, 0.0 }, .uv = .{ 0.0, 0.0 } },
-            .{ .pos = .{ -1.0, -1.0, 0.0 }, .uv = .{ 0.0, 1.0 } },
-            .{ .pos = .{ 1.0, -1.0, 0.0 }, .uv = .{ 1.0, 1.0 } },
-            .{ .pos = .{ 1.0, -1.0, 0.0 }, .uv = .{ 1.0, 1.0 } },
-            .{ .pos = .{ 1.0, 1.0, 0.0 }, .uv = .{ 1.0, 0.0 } },
-            .{ .pos = .{ -1.0, 1.0, 0.0 }, .uv = .{ 0.0, 0.0 } },
-        }));
-
         var ret: Visualiser = .{
             .shader = shader,
 
@@ -387,8 +340,6 @@ const Visualiser = struct {
             .computer = computer,
             .texture_bgl = bgl_textures,
             .sampler = sampler,
-
-            .vertex_buffer = vertex_buffer,
         };
 
         try ret.resize(try g_state.window.get_size());
@@ -440,7 +391,6 @@ const Visualiser = struct {
         });
 
         render_pass.set_pipeline(self.render_pipeline);
-        render_pass.set_vertex_buffer(0, self.vertex_buffer, 0, @sizeOf(Vertex) * 6);
         render_pass.set_bind_group(0, uniform_stuff.bg_uniform, null);
         render_pass.set_bind_group(1, self.texture_bg, null);
         render_pass.draw(.{

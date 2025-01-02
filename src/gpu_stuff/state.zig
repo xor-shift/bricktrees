@@ -41,6 +41,7 @@ pub fn init(alloc: std.mem.Allocator) !State {
         .label = "device",
         .required_features = &.{
             wgpu.FeatureName.BGRA8UnormStorage,
+            wgpu.FeatureName.SampledTextureAndStorageBufferArrayNonUniformIndexing,
         },
     });
 

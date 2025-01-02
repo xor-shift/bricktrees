@@ -1,48 +1,31 @@
 const std = @import("std");
 const util = @import("util.zig");
+const idl_utils = @import("idl_utils.zig");
 
 const RawIDL = @import("raw.zig");
 
 const IDL = @This();
 
-pub const Field = struct {
-    kind: enum {
-        Primitive,
-        String,
-        Enumeration,
-        Structure,
-        Object,
-    },
-
-    is_array: bool,
-
-    pub fn is_externable(self: @This(), idl: IDL) bool {
-        if (self.is_array) {
-            return false;
-        }
-
-        if (self.kind == .Structure) {}
-
-        _ = idl;
-        return true;
-    }
-};
-
 pub const Enumeration = struct {
-    name: []const u8,
-    fields: [][]const u8,
+    inner: idl_utils.EBFImpl,
 
-    fn deinit(self: Enumeration, alloc: std.mem.Allocator) void {
-        alloc.free(self.name);
-        for (self.fields) |v| alloc.free(v);
-        alloc.free(self.fields);
+    pub fn deinit(self: Enumeration, alloc: std.mem.Allocator) void {
+        return self.inner.deinit(alloc);
+    }
+
+    pub fn clone(self: Enumeration, alloc: std.mem.Allocator) !Enumeration {
+        return .{ .inner = try self.inner.clone(alloc) };
+    }
+
+    pub fn merge_with(self: Enumeration, other: Enumeration, alloc: std.mem.Allocator) !Enumeration {
+        return .{ .inner = try self.inner.merge_with(other.inner, alloc) };
     }
 
     pub fn write_zig_struct(self: Enumeration, idl: IDL, writer: anytype) !void {
         _ = idl;
 
-        try std.fmt.format(writer, "pub const {s} = enum(c_uint) {{\n", .{self.name});
-        for (0.., self.fields) |i, field| {
+        try std.fmt.format(writer, "pub const {s} = enum(c_uint) {{\n", .{self.inner.name});
+        for (0.., self.inner.fields) |i, field| {
             try std.fmt.format(writer, "    {s} = {d},\n", .{ field, i });
         }
         _ = try writer.write("};\n");
@@ -50,41 +33,37 @@ pub const Enumeration = struct {
 };
 
 pub const Bitflags = struct {
-    name: []const u8,
-    flags: [][]const u8,
+    inner: idl_utils.EBFImpl,
 
-    fn deinit(self: Bitflags, alloc: std.mem.Allocator) void {
-        alloc.free(self.name);
-        for (self.flags) |v| alloc.free(v);
-        alloc.free(self.flags);
+    pub fn deinit(self: Bitflags, alloc: std.mem.Allocator) void {
+        return self.inner.deinit(alloc);
+    }
+
+    pub fn clone(self: Bitflags, alloc: std.mem.Allocator) !Bitflags {
+        return .{ .inner = try self.inner.clone(alloc) };
+    }
+
+    pub fn merge_with(self: Bitflags, other: Bitflags, alloc: std.mem.Allocator) !Bitflags {
+        return .{ .inner = try self.inner.merge_with(other.inner, alloc) };
     }
 
     pub fn deficiency(self: Bitflags) usize {
-        return 32 - self.flags.len;
+        return 32 - self.inner.fields.len;
     }
 
     pub fn write_zig_struct(self: Bitflags, idl: IDL, writer: anytype) !void {
         _ = idl;
 
-        try std.fmt.format(writer, "pub const {s} = packed struct(u32) {{\n", .{self.name});
-        for (self.flags) |flag| {
+        try std.fmt.format(writer, "pub const {s} = packed struct(u32) {{\n", .{self.inner.name});
+        for (self.inner.fields) |flag| {
             try std.fmt.format(writer, "    {s}: bool = false,\n", .{flag});
         }
         try std.fmt.format(writer, "    _padding: u{d} = 0,\n}};\n", .{self.deficiency()});
     }
 };
 
-pub const Structure = struct {
-    kind: enum {
-        Standalone,
-    },
-
-    fields: []const Field,
-};
-
 enumerations: std.StringHashMapUnmanaged(Enumeration) = .{},
 bitflags: std.StringHashMapUnmanaged(Bitflags) = .{},
-structures: std.StringHashMapUnmanaged(Structure) = .{},
 
 fn iterate_enum_or_bitflags(comptime pascal_field: bool, declarations: []const RawIDL.EBDecl, alloc: std.mem.Allocator, thing: anytype) !void {
     for (declarations) |decl| {
@@ -114,34 +93,38 @@ fn iterate_enum_or_bitflags(comptime pascal_field: bool, declarations: []const R
     }
 }
 
-pub fn from_raw(raw_idl: RawIDL, alloc: std.mem.Allocator) !IDL {
-    var ret: IDL = .{
+pub fn init() IDL {
+    return .{
         .enumerations = .{},
         .bitflags = .{},
-        .structures = .{},
     };
+}
+
+pub fn from_raw(raw_idl: RawIDL, alloc: std.mem.Allocator) !IDL {
+    var ret = IDL.init();
 
     try iterate_enum_or_bitflags(true, raw_idl.enums, alloc, struct {
         alloc: std.mem.Allocator,
         self: *IDL,
+        raw_idl: RawIDL,
 
         fn start(ctx: @This(), name: []const u8, num_fields: usize) !void {
             const name_copy = try ctx.alloc.dupe(u8, name);
-            try ctx.self.enumerations.put(ctx.alloc, name_copy, Enumeration{
+            try ctx.self.enumerations.put(ctx.alloc, name_copy, Enumeration{ .inner = .{
                 .name = name_copy,
                 .fields = try ctx.alloc.alloc([]const u8, num_fields),
-            });
+            } });
         }
 
         fn field(ctx: @This(), name: []const u8, index: usize, field_name: []const u8) !void {
-            ctx.self.enumerations.getPtr(name).?.fields[index] = try ctx.alloc.dupe(u8, field_name);
+            ctx.self.enumerations.getPtr(name).?.inner.fields[index] = try ctx.alloc.dupe(u8, field_name);
         }
 
         fn end(ctx: @This(), name: []const u8) !void {
             _ = ctx;
             _ = name;
         }
-    }{ .self = &ret, .alloc = alloc });
+    }{ .self = &ret, .alloc = alloc, .raw_idl = raw_idl });
 
     try iterate_enum_or_bitflags(false, raw_idl.bitflags, alloc, struct {
         alloc: std.mem.Allocator,
@@ -149,10 +132,10 @@ pub fn from_raw(raw_idl: RawIDL, alloc: std.mem.Allocator) !IDL {
 
         fn start(ctx: @This(), name: []const u8, num_fields: usize) !void {
             const name_copy = try ctx.alloc.dupe(u8, name);
-            try ctx.self.bitflags.put(ctx.alloc, name_copy, Bitflags{
+            try ctx.self.bitflags.put(ctx.alloc, name_copy, Bitflags{ .inner = .{
                 .name = name_copy,
-                .flags = try ctx.alloc.alloc([]const u8, num_fields - 1),
-            });
+                .fields = try ctx.alloc.alloc([]const u8, num_fields - 1),
+            } });
         }
 
         fn field(ctx: @This(), name: []const u8, index: usize, field_name: []const u8) !void {
@@ -161,7 +144,7 @@ pub fn from_raw(raw_idl: RawIDL, alloc: std.mem.Allocator) !IDL {
                 return;
             }
 
-            ctx.self.bitflags.getPtr(name).?.flags[index - 1] = try ctx.alloc.dupe(u8, field_name);
+            ctx.self.bitflags.getPtr(name).?.inner.fields[index - 1] = try ctx.alloc.dupe(u8, field_name);
         }
 
         fn end(ctx: @This(), name: []const u8) !void {
@@ -174,11 +157,31 @@ pub fn from_raw(raw_idl: RawIDL, alloc: std.mem.Allocator) !IDL {
 }
 
 pub fn deinit(self: *IDL, alloc: std.mem.Allocator) void {
-    var enum_iter = self.enumerations.iterator();
-    while (enum_iter.next()) |kv| kv.value_ptr.deinit(alloc);
-    self.enumerations.deinit(alloc);
+    idl_utils.deinit_hashmap_impl(&self.enumerations, alloc);
+    idl_utils.deinit_hashmap_impl(&self.bitflags, alloc);
 
-    var bitflags_iter = self.bitflags.iterator();
-    while (bitflags_iter.next()) |kv| kv.value_ptr.deinit(alloc);
-    self.bitflags.deinit(alloc);
+    self.* = undefined;
+}
+
+pub fn clone(self: IDL, alloc: std.mem.Allocator) !IDL {
+    var cloned_enumerations = try idl_utils.clone_hashmap_impl(self.enumerations, alloc);
+    errdefer idl_utils.deinit_hashmap_impl(&cloned_enumerations, alloc);
+
+    var cloned_bitflags = try idl_utils.clone_hashmap_impl(self.bitflags, alloc);
+    errdefer idl_utils.deinit_hashmap_impl(&cloned_bitflags, alloc);
+
+    return .{
+        .enumerations = cloned_enumerations,
+        .bitflags = cloned_bitflags,
+    };
+}
+
+pub fn merge_with(self: IDL, other: IDL, alloc: std.mem.Allocator) !IDL {
+    var ret = try self.clone(alloc);
+    errdefer ret.deinit(alloc);
+
+    try idl_utils.merge_impl(&ret.enumerations, other.enumerations, alloc);
+    try idl_utils.merge_impl(&ret.bitflags, other.bitflags, alloc);
+
+    return ret;
 }

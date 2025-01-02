@@ -15,6 +15,17 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const clay = b.addStaticLibrary(.{
+        .name = "clay",
+        .root_source_file = b.path("lib/clay/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    clay.addCSourceFile(.{
+        .file = b.path("lib/clay/impl.c"),
+        .flags = &.{},
+    });
+
     const qoi = b.addStaticLibrary(.{
         .name = "qoi",
         .root_source_file = b.path("lib/sdl/root.zig"),
@@ -31,6 +42,7 @@ pub fn build(b: *std.Build) void {
     });
     add_c_stuff(b, exe);
     exe.linkLibrary(qoi);
+    exe.linkLibrary(clay);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);

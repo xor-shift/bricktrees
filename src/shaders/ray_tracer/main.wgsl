@@ -16,6 +16,8 @@ struct Uniforms {
 @group(2) @binding(0) var chunkmap: texture_3d<u32>;
 @group(2) @binding(1) var chunk_mipmaps: texture_2d<u32>;
 @group(2) @binding(2) var chunks: texture_2d_array<u32>;
+@group(3) @binding(0) var new_chunk_mipmaps: binding_array<texture_1d<u32>>;
+@group(3) @binding(1) var new_chunks: binding_array<texture_3d<u32>>;
 
 @compute @workgroup_size(8, 8, 1) fn cs_main(
     @builtin(global_invocation_id)   global_id: vec3<u32>,

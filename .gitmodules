@@ -4,3 +4,6 @@
 [submodule "thirdparty/wgpu-native"]
 	path = thirdparty/wgpu-native
 	url = https://github.com/gfx-rs/wgpu-native
+[submodule "thirdparty/cimgui"]
+	path = thirdparty/cimgui
+	url = https://github.com/cimgui/cimgui

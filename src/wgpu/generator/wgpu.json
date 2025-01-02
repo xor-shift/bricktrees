@@ -1,0 +1,95 @@
+{
+  "copyright": "Copyright 2019-2023 WebGPU-Native developers\n\nSPDX-License-Identifier: BSD-3-Clause\n",
+  "name": "wgpu",
+  "enum_prefix": "0x0003",
+  "constants": [],
+  "typedefs": [],
+  "enums": [
+    {
+      "name": "s_type",
+      "doc": "TODO\n",
+      "entries": [
+          { "name": "DeviceExtras", "doc": "TODO\n" },
+          { "name": "RequiredLimitsExtras", "doc": "TODO\n" },
+          { "name": "PipelineLayoutExtras", "doc": "TODO\n" },
+          { "name": "ShaderModuleGLSLDescriptor", "doc": "TODO\n" },
+          { "name": "SupportedLimitsExtras", "doc": "TODO\n" },
+          { "name": "InstanceExtras", "doc": "TODO\n" },
+          { "name": "BindGroupEntryExtras", "doc": "TODO\n" },
+          { "name": "BindGroupLayoutEntryExtras", "doc": "TODO\n" },
+          { "name": "QuerySetDescriptorExtras", "doc": "TODO\n" },
+          { "name": "SurfaceConfigurationExtras", "doc": "TODO\n" }
+      ]
+    },
+
+    {
+      "name": "feature_name",
+      "doc": "TODO\n",
+      "entries": [
+          { "name": "PushConstants", "doc": "TODO\n" },
+          { "name": "TextureAdapterSpecificFormatFeatures", "doc": "TODO\n" },
+          { "name": "MultiDrawIndirect", "doc": "TODO\n" },
+          { "name": "MultiDrawIndirectCount", "doc": "TODO\n" },
+          { "name": "VertexWritableStorage", "doc": "TODO\n" },
+          { "name": "TextureBindingArray", "doc": "TODO\n" },
+          { "name": "SampledTextureAndStorageBufferArrayNonUniformIndexing", "doc": "TODO\n" },
+          { "name": "PipelineStatisticsQuery", "doc": "TODO\n" },
+          { "name": "StorageResourceBindingArray", "doc": "TODO\n" },
+          { "name": "PartiallyBoundBindingArray", "doc": "TODO\n" },
+          { "name": "TextureFormat16bitNorm", "doc": "TODO\n" },
+          { "name": "TextureCompressionAstcHdr", "doc": "TODO\n" },
+          { "name": "MappablePrimaryBuffers", "doc": "TODO\n" },
+          { "name": "BufferBindingArray", "doc": "TODO\n" },
+          { "name": "UniformBufferAndStorageTextureArrayNonUniformIndexing", "doc": "TODO\n" },
+          { "name": "AddressModeClampToZero", "doc": "don't use, requires wgpu.h api change\n" },
+          { "name": "AddressModeClampToBorder", "doc": "don't use, requires wgpu.h api change\n" },
+          { "name": "PolygonModeLine", "doc": "don't use, requires wgpu.h api change\n" },
+          { "name": "PolygonModePoint", "doc": "don't use, requires wgpu.h api change\n" },
+          { "name": "ConservativeRasterization", "doc": "don't use, requires wgpu.h api change\n" },
+          { "name": "ClearTexture", "doc": "don't use, requires wgpu.h api change\n" },
+          { "name": "SpirvShaderPassthrough", "doc": "TODO\n" },
+          { "name": "Multiview", "doc": "don't use, requires wgpu.h api change\n" },
+          { "name": "VertexAttribute64bit", "doc": "TODO\n" },
+          { "name": "TextureFormatNv12", "doc": "TODO\n" },
+          { "name": "RayTracingAccelerationStructure", "doc": "TODO\n" },
+          { "name": "RayQuery", "doc": "TODO\n" },
+          { "name": "ShaderF64", "doc": "TODO\n" },
+          { "name": "ShaderI16", "doc": "TODO\n" },
+          { "name": "ShaderPrimitiveIndex", "doc": "TODO\n" },
+          { "name": "ShaderEarlyDepthTest", "doc": "TODO\n" },
+          { "name": "Subgroup", "doc": "TODO\n" },
+          { "name": "SubgroupVertex", "doc": "TODO\n" },
+          { "name": "SubgroupBarrier", "doc": "TODO\n" },
+          { "name": "TimestampQueryInsideEncoders", "doc": "TODO\n" },
+          { "name": "TimestampQueryInsidePasses", "doc": "TODO\n" }
+      ]
+    },
+
+    {
+      "name": "query_type",
+      "doc": "TODO\n",
+      "entries": [
+          { "name": "PipelineStatistics", "doc": "TODO\n" }
+      ]
+    },
+
+    {
+      "name": "texture_format",
+      "doc": "TODO\n",
+      "entries": [
+          { "name": "R16Unorm", "doc": "From Features::TEXTURE_FORMAT_16BIT_NORM\n" },
+          { "name": "R16Snorm", "doc": "TODO\n" },
+          { "name": "Rg16Unorm", "doc": "TODO\n" },
+          { "name": "Rg16Snorm", "doc": "TODO\n" },
+          { "name": "Rgba16Unorm", "doc": "TODO\n" },
+          { "name": "Rgba16Snorm", "doc": "TODO\n" },
+          { "name": "NV12", "doc": "From Features::TEXTURE_FORMAT_NV12\n" }
+      ]
+    }
+  ],
+  "bitflags": [],
+  "function_types": [],
+  "structs": [],
+  "functions": [],
+  "objects": []
+}

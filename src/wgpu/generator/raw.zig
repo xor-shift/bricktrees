@@ -9,12 +9,62 @@ pub const ConstantDecl = struct {
 pub const EBEntry = struct {
     name: []const u8,
     doc: []const u8,
+
+    pub fn clone(self: EBEntry, alloc: std.mem.Allocator) !EBEntry {
+        const cloned_name = try alloc.dupe(u8, self.name);
+        errdefer alloc.free(cloned_name);
+
+        const cloned_doc = try alloc.dupe(u8, self.doc);
+        errdefer alloc.free(cloned_doc);
+
+        return .{
+            .name = cloned_name,
+            .doc = cloned_doc,
+        };
+    }
+
+    pub fn deinit(self: EBEntry, alloc: std.mem.Allocator) void {
+        alloc.free(self.name);
+        alloc.free(self.doc);
+    }
 };
 
 pub const EBDecl = struct {
     name: []const u8,
     doc: []const u8,
     entries: []const EBEntry,
+
+    pub fn clone(self: EBDecl, alloc: std.mem.Allocator) !EBDecl {
+        const cloned_name = try alloc.dupe(u8, self.name);
+        errdefer alloc.free(cloned_name);
+
+        const cloned_doc = try alloc.dupe(u8, self.doc);
+        errdefer alloc.free(cloned_doc);
+
+        const entries = try alloc.alloc(EBEntry, self.entries.len);
+        errdefer alloc.free(entries);
+
+        var copied_entries: usize = 0;
+        errdefer for (0..copied_entries) |i| entries[i].deinit(alloc);
+        for (self.entries) |entry| {
+            entries[copied_entries] = try entry.clone(alloc);
+            copied_entries += 1;
+        }
+
+        return .{
+            .name = cloned_name,
+            .doc = cloned_doc,
+            .entries = entries,
+        };
+    }
+
+    pub fn deinit(self: EBDecl, alloc: std.mem.Allocator) void {
+        alloc.free(self.name);
+        alloc.free(self.doc);
+
+        for (self.entries) |entry| entry.deinit(alloc);
+        alloc.free(self.entries);
+    }
 };
 
 pub const StructMember = struct {
