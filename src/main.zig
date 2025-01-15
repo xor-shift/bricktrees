@@ -1,436 +1,165 @@
 const std = @import("std");
 
-const blas = @import("blas/blas.zig");
-const future = @import("core/future.zig");
-const mpsc = @import("core/mpsc.zig");
+const blas = @import("blas");
+const imgui = @import("imgui");
+const qoi = @import("qoi");
+const sdl = @import("gfx").sdl;
+const wgpu = @import("gfx").wgpu;
 
-pub const sdl = @import("sdl.zig");
-pub const wgpu = @import("wgpu/wgpu.zig");
+const Gui = @import("imgui").WGPUContext;
 
-const Map = @import("gpu_stuff/map.zig");
-const NewUniforms = @import("gpu_stuff/uniforms.zig");
-const State = @import("gpu_stuff/state.zig");
+pub const Globals = struct {
+    instance: wgpu.Instance,
 
-pub var g_state: State = undefined;
+    window: sdl.Window,
+    surface: wgpu.Surface,
 
-const TextureSet = struct {
-    visualisation: wgpu.Texture,
-    view_visualisation: wgpu.TextureView,
-};
+    adapter: wgpu.Adapter,
+    device: wgpu.Device,
+    queue: wgpu.Queue,
 
-const UniformStuff = struct {
-    bgl_uniform: wgpu.BindGroupLayout,
-    bg_uniform: wgpu.BindGroup,
-    buffer: wgpu.Buffer,
+    // unmanaged
+    gui: Gui = undefined,
 
-    fn init() !UniformStuff {
-        const bgl_uniform = try g_state.device.create_bind_group_layout(.{
-            .label = "test bgl 0",
-            .entries = &.{
-                .{
-                    .binding = 0,
-                    .visibility = .{
-                        .vertex = true,
-                        .fragment = true,
-                        .compute = true,
-                    },
-                    .layout = .{ .Buffer = .{
-                        .type = .Uniform,
-                    } },
-                },
+    const max_n: usize = 2;
+    const arena_size: usize = 16 * 1024 * 1024;
+
+    /// Initializes just the WebGPU stuff.
+    /// Assign to `g.gui` and then call `g.resize` after calling this.
+    fn init(dims: blas.Vec2uz) !Globals {
+        const instance = wgpu.Instance.init();
+        errdefer instance.deinit();
+        std.log.debug("instance: {?p}", .{instance.handle});
+
+        const window = try sdl.Window.init("test", dims);
+        errdefer window.deinit();
+        std.log.debug("window: {p}", .{window.handle});
+
+        const surface = try window.get_surface(instance);
+        errdefer surface.deinit();
+        std.log.debug("surface: {?p}", .{surface.handle});
+
+        const adapter = try instance.request_adapter_sync(.{
+            .compatible_surface = surface,
+            .backend_type = .Vulkan,
+        });
+        errdefer adapter.deinit();
+        std.log.debug("surface: {?p}", .{surface.handle});
+
+        const device = try adapter.request_device_sync(.{
+            .label = "device",
+            .required_features = &.{
+                wgpu.FeatureName.BGRA8UnormStorage,
+                wgpu.FeatureName.SampledTextureAndStorageBufferArrayNonUniformIndexing,
             },
         });
+        errdefer device.deinit();
+        std.log.debug("device: {?p}", .{device.handle});
 
-        const buffer = try g_state.device.create_buffer(.{
-            .label = "uniform buffer",
-            .usage = .{
-                .copy_dst = true,
-                .uniform = true,
-            },
-            .size = @sizeOf(NewUniforms.Serialized),
-        });
-
-        const bg_uniform = try g_state.device.create_bind_group(.{
-            .label = "test bg",
-            .layout = bgl_uniform,
-            .entries = &.{.{
-                .binding = 0,
-                .resource = .{ .Buffer = .{
-                    .buffer = buffer,
-                    .offset = 0,
-                    .size = @sizeOf(NewUniforms.Serialized),
-                } },
-            }},
-        });
+        const queue = try device.get_queue();
+        errdefer queue.deinit();
+        std.log.debug("queue: {?p}", .{queue.handle});
 
         return .{
-            .bgl_uniform = bgl_uniform,
-            .bg_uniform = bg_uniform,
-            .buffer = buffer,
+            .instance = instance,
+            .window = window,
+            .surface = surface,
+            .adapter = adapter,
+            .device = device,
+            .queue = queue,
         };
+    }
+
+    fn deinit(self: *Globals) void {
+        defer self.* = undefined;
+
+        self.queue.deinit();
+        self.device.deinit();
+        self.adapter.deinit();
+
+        self.surface.deinit();
+        self.window.deinit();
+
+        self.instance.deinit();
+    }
+
+    fn resize(self: *Globals, dims: blas.Vec2uz) !void {
+        try self.surface.configure(.{
+            .device = self.device,
+            .format = .BGRA8Unorm,
+            .usage = .{ .render_attachment = true },
+            .view_formats = &.{.BGRA8UnormSrgb},
+            .width = @intCast(dims.x()),
+            .height = @intCast(dims.y()),
+            .present_mode = .Fifo,
+        });
+
+        const io = imgui.c.igGetIO();
+        io.*.DisplaySize = .{
+            .x = @floatFromInt(dims.x()),
+            .y = @floatFromInt(dims.y()),
+        };
+    }
+
+    // The short name which stands for "n-frame-ly allocator" is for ease of typing.
+    // This returns an arena that will be valid until the end of the next n frames.
+    // An `n` valeu of 0 means that the arena will last 'til the end of the frame.
+    // Max n is determined beforehand and is most likely 2.
+    fn nfa(self: *Globals, comptime n: usize) std.mem.Allocator {
+        _ = self;
+        _ = n;
+
+        return undefined;
     }
 };
 
-const Computer = struct {
-    shader: wgpu.ShaderModule,
+pub var g: Globals = undefined;
 
-    pipeline_layout: wgpu.PipelineLayout,
-    pipeline: wgpu.ComputePipeline,
+fn initialize_things(alloc: std.mem.Allocator) !void {
+    try sdl.init(.{ .video = true });
+    errdefer sdl.deinit();
 
-    geometry_bgl: wgpu.BindGroupLayout,
-    geometry_bg: wgpu.BindGroup = .{},
-
-    geometry_textures: [2]wgpu.Texture = .{ .{}, .{} },
-    geometry_texture_views: [2]wgpu.TextureView = .{ .{}, .{} },
-    radiance_texture: wgpu.Texture = .{},
-    radiance_texture_view: wgpu.TextureView = .{},
-
-    fn init(uniform_stuff: UniformStuff, map: Map, alloc: std.mem.Allocator) !Computer {
-        const shader = try g_state.device.create_shader_module_wgsl_from_file("compute shader", "run/shaders/ray_tracer.wgsl", alloc);
-
-        const geometry_bgl = try g_state.device.create_bind_group_layout(.{
-            .label = "compute geometry bgl",
-            .entries = &.{
-                .{
-                    .binding = 0,
-                    .visibility = .{
-                        .compute = true,
-                    },
-                    .layout = .{ .StorageTexture = .{
-                        .access = .WriteOnly,
-                        .format = .RGBA32Uint,
-                        .view_dimension = .D2,
-                    } },
-                },
-                .{
-                    .binding = 1,
-                    .visibility = .{
-                        .compute = true,
-                    },
-                    .layout = .{ .StorageTexture = .{
-                        .access = .WriteOnly,
-                        .format = .RGBA32Uint,
-                        .view_dimension = .D2,
-                    } },
-                },
-                .{
-                    .binding = 2,
-                    .visibility = .{
-                        .compute = true,
-                    },
-                    .layout = .{ .StorageTexture = .{
-                        .access = .WriteOnly,
-                        .format = .RGBA8Unorm,
-                        .view_dimension = .D2,
-                    } },
-                },
-            },
-        });
-
-        const pipeline_layout = try g_state.device.create_pipeline_layout(.{
-            .label = "visualiser pipeline layout",
-            .bind_group_layouts = &.{ uniform_stuff.bgl_uniform, geometry_bgl, map.map_bgl },
-        });
-
-        const pipeline = try g_state.device.create_compute_pipeline(.{ .label = "compute pipeline", .layout = pipeline_layout, .compute = .{
-            .module = shader,
-            .entry_point = "cs_main",
-            .constants = &.{},
-        } });
-
-        var ret: Computer = .{
-            .shader = shader,
-            .pipeline_layout = pipeline_layout,
-            .pipeline = pipeline,
-            .geometry_bgl = geometry_bgl,
-        };
-
-        try ret.resize(try g_state.window.get_size());
-
-        return ret;
+    g = try Globals.init(blas.vec2uz(1280, 720));
+    errdefer {
+        g.deinit();
+        g = undefined;
     }
 
-    fn resize(self: *Computer, dims: blas.Vec2uz) !void {
-        for (0..2) |i| {
-            if (self.geometry_textures[i].handle != null) self.geometry_textures[i].release();
-            self.geometry_textures[i] = try g_state.device.create_texture(.{
-                .label = "a geometry texture",
-                .usage = .{
-                    .copy_src = true,
-                    .texture_binding = true,
-                    .storage_binding = true,
-                },
-                .dimension = .D2,
-                .size = .{
-                    .width = @intCast(dims.width()),
-                    .height = @intCast(dims.height()),
-                    .depth_or_array_layers = 1,
-                },
-                .format = .RGBA32Uint,
-                .mipLevelCount = 1,
-                .sampleCount = 1,
-                .view_formats = &.{},
-            });
+    imgui.init(alloc);
+    errdefer imgui.deinit();
 
-            if (self.geometry_texture_views[i].handle != null) self.geometry_texture_views[i].release();
-            self.geometry_texture_views[i] = try self.geometry_textures[0].create_view(null);
-        }
+    g.gui = try Gui.init(g.device, g.queue, alloc);
+    errdefer g.gui.deinit();
 
-        if (self.radiance_texture.handle != null) self.radiance_texture.release();
-        self.radiance_texture = try g_state.device.create_texture(.{
-            .label = "radiance texture",
-            .usage = .{
-                .copy_src = true,
-                .texture_binding = true,
-                .storage_binding = true,
-            },
-            .dimension = .D2,
-            .size = .{
-                .width = @intCast(dims.width()),
-                .height = @intCast(dims.height()),
-                .depth_or_array_layers = 1,
-            },
-            .format = .RGBA8Unorm,
-            .mipLevelCount = 1,
-            .sampleCount = 1,
-            .view_formats = &.{},
-        });
+    try g.resize(blas.vec2uz(1280, 720));
+}
 
-        self.radiance_texture_view = try self.radiance_texture.create_view(null);
-
-        self.geometry_bg = try g_state.device.create_bind_group(.{
-            .label = "compute bind group",
-            .layout = self.geometry_bgl,
-            .entries = &.{
-                .{
-                    .binding = 0,
-                    .resource = .{ .TextureView = self.geometry_texture_views[0] },
-                },
-                .{
-                    .binding = 1,
-                    .resource = .{ .TextureView = self.geometry_texture_views[1] },
-                },
-                .{
-                    .binding = 2,
-                    .resource = .{ .TextureView = self.radiance_texture_view },
-                },
-            },
-        });
-    }
-
-    fn render(self: Computer, uniform_stuff: UniformStuff, map: Map, encoder: wgpu.CommandEncoder, target: wgpu.TextureView) !void {
-        _ = target;
-
-        const compute_pass = try encoder.begin_compute_pass(.{
-            .label = "compute pass",
-        });
-
-        compute_pass.set_pipeline(self.pipeline);
-        compute_pass.set_bind_group(0, uniform_stuff.bg_uniform, null);
-        compute_pass.set_bind_group(1, self.geometry_bg, null);
-        compute_pass.set_bind_group(2, map.map_bg, null);
-
-        const dims = try g_state.window.get_size();
-        const wg_sz = blas.vec2uz(8, 8);
-        const wg_count = blas.divew(blas.sub(blas.add(dims, wg_sz), blas.vec2uz(1, 1)), wg_sz);
-        compute_pass.dispatch_workgroups(.{ @intCast(wg_count.width()), @intCast(wg_count.height()), 1 });
-
-        compute_pass.end();
-        compute_pass.release();
-    }
-};
-
-const Visualiser = struct {
-    shader: wgpu.ShaderModule,
-
-    render_pipeline_layout: wgpu.PipelineLayout,
-    render_pipeline: wgpu.RenderPipeline,
-
-    computer: *Computer,
-
-    texture_bgl: wgpu.BindGroupLayout,
-    texture_bg: wgpu.BindGroup = .{},
-    sampler: wgpu.Sampler,
-
-    fn init(uniform_stuff: UniformStuff, computer: *Computer, alloc: std.mem.Allocator) !Visualiser {
-        const shader = try g_state.device.create_shader_module_wgsl_from_file("visualiser shader", "run/shaders/visualiser.wgsl", alloc);
-
-        const bgl_textures = try g_state.device.create_bind_group_layout(.{
-            .label = "textures' bgl",
-            .entries = &.{
-                .{
-                    .binding = 0,
-                    .visibility = .{
-                        .fragment = true,
-                    },
-                    .layout = .{ .Sampler = .{ .type = .NonFiltering } },
-                },
-                .{
-                    .binding = 1,
-                    .visibility = .{
-                        .fragment = true,
-                    },
-                    .layout = .{ .Texture = .{
-                        .sample_type = .Float,
-                        .view_dimension = .D2,
-                        .multisampled = false,
-                    } },
-                },
-                .{
-                    .binding = 2,
-                    .visibility = .{
-                        .fragment = true,
-                    },
-                    .layout = .{ .Texture = .{
-                        .sample_type = .Uint,
-                        .view_dimension = .D2,
-                        .multisampled = false,
-                    } },
-                },
-                .{
-                    .binding = 3,
-                    .visibility = .{
-                        .fragment = true,
-                    },
-                    .layout = .{ .Texture = .{
-                        .sample_type = .Uint,
-                        .view_dimension = .D2,
-                        .multisampled = false,
-                    } },
-                },
-            },
-        });
-
-        const pipeline_layout = try g_state.device.create_pipeline_layout(.{
-            .label = "visualiser pipeline layout",
-            .bind_group_layouts = &.{ uniform_stuff.bgl_uniform, bgl_textures },
-        });
-
-        const render_pipeline = try g_state.device.create_render_pipeline(.{
-            .label = "visulaiser pipeline",
-            .layout = pipeline_layout,
-            .vertex = .{
-                .module = shader,
-                .entry_point = "vs_main",
-                .buffers = &.{},
-            },
-            .fragment = .{
-                .module = shader,
-                .entry_point = "fs_main",
-                .targets = &.{.{ .format = .BGRA8Unorm, .write_mask = .{
-                    .red = true,
-                    .green = true,
-                    .blue = true,
-                    .alpha = true,
-                } }},
-            },
-            .primitive = .{
-                .topology = .TriangleList,
-            },
-        });
-
-        const sampler = try g_state.device.create_sampler(.{});
-
-        var ret: Visualiser = .{
-            .shader = shader,
-
-            .render_pipeline_layout = pipeline_layout,
-            .render_pipeline = render_pipeline,
-
-            .computer = computer,
-            .texture_bgl = bgl_textures,
-            .sampler = sampler,
-        };
-
-        try ret.resize(try g_state.window.get_size());
-
-        return ret;
-    }
-
-    fn resize(self: *Visualiser, dims: blas.Vec2uz) !void {
-        _ = dims;
-
-        if (self.texture_bg.handle != null) {
-            self.texture_bg.release();
-        }
-
-        const bg_textures = try g_state.device.create_bind_group(.{
-            .label = "visualisation textures' bg",
-            .layout = self.texture_bgl,
-            .entries = &.{
-                .{
-                    .binding = 0,
-                    .resource = .{ .Sampler = self.sampler },
-                },
-                .{
-                    .binding = 1,
-                    .resource = .{ .TextureView = self.computer.radiance_texture_view },
-                },
-                .{
-                    .binding = 2,
-                    .resource = .{ .TextureView = self.computer.geometry_texture_views[0] },
-                },
-                .{
-                    .binding = 3,
-                    .resource = .{ .TextureView = self.computer.geometry_texture_views[1] },
-                },
-            },
-        });
-
-        self.texture_bg = bg_textures;
-    }
-
-    fn render(self: Visualiser, uniform_stuff: UniformStuff, encoder: wgpu.CommandEncoder, target: wgpu.TextureView) !void {
-        const render_pass = try encoder.begin_render_pass(.{
-            .color_attachments = &.{.{
-                .view = target,
-                .load_op = .Clear,
-                .store_op = .Store,
-                .clear_value = .{ .r = 0.0, .g = 0.0, .b = 0.5, .a = 1.0 },
-            }},
-        });
-
-        render_pass.set_pipeline(self.render_pipeline);
-        render_pass.set_bind_group(0, uniform_stuff.bg_uniform, null);
-        render_pass.set_bind_group(1, self.texture_bg, null);
-        render_pass.draw(.{
-            .vertex_count = 6,
-            .instance_count = 1,
-            .first_vertex = 0,
-            .first_instance = 0,
-        });
-        render_pass.end();
-        render_pass.release();
-    }
-};
+fn deinitialize_things() void {
+    g.gui.deinit();
+    imgui.deinit();
+    g.deinit();
+    sdl.deinit();
+}
 
 pub fn main() !void {
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
     const alloc = gpa.allocator();
-    defer _ = gpa.deinit();
+    defer if (gpa.deinit() == .leak) std.log.warn("leaked memory", .{});
 
-    g_state = try State.init(alloc);
-    defer g_state.deinit();
+    initialize_things(alloc) catch |e| {
+        std.log.err("initialization failed: {any}", .{e});
+        std.process.exit(1);
+    };
 
-    var map = try Map.init(alloc);
-    defer map.deinit();
-
-    const uniform_stuff = try UniformStuff.init();
-    var computer = try Computer.init(uniform_stuff, map, alloc);
-    var visualiser = try Visualiser.init(uniform_stuff, &computer, alloc);
-
-    var uniforms: NewUniforms = .{};
-    uniforms.resize(try g_state.window.get_size());
+    defer deinitialize_things();
 
     var frame_timer = try std.time.Timer.start();
     var ms_spent_last_frame: f64 = 1000.0;
     outer: while (true) {
         const inter_frame_time = @as(f64, @floatFromInt(frame_timer.lap())) / @as(f64, @floatFromInt(std.time.ns_per_ms));
 
-        g_state.queue.write_buffer(uniform_stuff.buffer, 0, std.mem.asBytes(&uniforms.serialize()));
-
         while (try sdl.poll_event()) |ev| {
-            uniforms.event(ev);
+            imgui.sdl_event.translate_event(g.gui.context, ev);
 
             switch (ev.common.type) {
                 sdl.c.SDL_EVENT_QUIT => break :outer,
@@ -438,14 +167,10 @@ pub fn main() !void {
                     const event = ev.window;
                     const dims = blas.vec2uz(@intCast(event.data1), @intCast(event.data2));
 
-                    uniforms.resize(dims);
-                    try g_state.resize(dims);
-                    try computer.resize(dims);
-                    try visualiser.resize(dims);
+                    _ = dims;
                 },
                 sdl.c.SDL_EVENT_KEY_DOWN => {
                     switch (ev.key.key) {
-                        sdl.c.SDLK_Q => break :outer,
                         else => {},
                     }
                 },
@@ -457,10 +182,7 @@ pub fn main() !void {
             }
         }
 
-        map.pre_frame(ms_spent_last_frame);
-        uniforms.pre_frame(ms_spent_last_frame);
-
-        const current_texture = g_state.surface.get_current_texture() catch |e| {
+        const current_texture = g.surface.get_current_texture() catch |e| {
             if (e == wgpu.Error.Outdated) {
                 std.log.debug("outdated", .{});
                 continue;
@@ -473,21 +195,28 @@ pub fn main() !void {
             .label = "current render texture view",
         });
 
-        const command_encoder = try g_state.device.create_command_encoder(null);
+        imgui.c.igNewFrame();
+        defer imgui.c.igEndFrame();
 
-        try computer.render(uniform_stuff, map, command_encoder, current_texture_view);
-        try visualiser.render(uniform_stuff, command_encoder, current_texture_view);
+        imgui.c.igShowDemoWindow(null);
+        imgui.c.igShowMetricsWindow(null);
+        imgui.c.igShowDebugLogWindow(null);
+
+        const command_encoder = try g.device.create_command_encoder(null);
+
+        try g.gui.render(command_encoder, current_texture_view);
 
         current_texture_view.release();
 
         const command_buffer = try command_encoder.finish(null);
         command_encoder.release();
-        g_state.queue.submit((&command_buffer)[0..1]);
+
+        g.queue.submit((&command_buffer)[0..1]);
         command_buffer.release();
 
-        g_state.surface.present();
+        g.surface.present();
 
-        current_texture.texture.release();
+        current_texture.texture.deinit();
 
         const frame_time = @as(f64, @floatFromInt(frame_timer.lap())) / @as(f64, @floatFromInt(std.time.ns_per_ms));
 
@@ -497,9 +226,5 @@ pub fn main() !void {
 }
 
 test {
-    std.testing.refAllDecls(@This());
-    std.testing.refAllDecls(blas);
-    std.testing.refAllDecls(mpsc);
-    std.testing.refAllDecls(@import("ctf_2fort/chunk.zig"));
-    std.testing.refAllDecls(@import("ctf_2fort/util.zig"));
+    // std.debug.assert(false);
 }

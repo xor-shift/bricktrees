@@ -40,14 +40,13 @@
           libxkbcommon
 
           yq jq
+
+          freetype
+
+          luajit
         ];
 
         packages = buildInputs;
-
-        /*shellHook = ''
-          export LIBCLANG_PATH=${llvm.libclang.lib}/lib
-          export LD_LIBRARY_PATH=${pkgs.wayland}/lib:$LD_LIBRARY_PATH
-        '';*/
 
         LD_LIBRARY_PATH = "${lib.makeLibraryPath buildInputs}";
 
