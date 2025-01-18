@@ -1,16 +1,12 @@
 .{
     .name = "vktest",
     .version = "0.0.0",
-    .dependencies = .{
-        .ztap = .{
-            .url = "https://github.com/mnemnion/ztap/archive/refs/tags/v0.8.1.tar.gz",
-            .hash = "122027a26784d8a68777254eb2141b84b43af13626d73164dd5339d01c88e671848e",
-        },
-    },
+    .dependencies = .{},
 
     .paths = .{
         "build.zig",
         "build.zig.zon",
         "src",
+        "lib",
     },
 }

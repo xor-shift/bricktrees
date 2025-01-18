@@ -35,10 +35,7 @@ font_texture_bg: wgpu.BindGroup,
 vtx_buffer: VariableBuffer,
 idx_buffer: VariableBuffer,
 
-pub fn init(device: wgpu.Device, queue: wgpu.Queue, alloc: std.mem.Allocator) !Self {
-    _ = alloc;
-    // const init_arena = std.heap.ArenaAllocator.init(alloc);
-
+pub fn init(device: wgpu.Device, queue: wgpu.Queue) !Self {
     const ctx = c.igCreateContext(null) orelse std.debug.panic("igCreateContext returned null", .{});
     c.igSetCurrentContext(ctx);
 
@@ -265,8 +262,13 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+    const io = c.igGetIO();
+
     const uniforms: Uniforms = .{
-        .dimensions = [2]u32{ 1280, 720 },
+        .dimensions = [2]u32{
+            @intFromFloat(io.*.DisplaySize.x),
+            @intFromFloat(io.*.DisplaySize.y),
+        },
     };
     self.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&uniforms));
 
@@ -329,54 +331,55 @@ pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView)
             const idx_offset = global_idx_offset + @as(usize, @intCast(command.IdxOffset));
             const vtx_offset = global_vtx_offset + @as(usize, @intCast(command.VtxOffset));
 
-            std.log.debug( //
-                "    \x1b[1mImDrawCmd\x1b[0m #\x1b[34m{d}\x1b[0m: " ++
-                "[\x1b[31m{d} ({d} (g) + {d} (l)), {d}\x1b[0m) (\x1b[31m{d}\x1b[0m total), " ++
-                "[\x1b[32m{d} ({d} (g) + {d} (l)), ...\x1b[0m), " ++
-                "texture #\x1b[1m{d}\x1b[0m" ++
-                "", .{
-                    // zig fmt: off
-                    command_no,
-                    idx_offset, global_idx_offset, command.IdxOffset, (idx_offset + command.ElemCount), command.ElemCount,
-                    vtx_offset, global_vtx_offset, command.VtxOffset,
-                    command.TextureId,
-                    // zig fmt: on
-                });
+            std.log.debug("    \x1b[1mImDrawCmd\x1b[0m #\x1b[34m{d}\x1b[0m:", .{command_no});
+            std.log.debug("      [\x1b[31m{d} ({d} (g) + {d} (l)), {d}\x1b[0m) (\x1b[31m{d}\x1b[0m total)", .{
+                idx_offset,
+                global_idx_offset,
+                command.IdxOffset,
+                (idx_offset + command.ElemCount),
+                command.ElemCount,
+            });
+            std.log.debug("      [\x1b[32m{d} ({d} (g) + {d} (l)), ...\x1b[0m)", .{
+                vtx_offset,
+                global_vtx_offset,
+                command.VtxOffset,
+            });
+            std.log.debug("      texture #\x1b[1m{d}\x1b[0m", .{command.TextureId});
 
-                const render_pass = try encoder.begin_render_pass(.{
-                    .label = "imgui render pass",
-                    .color_attachments = &.{
-                        wgpu.RenderPass.ColorAttachment{
-                            .view = onto,
-                            .load_op = .Load,
-                            .store_op = .Store,
-                        },
+            const render_pass = try encoder.begin_render_pass(.{
+                .label = "imgui render pass",
+                .color_attachments = &.{
+                    wgpu.RenderPass.ColorAttachment{
+                        .view = onto,
+                        .load_op = .Load,
+                        .store_op = .Store,
                     },
-                });
+                },
+            });
 
-                render_pass.set_pipeline(self.pipeline);
-                render_pass.set_bind_group(0, self.uniform_bg, null);
-                render_pass.set_bind_group(1, self.font_texture_bg, null);
-                render_pass.set_vertex_buffer(0, self.vtx_buffer.buffer, 0, @intCast(self.vtx_buffer.desc.size));
-                render_pass.set_index_buffer(self.idx_buffer.buffer, .Uint32, 0, @intCast(self.idx_buffer.desc.size));
-                render_pass.set_scissor_rect(
-                    blas.vec2u(@intFromFloat(command.ClipRect.x), @intFromFloat(command.ClipRect.y)),
-                    blas.vec2u(
-                        @intFromFloat(command.ClipRect.z - command.ClipRect.x),
-                        @intFromFloat(command.ClipRect.w - command.ClipRect.y),
-                    ),
-                );
+            render_pass.set_pipeline(self.pipeline);
+            render_pass.set_bind_group(0, self.uniform_bg, null);
+            render_pass.set_bind_group(1, self.font_texture_bg, null);
+            render_pass.set_vertex_buffer(0, self.vtx_buffer.buffer, 0, @intCast(self.vtx_buffer.desc.size));
+            render_pass.set_index_buffer(self.idx_buffer.buffer, .Uint32, 0, @intCast(self.idx_buffer.desc.size));
+            render_pass.set_scissor_rect(
+                blas.vec2u(@intFromFloat(command.ClipRect.x), @intFromFloat(command.ClipRect.y)),
+                blas.vec2u(
+                    @intFromFloat(command.ClipRect.z - command.ClipRect.x),
+                    @intFromFloat(command.ClipRect.w - command.ClipRect.y),
+                ),
+            );
 
-                render_pass.draw_indexed(wgpu.RenderPass.IndexedDrawArgs{
-                    .first_index = @intCast(idx_offset),
-                    .index_count = @intCast(command.ElemCount),
-                    .base_vertex = @intCast(vtx_offset),
-                    .first_instance = 0,
-                    .instance_count = 1,
-                });
+            render_pass.draw_indexed(wgpu.RenderPass.IndexedDrawArgs{
+                .first_index = @intCast(idx_offset),
+                .index_count = @intCast(command.ElemCount),
+                .base_vertex = @intCast(vtx_offset),
+                .first_instance = 0,
+                .instance_count = 1,
+            });
 
-                render_pass.end();
-                render_pass.deinit();
-            }
+            render_pass.end();
+            render_pass.deinit();
         }
     }
+}

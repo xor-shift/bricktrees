@@ -138,17 +138,11 @@ pub fn build(b: *std.Build) void {
         run_step.dependOn(&run_cmd.step);
     }
 
-    const ztap_dep = b.dependency("ztap", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    const ztap = ztap_dep.module("ztap");
-
     // executable's tests
     {
         const exe_tests = b.addTest(.{
             .root_source_file = b.path("src/main.zig"),
-            .test_runner = b.path("test_runner.zig"),
+            .test_runner = b.path("src/test_runner.zig"),
             .target = target,
             .optimize = optimize,
         });
@@ -156,7 +150,6 @@ pub fn build(b: *std.Build) void {
         exe_tests.root_module.addImport("qoi", qoi);
         exe_tests.root_module.addImport("blas", blas);
         exe_tests.root_module.addImport("imgui", imgui);
-        exe_tests.root_module.addImport("ztap", ztap);
         // link_to_wgpu_and_sdl(b, exe_tests);
 
         var run_exe_tests = b.addRunArtifact(exe_tests);
@@ -169,11 +162,10 @@ pub fn build(b: *std.Build) void {
     inline for (.{ "blas", "qoi", "imgui" }) |lib_name| {
         const tests = b.addTest(.{
             .root_source_file = b.path(std.fmt.comptimePrint("lib/{s}/root.zig", .{lib_name})),
-            .test_runner = b.path("test_runner.zig"),
+            .test_runner = b.path("src/test_runner.zig"),
             .target = target,
             .optimize = optimize,
         });
-        tests.root_module.addImport("ztap", ztap);
 
         var run_tests = b.addRunArtifact(tests);
         run_tests.has_side_effects = true;
