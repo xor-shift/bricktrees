@@ -22,14 +22,6 @@ pub const Any = struct {
         on_alloc.destroy(@as(*Self, @ptrCast(@alignCast(self_arg))));
     }
 
-    pub fn on_ready(self_arg: *anyopaque) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).on_ready();
-    }
-
-    pub fn on_shutdown(self_arg: *anyopaque) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).on_shutdown();
-    }
-
     pub fn on_resize(self_arg: *anyopaque, dims: blas.Vec2uz) anyerror!void {
         try @as(*Self, @ptrCast(@alignCast(self_arg))).on_resize(dims);
     }
@@ -54,6 +46,17 @@ pub fn deinit(self: *Self) void {
     self.context.deinit();
 }
 
+pub fn to_any(self: *Self) AnyThing {
+    return .{
+        .thing = @ptrCast(self),
+
+        .deinit = Self.Any.deinit,
+        .destroy = Self.Any.destroy,
+        .on_resize = Self.Any.on_resize,
+        .on_raw_event = Self.Any.on_raw_event,
+    };
+}
+
 pub fn c(self: *Self) *imgui.c.ImGuiContext {
     return self.context.context;
 }
@@ -64,27 +67,6 @@ pub fn ctx_guard(self: *Self) imgui.ContextGuard {
 
 pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
     try self.context.render(encoder, onto);
-}
-
-pub fn to_any(self: *Self) AnyThing {
-    return .{
-        .thing = @ptrCast(self),
-
-        .deinit = Self.Any.deinit,
-        .destroy = Self.Any.destroy,
-        .on_ready = Self.Any.on_ready,
-        .on_shutdown = Self.Any.on_shutdown,
-        .on_resize = Self.Any.on_resize,
-        .on_raw_event = Self.Any.on_raw_event,
-    };
-}
-
-pub fn on_ready(self: *Self) !void {
-    _ = self;
-}
-
-pub fn on_shutdown(self: *Self) !void {
-    _ = self;
 }
 
 pub fn on_resize(self: *Self, dims: blas.Vec2uz) !void {

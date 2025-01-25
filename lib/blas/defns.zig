@@ -1,6 +1,12 @@
 const Matrix = @import("root.zig").Matrix;
 const Vector = @import("root.zig").Vector;
 
+pub fn explode(comptime T: type, comptime Dims: usize, v: T) Vector(T, Dims) {
+    var ret: Vector(T, Dims) = undefined;
+    @memset(&ret.el, v);
+    return ret;
+}
+
 // zig fmt: off
 pub const Vec2f = Vector(f32, 2);
 pub const Vec3f = Vector(f32, 3);
@@ -52,10 +58,26 @@ pub fn vec4uz(x: usize, y: usize, z: usize, w: usize) Vec4uz { return .{ .el = .
 pub fn vec2z(x: isize, y: isize) Vec2z { return .{ .el = .{x, y} }; }
 pub fn vec3z(x: isize, y: isize, z: isize) Vec3z { return .{ .el = .{x, y, z} }; }
 pub fn vec4z(x: isize, y: isize, z: isize, w: isize) Vec4z { return .{ .el = .{x, y, z, w} }; }
+
+pub fn splat2f(v: f32) Vec2f { return explode(f32, 2, v); }
+pub fn splat3f(v: f32) Vec3f { return explode(f32, 3, v); }
+pub fn splat4f(v: f32) Vec4f { return explode(f32, 4, v); }
+pub fn splat2d(v: f64) Vec2d { return explode(f64, 2, v); }
+pub fn splat3d(v: f64) Vec3d { return explode(f64, 3, v); }
+pub fn splat4d(v: f64) Vec4d { return explode(f64, 4, v); }
+
+pub fn splat2u(v: u32) Vec2u { return explode(u32, 2, v); }
+pub fn splat3u(v: u32) Vec3u { return explode(u32, 3, v); }
+pub fn splat4u(v: u32) Vec4u { return explode(u32, 4, v); }
+pub fn splat2i(v: i32) Vec2i { return explode(i32, 2, v); }
+pub fn splat3i(v: i32) Vec3i { return explode(i32, 3, v); }
+pub fn splat4i(v: i32) Vec4i { return explode(i32, 4, v); }
+
+pub fn splat2uz(v: usize) Vec2uz { return explode(usize, 2, v); }
+pub fn splat3uz(v: usize) Vec3uz { return explode(usize, 3, v); }
+pub fn splat4uz(v: usize) Vec4uz { return explode(usize, 4, v); }
+pub fn splat2z(v: isize) Vec2z { return explode(isize, 2, v); }
+pub fn splat3z(v: isize) Vec3z { return explode(isize, 3, v); }
+pub fn splat4z(v: isize) Vec4z { return explode(isize, 4, v); }
 // zig fmt: on
 
-pub fn explode(comptime T: type, comptime Dims: usize, v: T) Vector(T, Dims) {
-    var ret: Vector(T, Dims) = undefined;
-    @memset(&ret.el, v);
-    return ret;
-}

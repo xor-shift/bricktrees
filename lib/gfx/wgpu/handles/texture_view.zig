@@ -36,6 +36,6 @@ pub const Handle = c.WGPUTextureView;
 
 handle: Handle = null,
 
-pub fn release(self: TextureView) void {
+pub fn deinit(self: TextureView) void {
     c.wgpuTextureViewRelease(self.handle);
 }

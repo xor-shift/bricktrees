@@ -26,6 +26,8 @@ pub const BindingResource = union(enum) {
     Sampler: Sampler,
     TextureView: TextureView,
 
+    BufferArray: []Buffer,
+    SamplerArray: []Sampler,
     TextureViewArray: []TextureView,
 };
 
@@ -35,7 +37,7 @@ pub const Entry = struct {
     binding: u32,
     resource: BindingResource,
 
-    pub fn get(self: Entry) NativeType {
+    pub fn get(self: Entry, helper: *ConversionHelper) NativeType {
         var ret: NativeType = .{
             .binding = self.binding,
         };
@@ -48,7 +50,31 @@ pub const Entry = struct {
             },
             .Sampler => |v| ret.sampler = v.handle,
             .TextureView => |v| ret.textureView = v.handle,
-            .TextureViewArray => |_| std.debug.panic("NYI", .{}),
+            .BufferArray => |v| {
+                const extras = helper.create(c.WGPUBindGroupEntryExtras);
+                extras.* = c.WGPUBindGroupEntryExtras{
+                    .chain = .{
+                        .next = null,
+                        .sType = c.WGPUSType_BindGroupEntryExtras,
+                    },
+                    .bufferCount = v.len,
+                    .buffers = @ptrCast(v.ptr),
+                };
+                ret.nextInChain = &extras.chain;
+            },
+            .SamplerArray => |_| @panic("NYI"),
+            .TextureViewArray => |v| {
+                const extras = helper.create(c.WGPUBindGroupEntryExtras);
+                extras.* = c.WGPUBindGroupEntryExtras{
+                    .chain = .{
+                        .next = null,
+                        .sType = c.WGPUSType_BindGroupEntryExtras,
+                    },
+                    .textureViewCount = v.len,
+                    .textureViews = @ptrCast(v.ptr),
+                };
+                ret.nextInChain = &extras.chain;
+            },
         }
 
         return ret;
@@ -68,7 +94,7 @@ pub const Descriptor = struct {
             .label = if (self.label) |v| v.ptr else null,
             .layout = self.layout.handle,
             .entryCount = self.entries.len,
-            .entries = helper.array_helper(false, Entry, self.entries),
+            .entries = helper.array_helper(true, Entry, self.entries),
         };
     }
 };

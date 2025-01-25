@@ -1,9 +1,9 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const color = @import("color.zig");
+pub const color = @import("color.zig");
 
-const Image = @import("image.zig");
+pub const Image = @import("image.zig");
 
 test {
     std.testing.refAllDecls(color);

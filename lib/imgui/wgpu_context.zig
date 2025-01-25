@@ -14,6 +14,8 @@ const Vec = @import("vec.zig").Vec;
 
 const Self = @This();
 
+const do_log: bool = false;
+
 device: wgpu.Device,
 queue: wgpu.Queue,
 
@@ -36,7 +38,7 @@ vtx_buffer: VariableBuffer,
 idx_buffer: VariableBuffer,
 
 pub fn init(device: wgpu.Device, queue: wgpu.Queue) !Self {
-    const ctx = c.igCreateContext(null) orelse std.debug.panic("igCreateContext returned null", .{});
+    const ctx = c.igCreateContext(null) orelse @panic("igCreateContext returned null");
     c.igSetCurrentContext(ctx);
 
     c.igStyleColorsDark(null);
@@ -285,15 +287,17 @@ pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView)
     // blue : \x1b[34m (command)
     // magn.: \x1b[35m (draw list)
 
-    std.log.debug( //
-        "\x1b[1mImDrawData\x1b[0m: " ++
-        "\x1b[31m{d}\x1b[0m idxs, " ++
-        "\x1b[32m{d}\x1b[0m vtxs, " ++
-        "\x1b[35m{d}\x1b[0m drls", .{
-        draw_data.TotalIdxCount,
-        draw_data.TotalVtxCount,
-        draw_data.CmdListsCount,
-    });
+    if (do_log) {
+        std.log.debug( //
+            "\x1b[1mImDrawData\x1b[0m: " ++
+            "\x1b[31m{d}\x1b[0m idxs, " ++
+            "\x1b[32m{d}\x1b[0m vtxs, " ++
+            "\x1b[35m{d}\x1b[0m drls", .{
+            draw_data.TotalIdxCount,
+            draw_data.TotalVtxCount,
+            draw_data.CmdListsCount,
+        });
+    }
 
     if (draw_data.TotalIdxCount == 0) {
         return;
@@ -316,35 +320,39 @@ pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView)
         defer global_idx_offset += idx_buffer.items.len;
         defer global_vtx_offset += vtx_buffer.items.len;
 
-        std.log.debug( //
-            "  \x1b[1mImDrawList\x1b[0m #\x1b[35m{d}\x1b[0m: " ++
-            "\x1b[31m{d}\x1b[0m idxs, " ++
-            "\x1b[32m{d}\x1b[0m vtxs, " ++
-            "\x1b[34m{d}\x1b[0m cmds", .{
-            draw_list_no,
-            idx_buffer.items.len,
-            vtx_buffer.items.len,
-            cmd_buffer.items.len,
-        });
+        if (do_log) {
+            std.log.debug( //
+                "  \x1b[1mImDrawList\x1b[0m #\x1b[35m{d}\x1b[0m: " ++
+                "\x1b[31m{d}\x1b[0m idxs, " ++
+                "\x1b[32m{d}\x1b[0m vtxs, " ++
+                "\x1b[34m{d}\x1b[0m cmds", .{
+                draw_list_no,
+                idx_buffer.items.len,
+                vtx_buffer.items.len,
+                cmd_buffer.items.len,
+            });
+        }
 
         for (0.., cmd_buffer.items) |command_no, command| {
             const idx_offset = global_idx_offset + @as(usize, @intCast(command.IdxOffset));
             const vtx_offset = global_vtx_offset + @as(usize, @intCast(command.VtxOffset));
 
-            std.log.debug("    \x1b[1mImDrawCmd\x1b[0m #\x1b[34m{d}\x1b[0m:", .{command_no});
-            std.log.debug("      [\x1b[31m{d} ({d} (g) + {d} (l)), {d}\x1b[0m) (\x1b[31m{d}\x1b[0m total)", .{
-                idx_offset,
-                global_idx_offset,
-                command.IdxOffset,
-                (idx_offset + command.ElemCount),
-                command.ElemCount,
-            });
-            std.log.debug("      [\x1b[32m{d} ({d} (g) + {d} (l)), ...\x1b[0m)", .{
-                vtx_offset,
-                global_vtx_offset,
-                command.VtxOffset,
-            });
-            std.log.debug("      texture #\x1b[1m{d}\x1b[0m", .{command.TextureId});
+            if (do_log) {
+                std.log.debug("    \x1b[1mImDrawCmd\x1b[0m #\x1b[34m{d}\x1b[0m:", .{command_no});
+                std.log.debug("      [\x1b[31m{d} ({d} (g) + {d} (l)), {d}\x1b[0m) (\x1b[31m{d}\x1b[0m total)", .{
+                    idx_offset,
+                    global_idx_offset,
+                    command.IdxOffset,
+                    (idx_offset + command.ElemCount),
+                    command.ElemCount,
+                });
+                std.log.debug("      [\x1b[32m{d} ({d} (g) + {d} (l)), ...\x1b[0m)", .{
+                    vtx_offset,
+                    global_vtx_offset,
+                    command.VtxOffset,
+                });
+                std.log.debug("      texture #\x1b[1m{d}\x1b[0m", .{command.TextureId});
+            }
 
             const render_pass = try encoder.begin_render_pass(.{
                 .label = "imgui render pass",

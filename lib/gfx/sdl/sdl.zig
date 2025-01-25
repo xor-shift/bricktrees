@@ -111,7 +111,7 @@ pub const Window = struct {
 
     pub fn get_surface(self: @This(), instance: wgpu.Instance) !wgpu.Surface {
         if (c.SDL_strcmp(c.SDL_GetCurrentVideoDriver(), "wayland") != 0) {
-            std.debug.panic("expected to be running under wayland, bailing", .{});
+            @panic("expected to be running under wayland, bailing");
         }
 
         const properties = c.SDL_GetWindowProperties(self.handle);
@@ -142,7 +142,7 @@ pub const Window = struct {
         };
 
         const wgpu_surface = wgpu_c.wgpuInstanceCreateSurface(instance.handle, &surface_descriptor) orelse {
-            std.debug.panic("failed to create a wgpu surface", .{});
+            @panic("failed to create a wgpu surface");
         };
 
         return .{ .handle = wgpu_surface };

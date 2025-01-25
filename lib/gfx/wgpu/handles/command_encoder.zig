@@ -31,7 +31,7 @@ pub const Handle = c.WGPUCommandEncoder;
 
 handle: Handle = null,
 
-pub fn release(self: CommandEncoder) void {
+pub fn deinit(self: CommandEncoder) void {
     c.wgpuCommandEncoderRelease(self.handle);
 }
 

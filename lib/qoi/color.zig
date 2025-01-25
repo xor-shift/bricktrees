@@ -51,7 +51,7 @@ fn SmallQueue(comptime T: type, comptime storage_size: usize) type {
 
         fn enqueue(self: *@This(), v: T) void {
             if (self.elem_count == storage_size) {
-                std.debug.panic("failed to enqueue element, storage is full", .{});
+                @panic("failed to enqueue element, storage is full");
             }
 
             self.storage[self.write_head % storage_size] = v;

@@ -38,6 +38,7 @@
           { "name": "PartiallyBoundBindingArray", "doc": "TODO\n" },
           { "name": "TextureFormat16bitNorm", "doc": "TODO\n" },
           { "name": "TextureCompressionAstcHdr", "doc": "TODO\n" },
+          { "name": "Reserved3000D", "doc": "TODO\n" },
           { "name": "MappablePrimaryBuffers", "doc": "TODO\n" },
           { "name": "BufferBindingArray", "doc": "TODO\n" },
           { "name": "UniformBufferAndStorageTextureArrayNonUniformIndexing", "doc": "TODO\n" },

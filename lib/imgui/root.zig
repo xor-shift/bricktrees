@@ -49,7 +49,7 @@ fn im_alloc_func(sz: usize, user_data: ?*anyopaque) callconv(.C) ?*anyopaque {
     const g: *Globals = @ptrCast(@alignCast(user_data.?));
     std.debug.assert(g == &globals);
 
-    const allocation = g.allocator.alignedAlloc(u8, 32, sz + @sizeOf(AllocationHeader)) catch std.debug.panic("failed to allocate for imgui", .{});
+    const allocation = g.allocator.alignedAlloc(u8, 32, sz + @sizeOf(AllocationHeader)) catch @panic("failed to allocate for imgui");
 
     const header: AllocationHeader = .{
         .allocation_size = @intCast(sz),

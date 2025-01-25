@@ -99,7 +99,7 @@ pub const Entry = struct {
             .visibility = auto.get_flags(self.visibility),
         };
 
-        if (self.count) |count| {
+        ret.nextInChain = if (self.count) |count| blk: {
             const extras = helper.create(c.WGPUBindGroupLayoutEntryExtras);
             extras.* = .{
                 .chain = .{
@@ -108,8 +108,9 @@ pub const Entry = struct {
                 },
                 .count = @intCast(count),
             };
-            ret.nextInChain = &extras.chain;
-        }
+
+            break :blk &extras.chain;
+        } else null;
 
         switch (self.layout) {
             .Buffer => |v| ret.buffer = v.get(),

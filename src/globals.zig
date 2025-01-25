@@ -12,6 +12,8 @@ const AnyThing = @import("thing.zig").AnyThing;
 
 const GuiThing = @import("things/gui.zig");
 
+pub const default_resolution: blas.Vec2uz = blas.vec2uz(1280, 720);
+
 alloc: std.mem.Allocator,
 
 instance: wgpu.Instance,
@@ -34,33 +36,42 @@ const max_n: usize = 2;
 const arena_size: usize = 16 * 1024 * 1024;
 
 const Any = struct {
-    pub fn deinit(self_arg: *anyopaque) void {
-        _ = self_arg;
+    fn init(self: *Self) AnyThing {
+        _ = self;
 
-        g.self_deinit();
+        return .{
+            .thing = undefined,
+
+            .on_ready = Self.Any.on_ready,
+            .on_shutdown = Self.Any.on_shutdown,
+            .on_resize = Self.Any.on_resize,
+            .on_raw_event = Self.Any.on_raw_event,
+
+            .do_gui = Self.Any.do_gui,
+            .render = Self.Any.render,
+        };
     }
 
-    pub fn destroy(self_arg: *anyopaque, on_alloc: std.mem.Allocator) void {
-        _ = self_arg;
-        _ = on_alloc;
-    }
+    pub fn on_ready(_: *anyopaque) anyerror!void {}
 
-    pub fn on_ready(self_arg: *anyopaque) anyerror!void {
-        _ = self_arg;
-    }
+    pub fn on_shutdown(_: *anyopaque) anyerror!void {}
 
-    pub fn on_shutdown(self_arg: *anyopaque) anyerror!void {
-        _ = self_arg;
-    }
-
-    pub fn on_resize(self_arg: *anyopaque, new: blas.Vec2uz) anyerror!void {
-        _ = self_arg;
+    pub fn on_resize(_: *anyopaque, new: blas.Vec2uz) anyerror!void {
         try g.resize_impl(new);
     }
 
-    pub fn on_raw_event(self_arg: *anyopaque, ev: sdl.c.SDL_Event) anyerror!void {
-        _ = self_arg;
+    pub fn on_raw_event(_: *anyopaque, ev: sdl.c.SDL_Event) anyerror!void {
         try g.on_raw_event(ev);
+    }
+
+    pub fn do_gui(_: *anyopaque) anyerror!void {
+        try g.do_gui();
+    }
+
+    pub fn render(_: *anyopaque, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
+        _ = encoder;
+        _ = onto;
+        // try g.render(encoder, onto);
     }
 };
 
@@ -97,8 +108,18 @@ pub fn init(dims: blas.Vec2uz, alloc: std.mem.Allocator) !Self {
     const device = try adapter.request_device_sync(.{
         .label = "device",
         .required_features = &.{
-            wgpu.FeatureName.BGRA8UnormStorage,
+            wgpu.FeatureName.BufferBindingArray,
+            wgpu.FeatureName.TextureBindingArray,
+
+            wgpu.FeatureName.StorageResourceBindingArray,
+
             wgpu.FeatureName.SampledTextureAndStorageBufferArrayNonUniformIndexing,
+        },
+        .required_limits = .{
+            .limits = .{
+                .max_sampled_textures_per_shader_stage = 2048,
+                .max_storage_buffers_per_shader_stage = 2048,
+            },
         },
     });
     errdefer device.deinit();
@@ -128,22 +149,26 @@ pub fn init(dims: blas.Vec2uz, alloc: std.mem.Allocator) !Self {
     return ret;
 }
 
-fn to_any(self: *Self) AnyThing {
-    _ = self;
-
-    return .{
-        .thing = undefined,
-
-        .deinit = Self.Any.deinit,
-        .destroy = Self.Any.destroy,
-        .on_ready = Self.Any.on_ready,
-        .on_shutdown = Self.Any.on_shutdown,
-        .on_resize = Self.Any.on_resize,
-        .on_raw_event = Self.Any.on_raw_event,
-    };
+pub fn to_any(self: *Self) AnyThing {
+    return Self.Any.init(self);
 }
 
-fn self_deinit(self: *Self) void {
+pub fn deinit(self: *Self) void {
+    for (0..self.things.items.len) |i| {
+        const j = self.things.items.len - i - 1;
+
+        if (j == 0) {
+            return;
+        }
+
+        const thing = &self.things.items[j];
+
+        thing.deinit(thing.thing);
+
+        thing.destroy(thing.thing, self.alloc);
+        thing.* = undefined;
+    }
+
     defer self.* = undefined;
 
     self.things.deinit();
@@ -159,34 +184,6 @@ fn self_deinit(self: *Self) void {
 
     imgui.deinit();
     sdl.deinit();
-}
-
-pub fn deinit(self: *Self) void {
-    for (0..self.things.items.len) |i| {
-        const j = self.things.items.len - i - 1;
-        const thing = &self.things.items[j];
-
-        thing.deinit(thing.thing);
-
-        if (j == 0) { // lest we crash
-            return;
-        }
-
-        thing.destroy(thing.thing, self.alloc);
-        thing.* = undefined;
-    }
-}
-
-fn resize_impl(self: *Self, dims: blas.Vec2uz) !void {
-    try self.surface.configure(.{
-        .device = self.device,
-        .format = .BGRA8Unorm,
-        .usage = .{ .render_attachment = true },
-        .view_formats = &.{.BGRA8UnormSrgb},
-        .width = @intCast(dims.x()),
-        .height = @intCast(dims.y()),
-        .present_mode = .Fifo,
-    });
 }
 
 pub fn resize(self: *Self, dims: blas.Vec2uz) !void {
@@ -213,6 +210,54 @@ pub fn new_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     }
 }
 
+pub fn gui_step(self: *Self) void {
+    const _context_guard = imgui.ContextGuard.init(self.gui.c());
+    defer _context_guard.deinit();
+
+    for (self.things.items) |thing| {
+        thing.do_gui(thing.thing) catch |e| {
+            std.log.err("error while calling do_gui on AnyThing @ {p}: {any}", .{
+                thing.thing,
+                e,
+            });
+        };
+    }
+}
+
+pub fn render_step(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) void {
+    for (self.things.items) |thing| {
+        thing.render(thing.thing, encoder, onto) catch |e| {
+            std.log.err("error while calling render on AnyThing @ {p}: {any}", .{
+                thing.thing,
+                e,
+            });
+        };
+    }
+}
+
+// The short name which stands for "n-frame-ly allocator" is for ease of typing.
+// This returns an arena that will be valid until the end of the next n frames.
+// An `n` valeu of 0 means that the arena will last 'til the end of the frame.
+// Max n is determined beforehand and is most likely 2.
+pub fn nfa(self: *Self, comptime n: usize) std.mem.Allocator {
+    _ = self;
+    _ = n;
+
+    return undefined;
+}
+
+fn resize_impl(self: *Self, dims: blas.Vec2uz) !void {
+    try self.surface.configure(.{
+        .device = self.device,
+        .format = .BGRA8Unorm,
+        .usage = .{ .render_attachment = true },
+        .view_formats = &.{.BGRA8UnormSrgb},
+        .width = @intCast(dims.x()),
+        .height = @intCast(dims.y()),
+        .present_mode = .Fifo,
+    });
+}
+
 fn on_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     switch (ev.common.type) {
         sdl.c.SDL_EVENT_WINDOW_RESIZED => {
@@ -227,13 +272,8 @@ fn on_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     }
 }
 
-// The short name which stands for "n-frame-ly allocator" is for ease of typing.
-// This returns an arena that will be valid until the end of the next n frames.
-// An `n` valeu of 0 means that the arena will last 'til the end of the frame.
-// Max n is determined beforehand and is most likely 2.
-fn nfa(self: *Self, comptime n: usize) std.mem.Allocator {
+fn do_gui(self: *Self) !void {
     _ = self;
-    _ = n;
 
-    return undefined;
+    imgui.c.igShowMetricsWindow(null);
 }

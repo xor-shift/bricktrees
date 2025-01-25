@@ -30,7 +30,7 @@ pub const Handle = c.WGPUComputePassEncoder;
 
 handle: Handle = null,
 
-pub fn release(self: ComputePass) void {
+pub fn deinit(self: ComputePass) void {
     c.wgpuComputePassEncoderRelease(self.handle);
 }
 

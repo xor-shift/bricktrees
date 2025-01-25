@@ -28,6 +28,6 @@ pub const Handle = c.WGPUCommandBuffer;
 
 handle: Handle = null,
 
-pub fn release(self: CommandBuffer) void {
+pub fn deinit(self: CommandBuffer) void {
     c.wgpuCommandBufferRelease(self.handle);
 }

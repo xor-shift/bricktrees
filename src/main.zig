@@ -9,33 +9,25 @@ const wgpu = @import("gfx").wgpu;
 const AnyThing = @import("thing.zig").AnyThing;
 const Globals = @import("globals.zig");
 
+const GPUThing = @import("things/gpu.zig");
 const GuiThing = @import("things/gui.zig");
 
 pub var g: Globals = undefined;
 
-fn initialize_things(alloc: std.mem.Allocator) !void {
-    g = try Globals.init(blas.vec2uz(1280, 720), alloc);
-    errdefer {
-        g.deinit();
-        g = undefined;
-    }
+fn initialize_things(alloc: std.mem.Allocator) void {
+    g = Globals.init(Globals.default_resolution, alloc) catch @panic("Globals.init");
 
-    // THINGS
+    const gui = alloc.create(GuiThing) catch @panic("alloc.create(GuiThing)");
+    gui.* = GuiThing.init() catch @panic("GuiThing.init()");
+    g.things.append(gui.to_any()) catch @panic("g.things.append");
 
-    {
-        const gui = try alloc.create(GuiThing);
-        errdefer alloc.destroy(gui);
+    g.gui = gui;
 
-        gui.* = try GuiThing.init();
-        errdefer gui.*.deinit();
+    const gpu = alloc.create(GPUThing) catch @panic("alloc.create(GPUThing)");
+    gpu.* = GPUThing.init(alloc) catch @panic("GPUThing.init()");
+    g.things.append(gpu.to_any()) catch @panic("g.things.append");
 
-        try g.things.append(gui.to_any());
-        g.gui = gui;
-    }
-
-    // FINISH
-
-    try g.resize(blas.vec2uz(1280, 720));
+    g.resize(Globals.default_resolution) catch @panic("g.resize");
 }
 
 fn deinitialize_things() void {
@@ -47,11 +39,7 @@ pub fn main() !void {
     const alloc = gpa.allocator();
     defer if (gpa.deinit() == .leak) std.log.warn("leaked memory", .{});
 
-    initialize_things(alloc) catch |e| {
-        std.log.err("initialization failed: {any}", .{e});
-        std.process.exit(1);
-    };
-
+    initialize_things(alloc);
     defer deinitialize_things();
 
     var frame_timer = try std.time.Timer.start();
@@ -91,19 +79,21 @@ pub fn main() !void {
         imgui.c.igNewFrame();
         defer imgui.c.igEndFrame();
 
-        imgui.c.igShowMetricsWindow(null);
-
         const command_encoder = try g.device.create_command_encoder(null);
+
+        g.gui_step();
+
+        g.render_step(command_encoder, current_texture_view);
 
         try g.gui.render(command_encoder, current_texture_view);
 
-        current_texture_view.release();
+        current_texture_view.deinit();
 
         const command_buffer = try command_encoder.finish(null);
-        command_encoder.release();
+        command_encoder.deinit();
 
         g.queue.submit((&command_buffer)[0..1]);
-        command_buffer.release();
+        command_buffer.deinit();
 
         g.surface.present();
 
@@ -122,11 +112,11 @@ test {
     std.testing.refAllDecls(@import("sgr.zig"));
 }
 
-test "will leak" {
-    const alloc = std.testing.allocator_instance.allocator();
-    _ = try alloc.alloc(u8, 1);
-}
-
-test "will fail" {
-    try std.testing.expectEqual(true, false);
-}
+// test "will leak" {
+//     const alloc = std.testing.allocator_instance.allocator();
+//     _ = try alloc.alloc(u8, 1);
+// }
+//
+// test "will fail" {
+//     try std.testing.expectEqual(true, false);
+// }

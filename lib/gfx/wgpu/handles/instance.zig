@@ -19,7 +19,7 @@ handle: Handle = null,
 
 pub fn init() Instance {
     const instance = c.wgpuCreateInstance(&.{}) orelse {
-        std.debug.panic("failed to create a wgpu instance", .{});
+        @panic("failed to create a wgpu instance");
     };
 
     return .{

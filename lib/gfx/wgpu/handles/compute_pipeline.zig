@@ -53,3 +53,7 @@ pub const Descriptor = struct {
 pub const Handle = c.WGPUComputePipeline;
 
 handle: Handle = null,
+
+pub fn deinit(self: ComputePipeline) void {
+    c.wgpuComputePipelineRelease(self.handle);
+}

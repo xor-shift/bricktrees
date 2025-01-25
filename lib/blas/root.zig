@@ -256,6 +256,21 @@ pub fn reduce(vec: anytype, op: builtin.ReduceOp) @TypeOf(vec).ValueType {
     return ret;
 }
 
+pub fn equal(lhs: anytype, rhs: @TypeOf(lhs)) Traits(@TypeOf(lhs)).Rebind(bool) {
+    const Mat = @TypeOf(lhs);
+    const Rebound = Traits(Mat).Rebind(bool);
+
+    var ret: Rebound = undefined;
+
+    for (0..Mat.rows) |row| for (0..Mat.cols) |col| {
+        const lhs_val = lhs.get(row, col);
+        const rhs_val = rhs.get(row, col);
+        ret.set(row, col, lhs_val == rhs_val);
+    };
+
+    return ret;
+}
+
 pub fn less_than(lhs: anytype, rhs: @TypeOf(lhs)) Traits(@TypeOf(lhs)).Rebind(bool) {
     const Mat = @TypeOf(lhs);
     const Rebound = Traits(Mat).Rebind(bool);

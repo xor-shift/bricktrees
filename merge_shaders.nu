@@ -10,5 +10,5 @@ def merge_shader [name: string] {
     merge_shaders $"./run/shaders/($name).wgsl" $all_files
 }
 
-merge_shader ray_tracer
+merge_shader compute
 merge_shader visualiser

@@ -6,6 +6,9 @@ const Promise = @import("core").Promise;
 
 const auto = @import("auto.zig");
 const common = @import("common.zig");
+const constants = @import("constants.zig");
+
+pub usingnamespace constants;
 
 //pub usingnamespace @import("enums.zig");
 pub usingnamespace @import("generated/enums.zig");
@@ -269,38 +272,38 @@ pub const VertexState = struct {
 pub const Limits = struct {
     pub const NativeType = c.WGPULimits;
 
-    max_texture_dimension_1d: u32 = 0,
-    max_texture_dimension_2d: u32 = 0,
-    max_texture_dimension_3d: u32 = 0,
-    max_texture_array_layers: u32 = 0,
-    max_bind_groups: u32 = 0,
-    max_bind_groups_plus_vertex_buffers: u32 = 0,
-    max_bindings_per_bind_group: u32 = 0,
-    max_dynamic_uniform_buffers_per_pipeline_layout: u32 = 0,
-    max_dynamic_storage_buffers_per_pipeline_layout: u32 = 0,
-    max_sampled_textures_per_shader_stage: u32 = 0,
-    max_samplers_per_shader_stage: u32 = 0,
-    max_storage_buffers_per_shader_stage: u32 = 0,
-    max_storage_textures_per_shader_stage: u32 = 0,
-    max_uniform_buffers_per_shader_stage: u32 = 0,
-    max_uniform_buffer_binding_size: u64 = 0,
-    max_storage_buffer_binding_size: u64 = 0,
-    min_uniform_buffer_offset_alignment: u32 = 0,
-    min_storage_buffer_offset_alignment: u32 = 0,
-    max_vertex_buffers: u32 = 0,
-    max_buffer_size: u64 = 0,
-    max_vertex_attributes: u32 = 0,
-    max_vertex_buffer_array_stride: u32 = 0,
-    max_inter_stage_shader_components: u32 = 0,
-    max_inter_stage_shader_variables: u32 = 0,
-    max_color_attachments: u32 = 0,
-    max_color_attachment_bytes_per_sample: u32 = 0,
-    max_compute_workgroup_storage_size: u32 = 0,
-    max_compute_invocations_per_workgroup: u32 = 0,
-    max_compute_workgroup_size_x: u32 = 0,
-    max_compute_workgroup_size_y: u32 = 0,
-    max_compute_workgroup_size_z: u32 = 0,
-    max_compute_workgroups_per_dimension: u32 = 0,
+    max_texture_dimension_1d: u32 = constants.limit_u32_undefined,
+    max_texture_dimension_2d: u32 = constants.limit_u32_undefined,
+    max_texture_dimension_3d: u32 = constants.limit_u32_undefined,
+    max_texture_array_layers: u32 = constants.limit_u32_undefined,
+    max_bind_groups: u32 = constants.limit_u32_undefined,
+    max_bind_groups_plus_vertex_buffers: u32 = constants.limit_u32_undefined,
+    max_bindings_per_bind_group: u32 = constants.limit_u32_undefined,
+    max_dynamic_uniform_buffers_per_pipeline_layout: u32 = constants.limit_u32_undefined,
+    max_dynamic_storage_buffers_per_pipeline_layout: u32 = constants.limit_u32_undefined,
+    max_sampled_textures_per_shader_stage: u32 = constants.limit_u32_undefined,
+    max_samplers_per_shader_stage: u32 = constants.limit_u32_undefined,
+    max_storage_buffers_per_shader_stage: u32 = constants.limit_u32_undefined,
+    max_storage_textures_per_shader_stage: u32 = constants.limit_u32_undefined,
+    max_uniform_buffers_per_shader_stage: u32 = constants.limit_u32_undefined,
+    max_uniform_buffer_binding_size: u64 = constants.limit_u64_undefined,
+    max_storage_buffer_binding_size: u64 = constants.limit_u64_undefined,
+    min_uniform_buffer_offset_alignment: u32 = constants.limit_u32_undefined,
+    min_storage_buffer_offset_alignment: u32 = constants.limit_u32_undefined,
+    max_vertex_buffers: u32 = constants.limit_u32_undefined,
+    max_buffer_size: u64 = constants.limit_u64_undefined,
+    max_vertex_attributes: u32 = constants.limit_u32_undefined,
+    max_vertex_buffer_array_stride: u32 = constants.limit_u32_undefined,
+    max_inter_stage_shader_components: u32 = constants.limit_u32_undefined,
+    max_inter_stage_shader_variables: u32 = constants.limit_u32_undefined,
+    max_color_attachments: u32 = constants.limit_u32_undefined,
+    max_color_attachment_bytes_per_sample: u32 = constants.limit_u32_undefined,
+    max_compute_workgroup_storage_size: u32 = constants.limit_u32_undefined,
+    max_compute_invocations_per_workgroup: u32 = constants.limit_u32_undefined,
+    max_compute_workgroup_size_x: u32 = constants.limit_u32_undefined,
+    max_compute_workgroup_size_y: u32 = constants.limit_u32_undefined,
+    max_compute_workgroup_size_z: u32 = constants.limit_u32_undefined,
+    max_compute_workgroups_per_dimension: u32 = constants.limit_u32_undefined,
 
     pub fn get(self: Limits) NativeType {
         return auto.wgpu_struct_get(null, NativeType, self);
@@ -324,8 +327,8 @@ pub const NativeLimits = struct {
 pub const RequiredLimits = struct {
     pub const NativeType = c.WGPURequiredLimits;
 
-    native_limits: ?NativeLimits,
-    limits: Limits,
+    native_limits: ?NativeLimits = null,
+    limits: Limits = .{},
 
     pub fn get(self: RequiredLimits, helper: *ConversionHelper) NativeType {
         const chained = helper.optional_helper(false, NativeLimits, self.native_limits);
