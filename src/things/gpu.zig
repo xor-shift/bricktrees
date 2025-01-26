@@ -9,6 +9,10 @@ const AnyThing = @import("../thing.zig").AnyThing;
 
 const g = &@import("../main.zig").g;
 
+const BufferArray = @import("gpu/BufferArray.zig");
+const TextureAndView = @import("gpu/TextureAndView.zig");
+const TVArray = @import("gpu/TVArray.zig");
+
 const Self = @This();
 
 pub const Any = struct {
@@ -51,6 +55,7 @@ pub const Any = struct {
     }
 };
 
+// Be careful: the vecN<T> of WGSL and the [N]T of C/Zig don't have the same alignment!
 const Uniforms = extern struct {
     dims: [2]f32,
     _padding_0: [2]u32 = undefined,
@@ -58,107 +63,6 @@ const Uniforms = extern struct {
     _padding_1: [1]f32 = undefined,
     look: [3]f32,
     _padding_2: [1]f32 = undefined,
-};
-
-const BufferArray = struct {
-    buffers: []wgpu.Buffer = &.{},
-
-    pub fn init(n: usize, device: wgpu.Device, desc: wgpu.Buffer.Descriptor, alloc: std.mem.Allocator) !BufferArray {
-        const buffers = try alloc.alloc(wgpu.Buffer, n);
-        errdefer alloc.free(buffers);
-
-        var buffers_created: usize = 0;
-        errdefer for (0..buffers_created) |i| {
-            buffers[i].deinit();
-        };
-
-        for (0..n) |i| {
-            const buffer = try device.create_buffer(desc);
-            errdefer buffer.deinit();
-
-            buffers[i] = buffer;
-
-            buffers_created += 1;
-        }
-
-        return .{
-            .buffers = buffers,
-        };
-    }
-
-    pub fn deinit(self: BufferArray, alloc: std.mem.Allocator) void {
-        for (self.buffers) |buffer| buffer.deinit();
-
-        alloc.free(self.buffers);
-    }
-};
-
-const TVArray = struct {
-    textures: []wgpu.Texture = &.{},
-    views: []wgpu.TextureView = &.{},
-
-    pub fn init(n: usize, device: wgpu.Device, tex_desc: wgpu.Texture.Descriptor, view_desc: ?wgpu.TextureView.Descriptor, alloc: std.mem.Allocator) !TVArray {
-        const textures = try alloc.alloc(wgpu.Texture, n);
-        errdefer alloc.free(textures);
-
-        const views = try alloc.alloc(wgpu.TextureView, n);
-        errdefer alloc.free(views);
-
-        var tvs_created: usize = 0;
-        errdefer for (0..tvs_created) |i| {
-            views[i].deinit();
-            textures[i].deinit();
-        };
-
-        for (0..n) |i| {
-            const texture = try device.create_texture(tex_desc);
-            errdefer texture.deinit();
-
-            const view = try texture.create_view(view_desc);
-            errdefer view.deinit();
-
-            textures[i] = texture;
-            views[i] = view;
-
-            tvs_created += 1;
-        }
-
-        return .{
-            .textures = textures,
-            .views = views,
-        };
-    }
-
-    pub fn deinit(self: TVArray, alloc: std.mem.Allocator) void {
-        for (self.views) |view| view.deinit();
-        for (self.textures) |texture| texture.deinit();
-
-        alloc.free(self.views);
-        alloc.free(self.textures);
-    }
-};
-
-const TextureAndView = struct {
-    texture: wgpu.Texture = .{},
-    view: wgpu.TextureView = .{},
-
-    pub fn init(device: wgpu.Device, tex_desc: wgpu.Texture.Descriptor, view_desc: ?wgpu.TextureView.Descriptor) !TextureAndView {
-        const texture = try device.create_texture(tex_desc);
-        errdefer texture.deinit();
-
-        const view = try texture.create_view(view_desc);
-        errdefer view.deinit();
-
-        return .{
-            .texture = texture,
-            .view = view,
-        };
-    }
-
-    pub fn deinit(self: TextureAndView) void {
-        self.texture.deinit();
-        self.view.deinit();
-    }
 };
 
 const Brickmap = @import("../brick/map.zig").U8Map(5);
