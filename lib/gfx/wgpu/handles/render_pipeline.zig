@@ -48,5 +48,5 @@ pub const NativeType = c.WGPURenderPipeline;
 handle: NativeType = null,
 
 pub fn deinit(self: RenderPipeline) void {
-    c.wgpuRenderPipelineRelease(self.handle);
+    if (self.handle != null) c.wgpuRenderPipelineRelease(self.handle);
 }

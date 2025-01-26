@@ -58,7 +58,7 @@ pub const Handle = c.WGPUSurface;
 handle: Handle = null,
 
 pub fn deinit(self: Surface) void {
-    c.wgpuSurfaceRelease(self.handle);
+    if (self.handle != null) c.wgpuSurfaceRelease(self.handle);
 }
 
 pub fn get_current_texture(self: Surface) Error!SurfaceTexture {

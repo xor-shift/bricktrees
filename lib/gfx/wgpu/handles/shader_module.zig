@@ -16,5 +16,5 @@ pub const Handle = c.WGPUShaderModule;
 handle: Handle = null,
 
 pub fn deinit(self: ShaderModule) void {
-    c.wgpuShaderModuleRelease(self.handle);
+    if (self.handle != null) c.wgpuShaderModuleRelease(self.handle);
 }

@@ -38,5 +38,5 @@ pub const Handle = c.WGPUSampler;
 handle: Handle = null,
 
 pub fn deinit(self: Sampler) void {
-    c.wgpuSamplerRelease(self.handle);
+    if (self.handle != null) c.wgpuSamplerRelease(self.handle);
 }

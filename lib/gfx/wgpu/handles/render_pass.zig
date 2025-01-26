@@ -91,7 +91,7 @@ pub const Handle = c.WGPURenderPassEncoder;
 handle: Handle = null,
 
 pub fn deinit(self: RenderPass) void {
-    c.wgpuRenderPassEncoderRelease(self.handle);
+    if (self.handle != null) c.wgpuRenderPassEncoderRelease(self.handle);
 }
 
 pub fn set_pipeline(self: RenderPass, pipeline: RenderPipeline) void {

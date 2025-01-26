@@ -55,5 +55,5 @@ pub const Handle = c.WGPUComputePipeline;
 handle: Handle = null,
 
 pub fn deinit(self: ComputePipeline) void {
-    c.wgpuComputePipelineRelease(self.handle);
+    if (self.handle != null) c.wgpuComputePipelineRelease(self.handle);
 }

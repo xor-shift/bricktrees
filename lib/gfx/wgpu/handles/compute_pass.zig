@@ -31,7 +31,7 @@ pub const Handle = c.WGPUComputePassEncoder;
 handle: Handle = null,
 
 pub fn deinit(self: ComputePass) void {
-    c.wgpuComputePassEncoderRelease(self.handle);
+    if (self.handle != null) c.wgpuComputePassEncoderRelease(self.handle);
 }
 
 pub fn set_pipeline(self: ComputePass, pipeline: wgpu.ComputePipeline) void {

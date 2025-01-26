@@ -104,5 +104,5 @@ pub const Handle = c.WGPUBindGroup;
 handle: Handle = null,
 
 pub fn deinit(self: BindGroup) void {
-    c.wgpuBindGroupRelease(self.handle);
+    if (self.handle != null) c.wgpuBindGroupRelease(self.handle);
 }

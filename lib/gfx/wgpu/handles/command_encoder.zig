@@ -32,7 +32,7 @@ pub const Handle = c.WGPUCommandEncoder;
 handle: Handle = null,
 
 pub fn deinit(self: CommandEncoder) void {
-    c.wgpuCommandEncoderRelease(self.handle);
+    if (self.handle != null) c.wgpuCommandEncoderRelease(self.handle);
 }
 
 pub fn begin_render_pass(self: CommandEncoder, descriptor: RenderPass.Descriptor) Error!RenderPass {

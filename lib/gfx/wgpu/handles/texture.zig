@@ -50,7 +50,7 @@ pub const Handle = c.WGPUTexture;
 handle: Handle = null,
 
 pub fn deinit(self: Texture) void {
-    c.wgpuTextureRelease(self.handle);
+    if (self.handle != null) c.wgpuTextureRelease(self.handle);
 }
 
 pub fn create_view(self: Texture, descriptor: ?TextureView.Descriptor) Error!TextureView {

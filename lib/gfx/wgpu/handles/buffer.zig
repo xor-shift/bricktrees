@@ -48,7 +48,7 @@ pub const Handle = c.WGPUBuffer;
 handle: Handle = null,
 
 pub fn deinit(self: Buffer) void {
-    c.wgpuBufferRelease(self.handle);
+    if (self.handle != null) c.wgpuBufferRelease(self.handle);
 }
 
 pub fn destroy(self: Buffer) void {

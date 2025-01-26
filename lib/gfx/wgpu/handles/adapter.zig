@@ -40,7 +40,7 @@ pub const Handle = c.WGPUAdapter;
 handle: Handle = null,
 
 pub fn deinit(self: Adapter) void {
-    c.wgpuAdapterRelease(self.handle);
+    if (self.handle != null) c.wgpuAdapterRelease(self.handle);
 }
 
 pub fn request_device_sync(self: Adapter, descriptor: Device.Descriptor) !Device {

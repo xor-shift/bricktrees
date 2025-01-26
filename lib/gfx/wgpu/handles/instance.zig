@@ -28,7 +28,7 @@ pub fn init() Instance {
 }
 
 pub fn deinit(self: Instance) void {
-    c.wgpuInstanceRelease(self.handle);
+    if (self.handle != null) c.wgpuInstanceRelease(self.handle);
 }
 
 pub fn request_adapter_sync(self: Instance, options: Adapter.Options) !Adapter {

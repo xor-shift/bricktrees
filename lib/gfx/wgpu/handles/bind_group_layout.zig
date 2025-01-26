@@ -143,5 +143,5 @@ pub const Handle = c.WGPUBindGroupLayout;
 handle: Handle = null,
 
 pub fn deinit(self: BindGroupLayout) void {
-    c.wgpuBindGroupLayoutRelease(self.handle);
+    if (self.handle != null) c.wgpuBindGroupLayoutRelease(self.handle);
 }

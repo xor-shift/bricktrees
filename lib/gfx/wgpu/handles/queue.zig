@@ -35,7 +35,7 @@ pub const Handle = c.WGPUQueue;
 handle: Handle = null,
 
 pub fn deinit(self: Queue) void {
-    c.wgpuQueueRelease(self.handle);
+    if (self.handle != null) c.wgpuQueueRelease(self.handle);
 }
 
 pub fn submit(self: Queue, command_buffers: []const CommandBuffer) void {

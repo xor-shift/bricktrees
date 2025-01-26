@@ -64,7 +64,7 @@ pub const Handle = c.WGPUDevice;
 handle: Handle = null,
 
 pub fn deinit(self: Device) void {
-    c.wgpuDeviceRelease(self.handle);
+    if (self.handle != null) c.wgpuDeviceRelease(self.handle);
 }
 
 pub fn destroy(self: Device) void {

@@ -33,5 +33,5 @@ pub const Handle = c.WGPUPipelineLayout;
 handle: Handle = null,
 
 pub fn deinit(self: PipelineLayout) void {
-    c.wgpuPipelineLayoutRelease(self.handle);
+    if (self.handle != null) c.wgpuPipelineLayoutRelease(self.handle);
 }
