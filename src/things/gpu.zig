@@ -243,18 +243,6 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     });
     errdefer visualisation_texture_sampler.deinit();
 
-    const visualisation_texture = try TextureAndView.init(g.device, .{
-        .label = "visualisation texture",
-        .usage = .{ .texture_binding = true, .storage_binding = true },
-        .dimension = .D2,
-        .size = .{ .width = 1280, .height = 720, .depth_or_array_layers = 1 },
-        .format = .BGRA8Unorm,
-        .mipLevelCount = 1,
-        .sampleCount = 1,
-        .view_formats = &.{ .BGRA8Unorm, .BGRA8UnormSrgb },
-    }, null);
-    errdefer visualisation_texture.deinit();
-
     const bricktree_buffers = try BufferArray.init(no_brickmaps, g.device, brickmap_buffer_desc, alloc);
     errdefer bricktree_buffers.deinit(alloc);
 
@@ -381,18 +369,6 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     });
     errdefer compute_textures_bgl.deinit();
 
-    const compute_textures_bg = try g.device.create_bind_group(wgpu.BindGroup.Descriptor{
-        .label = "compute textures' BG",
-        .layout = compute_textures_bgl,
-        .entries = &.{
-            wgpu.BindGroup.Entry{
-                .binding = 0,
-                .resource = .{ .TextureView = visualisation_texture.view },
-            },
-        },
-    });
-    errdefer compute_textures_bg.deinit();
-
     const compute_pipeline_layout = try g.device.create_pipeline_layout(wgpu.PipelineLayout.Descriptor{
         .label = "compute pipeline layout",
         .bind_group_layouts = &.{ uniform_bgl, compute_textures_bgl, map_bgl },
@@ -430,22 +406,6 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     });
     errdefer visualisation_texture_bgl.deinit();
 
-    const visualisation_texture_bg = try g.device.create_bind_group(wgpu.BindGroup.Descriptor{
-        .label = "visualisation texture('s|s') fragment BGL",
-        .layout = visualisation_texture_bgl,
-        .entries = &.{
-            wgpu.BindGroup.Entry{
-                .binding = 0,
-                .resource = .{ .Sampler = visualisation_texture_sampler },
-            },
-            wgpu.BindGroup.Entry{
-                .binding = 1,
-                .resource = .{ .TextureView = visualisation_texture.view },
-            },
-        },
-    });
-    errdefer visualisation_texture_bg.deinit();
-
     const visualisation_pipeline_layout = try g.device.create_pipeline_layout(wgpu.PipelineLayout.Descriptor{
         .label = "visualisation pipeline layout",
         .bind_group_layouts = &.{ uniform_bgl, visualisation_texture_bgl },
@@ -481,7 +441,7 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     });
     errdefer visualisation_pipeline.deinit();
 
-    return .{
+    var ret: Self = .{
         .compute_shader = compute_shader,
         .visualisation_shader = visualisation_shader,
 
@@ -490,9 +450,9 @@ pub fn init(alloc: std.mem.Allocator) !Self {
         .uniform_buffer = uniform_buffer,
 
         .visualisation_texture_bgl = visualisation_texture_bgl,
-        .visualisation_texture_bg = visualisation_texture_bg,
+        .visualisation_texture_bg = .{},
         .visualisation_texture_sampler = visualisation_texture_sampler,
-        .visualisation_texture = visualisation_texture,
+        .visualisation_texture = .{},
 
         .visualisation_pipeline_layout = visualisation_pipeline_layout,
         .visualisation_pipeline = visualisation_pipeline,
@@ -504,11 +464,16 @@ pub fn init(alloc: std.mem.Allocator) !Self {
         .brickgrid_texture = brickgrid_texture,
 
         .compute_textures_bgl = compute_textures_bgl,
-        .compute_textures_bg = compute_textures_bg,
+        .compute_textures_bg = .{},
 
         .compute_pipeline_layout = compute_pipeline_layout,
         .compute_pipeline = compute_pipeline,
     };
+    errdefer ret.deinit();
+
+    try ret.on_resize(@TypeOf(g.*).default_resolution);
+
+    return ret;
 }
 
 pub fn deinit(self: *Self) void {
@@ -520,8 +485,58 @@ pub fn to_any(self: *Self) AnyThing {
 }
 
 pub fn on_resize(self: *Self, dims: blas.Vec2uz) !void {
-    _ = self;
-    _ = dims;
+    const visualisation_texture = try TextureAndView.init(g.device, .{
+        .label = "visualisation texture",
+        .usage = .{ .texture_binding = true, .storage_binding = true },
+        .dimension = .D2,
+        .size = .{
+            .width = @intCast(dims.x()),
+            .height = @intCast(dims.y()),
+            .depth_or_array_layers = 1,
+        },
+        .format = .BGRA8Unorm,
+        .mipLevelCount = 1,
+        .sampleCount = 1,
+        .view_formats = &.{ .BGRA8Unorm, .BGRA8UnormSrgb },
+    }, null);
+    errdefer visualisation_texture.deinit();
+
+    const visualisation_texture_bg = try g.device.create_bind_group(wgpu.BindGroup.Descriptor{
+        .label = "visualisation texture('s|s') fragment BGL",
+        .layout = self.visualisation_texture_bgl,
+        .entries = &.{
+            wgpu.BindGroup.Entry{
+                .binding = 0,
+                .resource = .{ .Sampler = self.visualisation_texture_sampler },
+            },
+            wgpu.BindGroup.Entry{
+                .binding = 1,
+                .resource = .{ .TextureView = visualisation_texture.view },
+            },
+        },
+    });
+    errdefer visualisation_texture_bg.deinit();
+
+    const compute_textures_bg = try g.device.create_bind_group(wgpu.BindGroup.Descriptor{
+        .label = "compute textures' BG",
+        .layout = self.compute_textures_bgl,
+        .entries = &.{
+            wgpu.BindGroup.Entry{
+                .binding = 0,
+                .resource = .{ .TextureView = visualisation_texture.view },
+            },
+        },
+    });
+    errdefer compute_textures_bg.deinit();
+
+    self.visualisation_texture.deinit();
+    self.visualisation_texture = visualisation_texture;
+
+    self.visualisation_texture_bg.deinit();
+    self.visualisation_texture_bg = visualisation_texture_bg;
+
+    self.compute_textures_bg.deinit();
+    self.compute_textures_bg = compute_textures_bg;
 }
 
 pub fn on_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
@@ -574,8 +589,6 @@ pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView)
 
     compute_pass.end();
     compute_pass.deinit();
-
-    std.log.err("asd", .{});
 
     const render_pass = try encoder.begin_render_pass(wgpu.RenderPass.Descriptor{
         .label = "render pass",
