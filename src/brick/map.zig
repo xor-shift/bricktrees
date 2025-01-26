@@ -133,11 +133,12 @@ pub fn U8Map(comptime depth: u6) type {
         // it would simplify the loading of the register greatly (a single
         // unaligned load as opposed to whatever is going on rn).
 
-        /// Level 0, kind of redundant.
-        occupied: bool,
         /// Level 1 through `depth` non-inclusive (might be empty).
-        /// Padded to 4 bytes to appease WebGPU upload size requirements.
-        tree: [(Traits.no_tree_bits / 8 + 3) / 4 * 4]u8,
+        /// Level 1, if present, is 8 bytes large instead of being composed of a single byte so as to be representable in WGSL.
+        tree: [
+            if (Traits.no_tree_bits == 0) 0 //
+            else Traits.no_tree_bits / 8 + 7
+        ]u8,
         /// Level `depth`
         voxels: [Traits.volume]PackedVoxel,
     };

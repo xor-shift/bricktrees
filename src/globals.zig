@@ -114,6 +114,8 @@ pub fn init(dims: blas.Vec2uz, alloc: std.mem.Allocator) !Self {
             wgpu.FeatureName.StorageResourceBindingArray,
 
             wgpu.FeatureName.SampledTextureAndStorageBufferArrayNonUniformIndexing,
+
+            wgpu.FeatureName.BGRA8UnormStorage,
         },
         .required_limits = .{
             .limits = .{
