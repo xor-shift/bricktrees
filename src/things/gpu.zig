@@ -13,6 +13,8 @@ const BufferArray = @import("gpu/BufferArray.zig");
 const TextureAndView = @import("gpu/TextureAndView.zig");
 const TVArray = @import("gpu/TVArray.zig");
 
+const Map = @import("gpu/Map.zig");
+
 const Self = @This();
 
 pub const Any = struct {
@@ -65,39 +67,6 @@ const Uniforms = extern struct {
     _padding_2: [1]f32 = undefined,
 };
 
-const Brickmap = @import("../brick/map.zig").U8Map(5);
-
-const brickmap_texture_desc = wgpu.Texture.Descriptor{
-    .label = "some brickmap texture",
-    .size = .{
-        .width = Brickmap.Traits.side_length,
-        .height = Brickmap.Traits.side_length,
-        .depth_or_array_layers = Brickmap.Traits.side_length,
-    },
-    .usage = .{
-        .copy_dst = true,
-        .texture_binding = true,
-    },
-    .format = .RGBA8Uint,
-    .dimension = .D3,
-    .sampleCount = 1,
-    .mipLevelCount = 1,
-    .view_formats = &.{},
-};
-
-const brickmap_buffer_desc = wgpu.Buffer.Descriptor{
-    .label = "some bricktree texture",
-    .size = (Brickmap.Traits.no_tree_bits / 8 + 3) / 4 * 4,
-    .usage = .{
-        .copy_dst = true,
-        .storage = true,
-    },
-    .mapped_at_creation = false,
-};
-
-const grid_dimensions: [3]usize = .{ 11, 4, 11 };
-const no_brickmaps: usize = grid_dimensions[0] * grid_dimensions[1] * grid_dimensions[2];
-
 compute_shader: wgpu.ShaderModule,
 visualisation_shader: wgpu.ShaderModule,
 
@@ -113,11 +82,7 @@ visualisation_texture: TextureAndView,
 visualisation_pipeline_layout: wgpu.PipelineLayout,
 visualisation_pipeline: wgpu.RenderPipeline,
 
-map_bgl: wgpu.BindGroupLayout,
-map_bg: wgpu.BindGroup,
-bricktree_buffers: BufferArray,
-brickmap_textures: TVArray,
-brickgrid_texture: TextureAndView,
+map: Map,
 
 compute_textures_bgl: wgpu.BindGroupLayout,
 compute_textures_bg: wgpu.BindGroup,
@@ -131,6 +96,12 @@ pub fn init(alloc: std.mem.Allocator) !Self {
 
     const visualisation_shader = try g.device.create_shader_module_wgsl_from_file("visualisation shader", "shaders/visualiser.wgsl", alloc);
     errdefer visualisation_shader.deinit();
+
+    var map = try Map.init(alloc, g.device, .{
+        .no_brickmaps = 256,
+        .grid_dimensions = .{11, 4, 11},
+    });
+    errdefer map.deinit();
 
     const uniform_buffer = try g.device.create_buffer(wgpu.Buffer.Descriptor{
         .label = "uniform buffer",
@@ -146,31 +117,6 @@ pub fn init(alloc: std.mem.Allocator) !Self {
         .label = "visualisation texture sampler",
     });
     errdefer visualisation_texture_sampler.deinit();
-
-    const bricktree_buffers = try BufferArray.init(no_brickmaps, g.device, brickmap_buffer_desc, alloc);
-    errdefer bricktree_buffers.deinit(alloc);
-
-    const brickmap_textures = try TVArray.init(no_brickmaps, g.device, brickmap_texture_desc, null, alloc);
-    errdefer brickmap_textures.deinit(alloc);
-
-    const brickgrid_texture = try TextureAndView.init(g.device, wgpu.Texture.Descriptor{
-        .label = "brickgrid texture",
-        .size = .{
-            .width = grid_dimensions[0],
-            .height = grid_dimensions[1],
-            .depth_or_array_layers = grid_dimensions[2],
-        },
-        .usage = .{
-            .copy_dst = true,
-            .texture_binding = true,
-        },
-        .format = .R32Uint,
-        .dimension = .D3,
-        .sampleCount = 1,
-        .mipLevelCount = 1,
-        .view_formats = &.{},
-    }, null);
-    errdefer brickgrid_texture.deinit();
 
     const uniform_bgl = try g.device.create_bind_group_layout(wgpu.BindGroupLayout.Descriptor{
         .label = "uniform bgl",
@@ -204,59 +150,6 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     });
     errdefer uniform_bg.deinit();
 
-    const map_bgl = try g.device.create_bind_group_layout(wgpu.BindGroupLayout.Descriptor{
-        .label = "map bgl",
-        .entries = &.{
-            wgpu.BindGroupLayout.Entry{
-                .binding = 0,
-                .visibility = .{ .compute = true },
-                .layout = .{ .Texture = .{
-                    .sample_type = .Uint,
-                    .view_dimension = .D3,
-                } },
-            },
-            wgpu.BindGroupLayout.Entry{
-                .binding = 1,
-                .visibility = .{ .compute = true },
-                .layout = .{ .Buffer = .{
-                    .type = .ReadOnlyStorage,
-                    .min_binding_size = Brickmap.Traits.no_tree_bits / 8,
-                } },
-                .count = no_brickmaps,
-            },
-            wgpu.BindGroupLayout.Entry{
-                .binding = 2,
-                .visibility = .{ .compute = true },
-                .layout = .{ .Texture = .{
-                    .sample_type = .Uint,
-                    .view_dimension = .D3,
-                } },
-                .count = no_brickmaps,
-            },
-        },
-    });
-    errdefer map_bgl.deinit();
-
-    const map_bg = try g.device.create_bind_group(wgpu.BindGroup.Descriptor{
-        .label = "grid bg",
-        .layout = map_bgl,
-        .entries = &.{
-            wgpu.BindGroup.Entry{
-                .binding = 0,
-                .resource = .{ .TextureView = brickgrid_texture.view },
-            },
-            wgpu.BindGroup.Entry{
-                .binding = 1,
-                .resource = .{ .BufferArray = bricktree_buffers.buffers },
-            },
-            wgpu.BindGroup.Entry{
-                .binding = 2,
-                .resource = .{ .TextureViewArray = brickmap_textures.views },
-            },
-        },
-    });
-    errdefer map_bg.deinit();
-
     const compute_textures_bgl = try g.device.create_bind_group_layout(wgpu.BindGroupLayout.Descriptor{
         .label = "compute textures' BGL",
         .entries = &.{
@@ -275,7 +168,7 @@ pub fn init(alloc: std.mem.Allocator) !Self {
 
     const compute_pipeline_layout = try g.device.create_pipeline_layout(wgpu.PipelineLayout.Descriptor{
         .label = "compute pipeline layout",
-        .bind_group_layouts = &.{ uniform_bgl, compute_textures_bgl, map_bgl },
+        .bind_group_layouts = &.{ uniform_bgl, compute_textures_bgl, map.map_bgl },
     });
     errdefer compute_pipeline_layout.deinit();
 
@@ -361,11 +254,7 @@ pub fn init(alloc: std.mem.Allocator) !Self {
         .visualisation_pipeline_layout = visualisation_pipeline_layout,
         .visualisation_pipeline = visualisation_pipeline,
 
-        .map_bgl = map_bgl,
-        .map_bg = map_bg,
-        .bricktree_buffers = bricktree_buffers,
-        .brickmap_textures = brickmap_textures,
-        .brickgrid_texture = brickgrid_texture,
+        .map = map,
 
         .compute_textures_bgl = compute_textures_bgl,
         .compute_textures_bg = .{},
@@ -381,7 +270,7 @@ pub fn init(alloc: std.mem.Allocator) !Self {
 }
 
 pub fn deinit(self: *Self) void {
-    _ = self;
+    self.map.deinit();
 }
 
 pub fn to_any(self: *Self) AnyThing {
@@ -458,6 +347,8 @@ pub fn do_gui(self: *Self) !void {
 }
 
 pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+    self.map.before_render();
+
     const dims = g.window.get_size() catch @panic("g.window.get_size()");
     g.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&Uniforms{
         .dims = .{
@@ -475,7 +366,7 @@ pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView)
     compute_pass.set_pipeline(self.compute_pipeline);
     compute_pass.set_bind_group(0, self.uniform_bg, null);
     compute_pass.set_bind_group(1, self.compute_textures_bg, null);
-    compute_pass.set_bind_group(2, self.map_bg, null);
+    compute_pass.set_bind_group(2, self.map.map_bg, null);
 
     const wg_sz = blas.vec2uz(8, 8);
     const wg_count = blas.divew(
