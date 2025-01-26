@@ -14,6 +14,13 @@ const GuiThing = @import("things/gui.zig");
 
 pub const default_resolution: blas.Vec2uz = blas.vec2uz(1280, 720);
 
+const nfa_max_n: usize = 2;
+const nfa_arena_size: usize = 16 * 1024 * 1024;
+
+const NFABufferType = [nfa_arena_size]u8;
+// one extra arena for safety
+const NFABuffersType = [(nfa_max_n + 2) * (nfa_max_n + 1) / 2]NFABufferType;
+
 alloc: std.mem.Allocator,
 
 instance: wgpu.Instance,
@@ -25,15 +32,17 @@ adapter: wgpu.Adapter,
 device: wgpu.Device,
 queue: wgpu.Queue,
 
+frame_no: usize = 0,
+nfa_buffers: *NFABuffersType,
+nf_allocators: [nfa_max_n][2]std.heap.FixedBufferAllocator = undefined,
+nf_arenas: [nfa_max_n]std.heap.ArenaAllocator = undefined,
+
 /// `AnyThing`s must be allocated on `alloc`.
 things: std.ArrayList(AnyThing),
 
 // unmanaged `Thing`s that get accessed often
 
 gui: *GuiThing = undefined,
-
-const max_n: usize = 2;
-const arena_size: usize = 16 * 1024 * 1024;
 
 const Any = struct {
     fn init(self: *Self) AnyThing {
@@ -131,6 +140,9 @@ pub fn init(dims: blas.Vec2uz, alloc: std.mem.Allocator) !Self {
     errdefer queue.deinit();
     std.log.debug("queue: {?p}", .{queue.handle});
 
+    const nfa_buffers = try alloc.create(NFABuffersType);
+    errdefer alloc.destroy(nfa_buffers);
+
     var ret: Self = .{
         .alloc = alloc,
 
@@ -142,6 +154,8 @@ pub fn init(dims: blas.Vec2uz, alloc: std.mem.Allocator) !Self {
         .adapter = adapter,
         .device = device,
         .queue = queue,
+
+        .nfa_buffers = nfa_buffers,
 
         .things = std.ArrayList(AnyThing).init(alloc),
     };
@@ -160,7 +174,7 @@ pub fn deinit(self: *Self) void {
         const j = self.things.items.len - i - 1;
 
         if (j == 0) {
-            return;
+            break;
         }
 
         const thing = &self.things.items[j];
@@ -186,6 +200,8 @@ pub fn deinit(self: *Self) void {
 
     imgui.deinit();
     sdl.deinit();
+
+    self.alloc.destroy(self.nfa_buffers);
 }
 
 pub fn resize(self: *Self, dims: blas.Vec2uz) !void {
@@ -237,15 +253,43 @@ pub fn render_step(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.Texture
     }
 }
 
-// The short name which stands for "n-frame-ly allocator" is for ease of typing.
-// This returns an arena that will be valid until the end of the next n frames.
-// An `n` valeu of 0 means that the arena will last 'til the end of the frame.
-// Max n is determined beforehand and is most likely 2.
-pub fn nfa(self: *Self, comptime n: usize) std.mem.Allocator {
-    _ = self;
-    _ = n;
+pub fn fa_new_frame(self: *Self) void {
+    defer self.frame_no += 1;
 
-    return undefined;
+    for (0..nfa_max_n) |i| {
+        const sz_before = (i + 2) * (i + 1) / 2 - 1;
+        const sz_current = i + 2;
+
+        const current = self.nfa_buffers.*[sz_before .. sz_before + sz_current];
+
+        const new = &current[self.frame_no % (i + 2)];
+        const old = &current[(self.frame_no + i + 1) % (i + 2)];
+
+        @memset(new.*[0..], undefined);
+        @memset(old.*[0..], undefined);
+
+        self.nf_allocators[i][(self.frame_no + 1) % 2] = undefined;
+        self.nf_allocators[i][self.frame_no % 2] = std.heap.FixedBufferAllocator.init(new);
+        self.nf_arenas[i] = std.heap.ArenaAllocator.init(self.nf_allocators[i][self.frame_no % 2].threadSafeAllocator());
+    }
+}
+
+// The short name which stands for "n-frame-ly allocator" is for ease of typing.
+//
+// This returns an arena that will be valid until the end of the next n
+// frame(s).
+//
+// An `n` value of 1 means that the arena will last until the end of the frame.
+//
+// The max. value of n is determined at compile time and is most likely to be 2.
+pub fn nfa(self: *Self, comptime n: usize) std.mem.Allocator {
+    if (n > nfa_max_n) @compileError("n may not exceed nfa_max_n");
+
+    return self.nf_arenas[n - 1].allocator();
+}
+
+pub fn nfa_alloc(self: *Self, comptime n: usize, comptime T: type, sz: usize) []T {
+    return self.nfa(n).alloc(T, sz) catch @panic("NFA OOM");
 }
 
 fn resize_impl(self: *Self, dims: blas.Vec2uz) !void {

@@ -45,6 +45,8 @@ pub fn main() !void {
     var frame_timer = try std.time.Timer.start();
     var ms_spent_last_frame: f64 = 1000.0;
     outer: while (true) {
+        g.fa_new_frame();
+
         const inter_frame_time = @as(f64, @floatFromInt(frame_timer.lap())) / @as(f64, @floatFromInt(std.time.ns_per_ms));
 
         while (try sdl.poll_event()) |ev| {
