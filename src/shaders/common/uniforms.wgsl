@@ -1,4 +1,11 @@
 struct Uniforms {
-    width: f32,
-    height: f32,
+    transform: mat4x4<f32>,
+    inverse_transform: mat4x4<f32>,
+
+    dims: vec2<f32>,
+    debug_mode: u32,
+    debug_level: u32,
+
+    pos: vec3<f32>,
+    padding_1: f32,
 }

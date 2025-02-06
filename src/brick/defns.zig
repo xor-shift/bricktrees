@@ -8,7 +8,7 @@ pub const Voxel = union(enum) {
         r: u8,
         g: u8,
         b: u8,
-    }, // R8 G8 B8 rrrrrr01
+    }, // R8 G8 B8 01rrrrrr
 
     /// Incident light gets reflected as though this voxel is a normal one with max. roughness and white albedo.
     /// `r`, `g`, and `b` are unorms, multiplier is a uint.

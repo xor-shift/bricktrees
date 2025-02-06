@@ -1,25 +1,25 @@
 const std = @import("std");
 
-const blas = @import("blas");
+const wgm = @import("wgm");
 const imgui = @import("imgui");
 const qoi = @import("qoi");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
+const rotating_arena = @import("rotating_arena.zig");
+
 const g = &@import("main.zig").g;
 
-const AnyThing = @import("thing.zig").AnyThing;
+const AnyThing = @import("AnyThing.zig");
+const GuiThing = @import("things/GuiThing.zig");
 
-const GuiThing = @import("things/gui.zig");
+const RotatingArenaConfig = rotating_arena.Config;
+const RotatingArena = rotating_arena.RotatingArena;
 
-pub const default_resolution: blas.Vec2uz = blas.vec2uz(1280, 720);
+pub const default_resolution: wgm.Vec2uz = wgm.vec2uz(1280, 720);
 
-const nfa_max_n: usize = 2;
-const nfa_arena_size: usize = 16 * 1024 * 1024;
-
-const NFABufferType = [nfa_arena_size]u8;
-// one extra arena for safety
-const NFABuffersType = [(nfa_max_n + 2) * (nfa_max_n + 1) / 2]NFABufferType;
+clock_mutex: std.Thread.Mutex,
+clock: std.time.Timer,
 
 alloc: std.mem.Allocator,
 
@@ -33,15 +33,30 @@ device: wgpu.Device,
 queue: wgpu.Queue,
 
 frame_no: usize = 0,
-nfa_buffers: *NFABuffersType,
-nf_allocators: [nfa_max_n][2]std.heap.FixedBufferAllocator = undefined,
-nf_arenas: [nfa_max_n]std.heap.ArenaAllocator = undefined,
+
+frame_ra: RotatingArena(.{
+    .no_pools = 1,
+    .bytes_per_pool = 16 * 1024 * 1024,
+}),
+frame_alloc: std.mem.Allocator = undefined,
+
+biframe_ra: RotatingArena(.{
+    .no_pools = 2,
+    .bytes_per_pool = 128 * 1024 * 1024,
+}),
+biframe_alloc: std.mem.Allocator,
+
+tick_ra: RotatingArena(.{
+    .no_pools = 1,
+    .bytes_per_pool = 16 * 1024 * 1024,
+}),
+tick_alloc: std.mem.Allocator = undefined,
 
 /// `AnyThing`s must be allocated on `alloc`.
 things: std.ArrayList(AnyThing),
 
-// unmanaged `Thing`s that get accessed often
-
+// Normally, you should store pointers to other `Thing`s you want inside your
+// own `Thing` but this is the one exception as every`Thing` needs it.
 gui: *GuiThing = undefined,
 
 const Any = struct {
@@ -65,7 +80,7 @@ const Any = struct {
 
     pub fn on_shutdown(_: *anyopaque) anyerror!void {}
 
-    pub fn on_resize(_: *anyopaque, new: blas.Vec2uz) anyerror!void {
+    pub fn on_resize(_: *anyopaque, new: wgm.Vec2uz) anyerror!void {
         try g.resize_impl(new);
     }
 
@@ -88,7 +103,7 @@ const Self = @This();
 
 /// Initializes just the WebGPU stuff.
 /// Assign to `g.gui` and then call `g.resize` after calling this.
-pub fn init(dims: blas.Vec2uz, alloc: std.mem.Allocator) !Self {
+pub fn init(dims: wgm.Vec2uz, alloc: std.mem.Allocator) !Self {
     try sdl.init(.{ .video = true });
     errdefer sdl.deinit();
 
@@ -140,10 +155,21 @@ pub fn init(dims: blas.Vec2uz, alloc: std.mem.Allocator) !Self {
     errdefer queue.deinit();
     std.log.debug("queue: {?p}", .{queue.handle});
 
-    const nfa_buffers = try alloc.create(NFABuffersType);
-    errdefer alloc.destroy(nfa_buffers);
+    var frame_ra = try @TypeOf(@as(Self, undefined).frame_ra).init();
+    errdefer frame_ra.deinit();
+
+    var biframe_ra = try @TypeOf(@as(Self, undefined).biframe_ra).init();
+    errdefer biframe_ra.deinit();
+    // this needs to be ready on init
+    const biframe_alloc = biframe_ra.rotate();
+
+    var tick_ra = try @TypeOf(@as(Self, undefined).tick_ra).init();
+    errdefer tick_ra.deinit();
 
     var ret: Self = .{
+        .clock_mutex = .{},
+        .clock = try std.time.Timer.start(),
+
         .alloc = alloc,
 
         .instance = instance,
@@ -155,7 +181,10 @@ pub fn init(dims: blas.Vec2uz, alloc: std.mem.Allocator) !Self {
         .device = device,
         .queue = queue,
 
-        .nfa_buffers = nfa_buffers,
+        .frame_ra = frame_ra,
+        .biframe_ra = biframe_ra,
+        .biframe_alloc = biframe_alloc,
+        .tick_ra = tick_ra,
 
         .things = std.ArrayList(AnyThing).init(alloc),
     };
@@ -201,98 +230,33 @@ pub fn deinit(self: *Self) void {
     imgui.deinit();
     sdl.deinit();
 
-    self.alloc.destroy(self.nfa_buffers);
+    self.frame_ra.deinit();
+    self.biframe_ra.deinit();
+    self.tick_ra.deinit();
 }
 
-pub fn resize(self: *Self, dims: blas.Vec2uz) !void {
-    for (self.things.items) |thing| {
-        thing.on_resize(thing.thing, dims) catch |e| {
-            std.log.err("error while calling on_resize on AnyThing @ {p} with dimensions {d}x{d}: {any}", .{
-                thing.thing,
-                dims.width(),
-                dims.height(),
-                e,
-            });
-        };
-    }
+/// Returns the number of nanoseconds that passed since the start of the program.
+pub fn time(self: *Self) u64 {
+    self.clock_mutex.lock();
+    defer self.clock_mutex.unlock();
+
+    return self.clock.read();
 }
 
-pub fn new_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
-    for (self.things.items) |thing| {
-        thing.on_raw_event(thing.thing, ev) catch |e| {
-            std.log.err("error while calling on_raw_event on AnyThing @ {p}: {any}", .{
-                thing.thing,
-                e,
-            });
-        };
-    }
-}
-
-pub fn gui_step(self: *Self) void {
-    const _context_guard = imgui.ContextGuard.init(self.gui.c());
-    defer _context_guard.deinit();
-
-    for (self.things.items) |thing| {
-        thing.do_gui(thing.thing) catch |e| {
-            std.log.err("error while calling do_gui on AnyThing @ {p}: {any}", .{
-                thing.thing,
-                e,
-            });
-        };
-    }
-}
-
-pub fn render_step(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) void {
-    for (self.things.items) |thing| {
-        thing.render(thing.thing, encoder, onto) catch |e| {
-            std.log.err("error while calling render on AnyThing @ {p}: {any}", .{
-                thing.thing,
-                e,
-            });
-        };
-    }
-}
-
-pub fn fa_new_frame(self: *Self) void {
+pub fn new_frame(self: *Self) void {
     defer self.frame_no += 1;
 
-    for (0..nfa_max_n) |i| {
-        const sz_before = (i + 2) * (i + 1) / 2 - 1;
-        const sz_current = i + 2;
-
-        const current = self.nfa_buffers.*[sz_before .. sz_before + sz_current];
-
-        const new = &current[self.frame_no % (i + 2)];
-        const old = &current[(self.frame_no + i + 1) % (i + 2)];
-
-        @memset(new.*[0..], undefined);
-        @memset(old.*[0..], undefined);
-
-        self.nf_allocators[i][(self.frame_no + 1) % 2] = undefined;
-        self.nf_allocators[i][self.frame_no % 2] = std.heap.FixedBufferAllocator.init(new);
-        self.nf_arenas[i] = std.heap.ArenaAllocator.init(self.nf_allocators[i][self.frame_no % 2].threadSafeAllocator());
-    }
+    self.frame_alloc = self.frame_ra.rotate();
+    self.biframe_alloc = self.biframe_ra.rotate();
 }
 
-// The short name which stands for "n-frame-ly allocator" is for ease of typing.
-//
-// This returns an arena that will be valid until the end of the next n
-// frame(s).
-//
-// An `n` value of 1 means that the arena will last until the end of the frame.
-//
-// The max. value of n is determined at compile time and is most likely to be 2.
-pub fn nfa(self: *Self, comptime n: usize) std.mem.Allocator {
-    if (n > nfa_max_n) @compileError("n may not exceed nfa_max_n");
+pub fn new_tick(self: *Self, delta_ns: u64) void {
+    self.tick_alloc = self.tick_ra.rotate();
 
-    return self.nf_arenas[n - 1].allocator();
+    self.call_on_every_thing("on_tick", .{delta_ns});
 }
 
-pub fn nfa_alloc(self: *Self, comptime n: usize, comptime T: type, sz: usize) []T {
-    return self.nfa(n).alloc(T, sz) catch @panic("NFA OOM");
-}
-
-fn resize_impl(self: *Self, dims: blas.Vec2uz) !void {
+fn resize_impl(self: *Self, dims: wgm.Vec2uz) !void {
     try self.surface.configure(.{
         .device = self.device,
         .format = .BGRA8Unorm,
@@ -308,7 +272,7 @@ fn on_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     switch (ev.common.type) {
         sdl.c.SDL_EVENT_WINDOW_RESIZED => {
             const event = ev.window;
-            const dims = blas.vec2uz(@intCast(event.data1), @intCast(event.data2));
+            const dims = wgm.vec2uz(@intCast(event.data1), @intCast(event.data2));
 
             try self.resize(dims);
         },
@@ -322,4 +286,35 @@ fn do_gui(self: *Self) !void {
     _ = self;
 
     imgui.c.igShowMetricsWindow(null);
+}
+
+fn call_on_every_thing(self: *Self, comptime fun_str: []const u8, args: anytype) void {
+    for (self.things.items) |thing| {
+        const fun = @field(thing, fun_str);
+        @call(.auto, fun, .{thing.thing} ++ args) catch |e| {
+            std.log.err("error calling " ++ fun_str ++ " on AnyThing @ {p}: {any}", .{
+                thing.thing,
+                e,
+            });
+        };
+    }
+}
+
+pub fn resize(self: *Self, dims: wgm.Vec2uz) !void {
+    self.call_on_every_thing("on_resize", .{dims});
+}
+
+pub fn new_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
+    self.call_on_every_thing("on_raw_event", .{ev});
+}
+
+pub fn gui_step(self: *Self) void {
+    const _context_guard = imgui.ContextGuard.init(self.gui.c());
+    defer _context_guard.deinit();
+
+    self.call_on_every_thing("do_gui", .{});
+}
+
+pub fn render_step(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) void {
+    self.call_on_every_thing("render", .{ encoder, onto });
 }

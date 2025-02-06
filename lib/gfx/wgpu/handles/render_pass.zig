@@ -4,7 +4,7 @@ const auto = @import("../auto.zig");
 const common = @import("../common.zig");
 const wgpu = @import("../wgpu.zig");
 
-const blas = @import("blas");
+const wgm = @import("wgm");
 
 const c = common.c;
 
@@ -110,7 +110,7 @@ pub fn set_index_buffer(self: RenderPass, buffer: Buffer, format: wgpu.IndexForm
     c.wgpuRenderPassEncoderSetIndexBuffer(self.handle, buffer.handle, @intFromEnum(format), offset, size);
 }
 
-pub fn set_scissor_rect(self: RenderPass, top_left: blas.Vec2u, dims: blas.Vec2u) void {
+pub fn set_scissor_rect(self: RenderPass, top_left: wgm.Vec2u, dims: wgm.Vec2u) void {
     c.wgpuRenderPassEncoderSetScissorRect(self.handle, top_left.x(), top_left.y(), dims.width(), dims.height());
 }
 

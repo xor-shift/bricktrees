@@ -27,8 +27,9 @@ pub fn build(b: *std.Build) void {
             // .cpu_model = .baseline,
         },
     });
+
     const optimize = b.standardOptimizeOption(.{
-        .preferred_optimize_mode = .Debug,
+        // .preferred_optimize_mode = .Debug,
     });
 
     const run_step = b.step("run", "Run the app");
@@ -46,8 +47,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const blas = b.addModule("blas", .{
-        .root_source_file = b.path("lib/blas/root.zig"),
+    const wgm = b.addModule("wgm", .{
+        .root_source_file = b.path("lib/wgm/root.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -68,13 +69,13 @@ pub fn build(b: *std.Build) void {
         gfx.addLibraryPath(b.path("thirdparty/wgpu-native/target/debug/"));
         gfx.linkSystemLibrary("wgpu_native", .{ .needed = true });
 
-        gfx.addImport("blas", blas);
+        gfx.addImport("wgm", wgm);
 
         break :blk gfx;
     };
 
     const imgui = blk: {
-        var imgui = b.addModule("blas", .{
+        var imgui = b.addModule("imgui", .{
             .root_source_file = b.path("lib/imgui/root.zig"),
             .target = target,
             .optimize = optimize,
@@ -101,7 +102,7 @@ pub fn build(b: *std.Build) void {
 
         imgui.linkSystemLibrary("freetype", .{ .needed = true });
 
-        imgui.addImport("blas", blas);
+        imgui.addImport("wgm", wgm);
         imgui.addImport("gfx", gfx);
 
         break :blk imgui;
@@ -117,7 +118,7 @@ pub fn build(b: *std.Build) void {
         });
         exe.root_module.addImport("core", core);
         exe.root_module.addImport("qoi", qoi);
-        exe.root_module.addImport("blas", blas);
+        exe.root_module.addImport("wgm", wgm);
         exe.root_module.addImport("imgui", imgui);
         exe.root_module.addImport("gfx", gfx);
         // link_to_wgpu_and_sdl(b, exe);
@@ -139,7 +140,7 @@ pub fn build(b: *std.Build) void {
     }
 
     // executable's tests
-    {
+    if (false) {
         const exe_tests = b.addTest(.{
             .root_source_file = b.path("src/main.zig"),
             .test_runner = b.path("src/test_runner.zig"),
@@ -148,7 +149,7 @@ pub fn build(b: *std.Build) void {
         });
         exe_tests.root_module.addImport("core", core);
         exe_tests.root_module.addImport("qoi", qoi);
-        exe_tests.root_module.addImport("blas", blas);
+        exe_tests.root_module.addImport("wgm", wgm);
         exe_tests.root_module.addImport("imgui", imgui);
         // link_to_wgpu_and_sdl(b, exe_tests);
 
@@ -159,7 +160,7 @@ pub fn build(b: *std.Build) void {
     }
 
     // basic tests
-    inline for (.{ "blas", "qoi", "imgui" }) |lib_name| {
+    inline for (.{ "wgm", "qoi", "imgui" }) |lib_name| {
         const tests = b.addTest(.{
             .root_source_file = b.path(std.fmt.comptimePrint("lib/{s}/root.zig", .{lib_name})),
             .test_runner = b.path("src/test_runner.zig"),

@@ -1,19 +1,27 @@
 const std = @import("std");
 
-const blas = @import("blas");
+const wgm = @import("wgm");
 const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
-const AnyThing = @import("../thing.zig").AnyThing;
+const brick = @import("../brick.zig");
+
+const AnyThing = @import("../AnyThing.zig");
+const BufferArray = @import("gpu/BufferArray.zig");
+const Map = @import("gpu/Map.zig");
+const TVArray = @import("gpu/TVArray.zig");
+const TextureAndView = @import("gpu/TextureAndView.zig");
+
+const Brickmap = Map.Brickmap;
+
+const PackedVoxel = brick.PackedVoxel;
+const Voxel = brick.Voxel;
+
+const BrickmapCoordinates = brick.BrickmapCoordinates;
+const VoxelCoordinates = brick.VoxelCoordinates;
 
 const g = &@import("../main.zig").g;
-
-const BufferArray = @import("gpu/BufferArray.zig");
-const TextureAndView = @import("gpu/TextureAndView.zig");
-const TVArray = @import("gpu/TVArray.zig");
-
-const Map = @import("gpu/Map.zig");
 
 const Self = @This();
 
@@ -40,7 +48,7 @@ pub const Any = struct {
         on_alloc.destroy(@as(*Self, @ptrCast(@alignCast(self_arg))));
     }
 
-    pub fn on_resize(self_arg: *anyopaque, dims: blas.Vec2uz) anyerror!void {
+    pub fn on_resize(self_arg: *anyopaque, dims: wgm.Vec2uz) anyerror!void {
         try @as(*Self, @ptrCast(@alignCast(self_arg))).on_resize(dims);
     }
 
@@ -57,19 +65,28 @@ pub const Any = struct {
     }
 };
 
-// Be careful: the vecN<T> of WGSL and the [N]T of C/Zig don't have the same alignment!
+// Be careful: the vecN<T> of WGSL and the [N]T of C/Zig may not have the same alignment!
 const Uniforms = extern struct {
+    transform: [16]f32 = .{ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 },
+    inverse_transform: [16]f32 = .{ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 },
+
     dims: [2]f32,
-    _padding_0: [2]u32 = undefined,
-    pos: [3]f32,
-    _padding_1: [1]f32 = undefined,
-    look: [3]f32,
-    _padding_2: [1]f32 = undefined,
+    debug_mode: u32 = 0,
+    debug_level: u32 = 0,
+
+    pos: [3]f32 = .{ 0, 0, 0 }, // redundant
+    _padding_1: [1]f32 = .{0},
 };
 
 compute_shader: wgpu.ShaderModule,
 visualisation_shader: wgpu.ShaderModule,
 
+uniforms: Uniforms = .{
+    .dims = .{
+        @floatFromInt(@TypeOf(g.*).default_resolution.width()),
+        @floatFromInt(@TypeOf(g.*).default_resolution.height()),
+    },
+},
 uniform_buffer: wgpu.Buffer,
 uniform_bgl: wgpu.BindGroupLayout,
 uniform_bg: wgpu.BindGroup,
@@ -97,9 +114,10 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     const visualisation_shader = try g.device.create_shader_module_wgsl_from_file("visualisation shader", "shaders/visualiser.wgsl", alloc);
     errdefer visualisation_shader.deinit();
 
+    const target_sidelength: usize = 32;
     var map = try Map.init(alloc, g.device, .{
         .no_brickmaps = 256,
-        .grid_dimensions = .{11, 4, 11},
+        .grid_dimensions = .{target_sidelength / Brickmap.Traits.side_length} ** 3,
     });
     errdefer map.deinit();
 
@@ -270,14 +288,28 @@ pub fn init(alloc: std.mem.Allocator) !Self {
 }
 
 pub fn deinit(self: *Self) void {
+    self.compute_pipeline.deinit();
+    self.compute_pipeline_layout.deinit();
+
+    self.compute_textures_bg.deinit();
+    self.compute_textures_bgl.deinit();
+
     self.map.deinit();
+
+    self.visualisation_pipeline.deinit();
+    self.visualisation_pipeline_layout.deinit();
 }
 
 pub fn to_any(self: *Self) AnyThing {
     return Self.Any.init(self);
 }
 
-pub fn on_resize(self: *Self, dims: blas.Vec2uz) !void {
+pub fn on_resize(self: *Self, dims: wgm.Vec2uz) !void {
+    self.uniforms.dims = .{
+        @floatFromInt(dims.width()),
+        @floatFromInt(dims.height()),
+    };
+
     const visualisation_texture = try TextureAndView.init(g.device, .{
         .label = "visualisation texture",
         .usage = .{ .texture_binding = true, .storage_binding = true },
@@ -338,73 +370,75 @@ pub fn on_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
 }
 
 pub fn do_gui(self: *Self) !void {
-    _ = self;
+    if (imgui.begin("asd", null, .{})) {
+        _ = imgui.button("asdf", null);
 
-    _ = imgui.c.igBegin("asd", null, 0);
-    defer imgui.c.igEnd();
+        _ = imgui.input_scalar(u32, "debug mode", &self.uniforms.debug_mode, 1, 1);
 
-    _ = imgui.c.igButton("asdf", .{ .x = 0, .y = 0 });
+        var debug_level: c_int = @intCast(self.uniforms.debug_level);
+        if (imgui.c.igInputInt("debug level", &debug_level, 1, 1, 0)) {
+            self.uniforms.debug_level = @intCast(debug_level);
+        }
+    }
+    imgui.end();
 }
 
 pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
-    self.map.before_render();
+    try self.map.before_render(g.queue);
 
     const dims = g.window.get_size() catch @panic("g.window.get_size()");
-    g.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&Uniforms{
-        .dims = .{
-            @floatFromInt(dims.x()),
-            @floatFromInt(dims.y()),
-        },
-        .pos = .{ 0.0, 0.0, 0.0 },
-        .look = .{ 0.0, 0.0, 0.0 },
-    }));
+    g.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&self.uniforms));
 
-    const compute_pass = try encoder.begin_compute_pass(wgpu.ComputePass.Descriptor{
-        .label = "compute pass",
-    });
+    {
+        const compute_pass = try encoder.begin_compute_pass(wgpu.ComputePass.Descriptor{
+            .label = "compute pass",
+        });
 
-    compute_pass.set_pipeline(self.compute_pipeline);
-    compute_pass.set_bind_group(0, self.uniform_bg, null);
-    compute_pass.set_bind_group(1, self.compute_textures_bg, null);
-    compute_pass.set_bind_group(2, self.map.map_bg, null);
+        compute_pass.set_pipeline(self.compute_pipeline);
+        compute_pass.set_bind_group(0, self.uniform_bg, null);
+        compute_pass.set_bind_group(1, self.compute_textures_bg, null);
+        compute_pass.set_bind_group(2, self.map.map_bg, null);
 
-    const wg_sz = blas.vec2uz(8, 8);
-    const wg_count = blas.divew(
-        blas.sub(
-            blas.add(dims, wg_sz),
-            blas.vec2uz(1, 1),
-        ),
-        wg_sz,
-    );
-    compute_pass.dispatch_workgroups(.{
-        @intCast(wg_count.width()),
-        @intCast(wg_count.height()),
-        1,
-    });
+        const wg_sz = wgm.vec2uz(8, 8);
+        const wg_count = wgm.divew(
+            wgm.sub(
+                wgm.add(dims, wg_sz),
+                wgm.vec2uz(1, 1),
+            ),
+            wg_sz,
+        );
+        compute_pass.dispatch_workgroups(.{
+            @intCast(wg_count.width()),
+            @intCast(wg_count.height()),
+            1,
+        });
 
-    compute_pass.end();
-    compute_pass.deinit();
+        compute_pass.end();
+        compute_pass.deinit();
+    }
 
-    const render_pass = try encoder.begin_render_pass(wgpu.RenderPass.Descriptor{
-        .label = "render pass",
-        .color_attachments = &.{
-            wgpu.RenderPass.ColorAttachment{
-                .view = onto,
-                .load_op = .Load,
-                .store_op = .Store,
+    {
+        const render_pass = try encoder.begin_render_pass(wgpu.RenderPass.Descriptor{
+            .label = "render pass",
+            .color_attachments = &.{
+                wgpu.RenderPass.ColorAttachment{
+                    .view = onto,
+                    .load_op = .Load,
+                    .store_op = .Store,
+                },
             },
-        },
-    });
+        });
 
-    render_pass.set_pipeline(self.visualisation_pipeline);
-    render_pass.set_bind_group(0, self.uniform_bg, null);
-    render_pass.set_bind_group(1, self.visualisation_texture_bg, null);
-    render_pass.draw(.{
-        .first_vertex = 0,
-        .vertex_count = 6,
-        .first_instance = 0,
-        .instance_count = 1,
-    });
-    render_pass.end();
-    render_pass.deinit();
+        render_pass.set_pipeline(self.visualisation_pipeline);
+        render_pass.set_bind_group(0, self.uniform_bg, null);
+        render_pass.set_bind_group(1, self.visualisation_texture_bg, null);
+        render_pass.draw(.{
+            .first_vertex = 0,
+            .vertex_count = 6,
+            .first_instance = 0,
+            .instance_count = 1,
+        });
+        render_pass.end();
+        render_pass.deinit();
+    }
 }

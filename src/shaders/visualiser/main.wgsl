@@ -8,7 +8,7 @@ struct VertexOut {
 }
 
 struct HardcodedVertex {
-    pos: vec2<f32>,
+    pos: vec3<f32>,
     uv: vec2<f32>,
 };
 
@@ -16,16 +16,20 @@ struct HardcodedVertex {
     @builtin(vertex_index) vertex_index : u32,
 ) -> VertexOut {
     var vertices = array<HardcodedVertex, 6>(
-        HardcodedVertex(vec2<f32>(-1.0, 1.0 ), vec2<f32>(0.0, 0.0)),
-        HardcodedVertex(vec2<f32>(-1.0, -1.0), vec2<f32>(0.0, 1.0)),
-        HardcodedVertex(vec2<f32>(1.0 , -1.0), vec2<f32>(1.0, 1.0)),
-        HardcodedVertex(vec2<f32>(1.0 , -1.0), vec2<f32>(1.0, 1.0)),
-        HardcodedVertex(vec2<f32>(1.0 , 1.0 ), vec2<f32>(1.0, 0.0)),
-        HardcodedVertex(vec2<f32>(-1.0, 1.0 ), vec2<f32>(0.0, 0.0)),
+        HardcodedVertex(vec3<f32>(-1.0,  1.0, 1), vec2<f32>(0.0, 0.0)),
+        HardcodedVertex(vec3<f32>(-1.0, -1.0, 2), vec2<f32>(0.0, 1.0)),
+        HardcodedVertex(vec3<f32>( 1.0, -1.0, 3), vec2<f32>(1.0, 1.0)),
+        HardcodedVertex(vec3<f32>( 1.0, -1.0, 3), vec2<f32>(1.0, 1.0)),
+        HardcodedVertex(vec3<f32>( 1.0,  1.0, 2), vec2<f32>(1.0, 0.0)),
+        HardcodedVertex(vec3<f32>(-1.0,  1.0, 1), vec2<f32>(0.0, 0.0)),
     );
 
+    // Leaving this in from me trying to debug why my transforms were fucked.
+    // Turns out matn<T> is column-major...
+    // let pos = uniforms.transform * vec4<f32>(vertices[vertex_index].pos, 1);
     return VertexOut(
-        vec4<f32>(vertices[vertex_index].pos, 0.0, 1.0),
+        // pos,
+        vec4<f32>(vertices[vertex_index].pos.xy, 0.5, 1),
         vertices[vertex_index].uv,
     );
 }
@@ -33,4 +37,6 @@ struct HardcodedVertex {
 @fragment fn fs_main(in: VertexOut) -> @location(0) vec4f {
     let sample = textureSample(text, samp, in.uv);
     return sample;
+
+    // return vec4<f32>(vec3<f32>(in.uv, in.pos.w), 1);
 }

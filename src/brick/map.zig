@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const blas = @import("blas");
+const wgm = @import("wgm");
 
 const defns = @import("defns.zig");
 const util = @import("util.zig");
@@ -27,7 +27,7 @@ pub fn MkTraits(comptime NodeTypeArg: type, comptime depth_arg: u6) type {
 
     return struct {
         pub const VoxelType = PackedVoxel;
-        pub const NodeType = NodeType;
+        pub const NodeType = NodeTypeArg;
 
         pub const depth: u6 = depth_arg;
         pub const side_length: usize = 1 << (bits_per_axis_per_level * depth);
@@ -113,13 +113,39 @@ pub fn U8Map(comptime depth: u6) type {
 
         pub const Traits = MkTraits(u8, depth);
 
-        pub fn to_index(coord: blas.Vec3uz) usize {
+        pub fn to_index(coord: wgm.Vec3uz) usize {
             return coord.x() +
                 coord.y() * Traits.side_length +
                 coord.z() * Traits.side_length * Traits.side_length;
         }
 
-        pub fn set(self: *Self, coord: blas.Vec3uz, voxel: PackedVoxel) void {
+        pub fn tree_at_level(self: *Self, level: u6) []u8 {
+            const bbl = Self.Traits.bits_before_level;
+            return self.tree[bbl(level) / 8 .. bbl(level + 1) / 8];
+        }
+
+        pub fn generate_tree(self: *Self) void {
+            @memset(self.tree[0..], 0);
+
+            generate_tree_scalar_u8(
+                Self.Traits,
+                depth - 1,
+                @ptrCast(self.tree_at_level(depth - 1)),
+                self.voxels[0..],
+            );
+
+            inline for (1..depth - 1) |i| {
+                const level = depth - i - 1;
+                generate_tree_scalar_u8(
+                    Self.Traits,
+                    level,
+                    @ptrCast(self.tree_at_level(level)),
+                    @ptrCast(self.tree_at_level(level + 1)),
+                );
+            }
+        }
+
+        pub fn set(self: *Self, coord: wgm.Vec3uz, voxel: PackedVoxel) void {
             self.voxels[to_index(coord)] = voxel;
         }
 
@@ -134,11 +160,7 @@ pub fn U8Map(comptime depth: u6) type {
         // unaligned load as opposed to whatever is going on rn).
 
         /// Level 1 through `depth` non-inclusive (might be empty).
-        /// Level 1, if present, is 8 bytes large instead of being composed of a single byte so as to be representable in WGSL.
-        tree: [
-            if (Traits.no_tree_bits == 0) 0 //
-            else Traits.no_tree_bits / 8 + 7
-        ]u8,
+        tree: [Traits.no_tree_bits / 8]u8,
         /// Level `depth`
         voxels: [Traits.volume]PackedVoxel,
     };
@@ -177,17 +199,17 @@ test generate_tree_scalar_u8 {
 
     const dummy = PackedVoxel{ .r = 255, .g = 0, .b = 0, .i = 1 };
 
-    map.set(blas.vec3uz(0, 0, 0), dummy);
-    map.set(blas.vec3uz(1, 0, 0), dummy);
-    map.set(blas.vec3uz(1, 1, 0), dummy);
+    map.set(wgm.vec3uz(0, 0, 0), dummy);
+    map.set(wgm.vec3uz(1, 0, 0), dummy);
+    map.set(wgm.vec3uz(1, 1, 0), dummy);
 
-    map.set(blas.vec3uz(0, 2, 0), dummy);
-    map.set(blas.vec3uz(2, 2, 0), dummy);
+    map.set(wgm.vec3uz(0, 2, 0), dummy);
+    map.set(wgm.vec3uz(2, 2, 0), dummy);
 
-    map.set(blas.vec3uz(0, 0, 2), dummy);
-    map.set(blas.vec3uz(0, 2, 2), dummy);
-    map.set(blas.vec3uz(2, 2, 2), dummy);
-    map.set(blas.vec3uz(4, 2, 2), dummy);
+    map.set(wgm.vec3uz(0, 0, 2), dummy);
+    map.set(wgm.vec3uz(0, 2, 2), dummy);
+    map.set(wgm.vec3uz(2, 2, 2), dummy);
+    map.set(wgm.vec3uz(4, 2, 2), dummy);
 
     generate_tree_scalar_u8(Map.Traits, 4, @ptrCast(level_4.ptr), map.voxels[0..]);
     try std.testing.expectEqualSlices(u8, &.{

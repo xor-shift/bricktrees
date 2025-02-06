@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const blas = @import("blas");
+const wgm = @import("wgm");
 const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
@@ -39,22 +39,22 @@ pub fn to_any(self: *Self) AnyThing {
 }
 
 const uniforms: struct {
-    dims: blas.Vec2u,
+    dims: wgm.Vec2u,
     fov: f32,
-    position: blas.Vec3f,
+    position: wgm.Vec3f,
 } = .{
-    .dims = blas.vec2u(768, 576),
+    .dims = wgm.vec2u(768, 576),
     .fov = 45,
-    .position = blas.vec3f(0.0, 0.0, 0.0),
+    .position = wgm.vec3f(0.0, 0.0, 0.0),
 };
 
-fn generate_ray(pixel_arg: blas.Vec2uz) blas.Vec3f {
-    const pixel = blas.vec2f(
+fn generate_ray(pixel_arg: wgm.Vec2uz) wgm.Vec3f {
+    const pixel = wgm.vec2f(
         @as(f32, @floatFromInt(pixel_arg.x())),
         @as(f32, @floatFromInt(pixel_arg.y())),
     );
 
-    const dims = blas.vec2f(
+    const dims = wgm.vec2f(
         @as(f32, @floatFromInt(uniforms.dims.width())),
         @as(f32, @floatFromInt(uniforms.dims.height())),
     );
@@ -64,7 +64,7 @@ fn generate_ray(pixel_arg: blas.Vec2uz) blas.Vec3f {
 
     const z = 69.420; // does not matter what value this has
 
-    const ray_direction = blas.normalized(blas.vec3f(
+    const ray_direction = wgm.normalized(wgm.vec3f(
         @tan(fov) * z * (pixel.x() / dims.width() - 0.5),
         @tan(fov / aspect) * z * (0.5 - pixel.y() / dims.height()),
         z,
@@ -85,7 +85,7 @@ pub fn draw(alloc: std.mem.Allocator) !void {
 
     for (0..img_height) |img_y| {
         for (0..img_width) |img_x| {
-            const ray_direction = generate_ray(blas.vec2uz(img_x, img_y));
+            const ray_direction = generate_ray(wgm.vec2uz(img_x, img_y));
 
             const index = img_x + img_y * img_width;
             image.data[index] = .{

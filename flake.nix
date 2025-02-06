@@ -22,7 +22,7 @@
           ripgrep cmake-language-server
           llvm.clang-tools
           pkg-config cmake ninja codespell
-          lldb
+          lldb valgrind
 
           zig zls
 

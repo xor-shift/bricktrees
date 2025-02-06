@@ -1,11 +1,21 @@
 const std = @import("std");
 
-const blas = @import("blas");
+const wgm = @import("wgm");
 const wgpu = @import("gfx").wgpu;
 
-pub const Brickmap = @import("../../brick/map.zig").U8Map(5);
+const brick = @import("../../brick.zig");
+
+const PackedVoxel = brick.PackedVoxel;
+const Voxel = brick.Voxel;
+
+const BrickmapCoordinates = brick.BrickmapCoordinates;
+const VoxelCoordinates = brick.VoxelCoordinates;
+
+const g = &@import("../../main.zig").g;
 
 const Self = @This();
+
+pub const Brickmap = brick.U8Map(5);
 
 const brickmap_texture_desc = wgpu.Texture.Descriptor{
     .label = "some brickmap texture",
@@ -27,7 +37,7 @@ const brickmap_texture_desc = wgpu.Texture.Descriptor{
 
 const bricktree_buffer_desc = wgpu.Buffer.Descriptor{
     .label = "some bricktree texture",
-    .size = (Brickmap.Traits.no_tree_bits / 8 + 3) / 4 * 4,
+    .size = Brickmap.Traits.no_tree_bits / 8 - 1,
     .usage = .{
         .copy_dst = true,
         .storage = true,
@@ -36,19 +46,18 @@ const bricktree_buffer_desc = wgpu.Buffer.Descriptor{
 };
 
 pub const BrickmapInfo = struct {
-    pub const State = enum {
-        Junk,
-        UploadToGPU,
-        DownloadFromGPU,
-        Valid,
-    };
+    /// This is true in ~~two~~ one situation~~s~~:
+    /// - The data on the GPU is junk for this brickmap
+    /// ~~- Another brickmap was uploaded to anoter slot at the same location.~~
+    ///
+    /// Both `valid` and `committed` can be `true` at the same time.
+    valid: bool = false,
 
-    state: State,
-    brickmap_coords: blas.Vec3uz,
-};
+    /// Value is undefined if `!valid`.
+    last_accessed: usize = undefined,
 
-pub const BrickgridEntry = struct {
-    brickmap: usize,
+    /// Value is undefined if `!valid`.
+    brickmap_coords: wgm.Vec3uz = undefined,
 };
 
 pub const MapConfig = struct {
@@ -63,6 +72,11 @@ pub const MapConfig = struct {
     }
 };
 
+const QueuedBrickmap = struct {
+    brickmap: *Brickmap,
+    coords: BrickmapCoordinates,
+};
+
 config: MapConfig,
 
 map_bgl: wgpu.BindGroupLayout,
@@ -70,12 +84,13 @@ map_bg: wgpu.BindGroup,
 brickgrid_texture: wgpu.Texture,
 brickgrid_texture_view: wgpu.TextureView,
 
+bigass_mutex: std.Thread.Mutex = .{},
+
+brickmap_queue: std.ArrayList(QueuedBrickmap),
+
 alloc: std.mem.Allocator,
 
-brickgrid_synced: bool = false,
-local_brickgrid: [*]?BrickgridEntry,
-
-local_brickmaps: [*]BrickmapInfo,
+brickmap_tracker: [*]BrickmapInfo,
 bricktree_buffers: [*]wgpu.Buffer,
 brickmap_textures: [*]wgpu.Texture,
 brickmap_texture_views: [*]wgpu.TextureView,
@@ -83,19 +98,9 @@ brickmap_texture_views: [*]wgpu.TextureView,
 pub fn init(alloc: std.mem.Allocator, device: wgpu.Device, config: MapConfig) !Self {
     var successful_initialisations: usize = 0;
 
-    const local_brickgrid = try alloc.alloc(
-        ?BrickgridEntry,
-        1 *
-            config.grid_dimensions[0] *
-            config.grid_dimensions[1] *
-            config.grid_dimensions[2],
-    );
-    errdefer alloc.free(local_brickgrid);
-
-    @memset(local_brickgrid, null);
-
-    const local_brickmaps = try alloc.alloc(BrickmapInfo, config.no_brickmaps);
-    errdefer alloc.free(local_brickmaps);
+    const brickmap_tracker = try alloc.alloc(BrickmapInfo, config.no_brickmaps);
+    errdefer alloc.free(brickmap_tracker);
+    @memset(brickmap_tracker, .{});
 
     const bricktree_buffers = try alloc.alloc(wgpu.Buffer, config.no_brickmaps);
     errdefer alloc.free(bricktree_buffers);
@@ -164,7 +169,7 @@ pub fn init(alloc: std.mem.Allocator, device: wgpu.Device, config: MapConfig) !S
                 .visibility = .{ .compute = true },
                 .layout = .{ .Buffer = .{
                     .type = .ReadOnlyStorage,
-                    .min_binding_size = Brickmap.Traits.no_tree_bits / 8,
+                    .min_binding_size = Brickmap.Traits.no_tree_bits / 8 - 1,
                 } },
                 .count = config.no_brickmaps,
             },
@@ -201,6 +206,8 @@ pub fn init(alloc: std.mem.Allocator, device: wgpu.Device, config: MapConfig) !S
     });
     errdefer map_bg.deinit();
 
+    const brickmap_queue = std.ArrayList(QueuedBrickmap).init(g.biframe_alloc);
+
     return .{
         .config = config,
 
@@ -209,11 +216,11 @@ pub fn init(alloc: std.mem.Allocator, device: wgpu.Device, config: MapConfig) !S
         .brickgrid_texture = brickgrid_texture,
         .brickgrid_texture_view = brickgrid_texture_view,
 
+        .brickmap_queue = brickmap_queue,
+
         .alloc = alloc,
 
-        .local_brickgrid = local_brickgrid.ptr,
-
-        .local_brickmaps = local_brickmaps.ptr,
+        .brickmap_tracker = brickmap_tracker.ptr,
         .bricktree_buffers = bricktree_buffers.ptr,
         .brickmap_textures = brickmap_textures.ptr,
         .brickmap_texture_views = brickmap_texture_views.ptr,
@@ -236,14 +243,139 @@ pub fn deinit(self: *Self) void {
 
     self.brickgrid_texture.deinit();
 
-    self.alloc.free(self.local_brickgrid[0..self.config.grid_size()]);
-    self.alloc.free(self.local_brickmaps[0..self.config.no_brickmaps]);
+    self.alloc.free(self.brickmap_tracker[0..self.config.no_brickmaps]);
 
     self.map_bg.deinit();
     self.map_bgl.deinit();
 }
 
+/// Queues a brickmap for upload.
+///
+/// This function will make a copy of the brickmap given.
+///
+/// This function is thread-safe.
+pub fn queue_brickmap(self: *Self, at_coords: BrickmapCoordinates, brickmap: *const Brickmap) !void {
+    self.bigass_mutex.lock();
+    defer self.bigass_mutex.unlock();
+
+    const alloc = self.brickmap_queue.allocator;
+
+    const copy = try alloc.create(Brickmap);
+    copy.* = brickmap.*;
+    errdefer alloc.destroy(copy);
+
+    try self.brickmap_queue.append(.{
+        .coords = at_coords,
+        .brickmap = copy,
+    });
+}
+
+fn generate_brickgrid(self: *Self, brickgrid_origin: BrickmapCoordinates, alloc: std.mem.Allocator) ![]?usize {
+    var ret = try alloc.alloc(?usize, self.config.grid_size());
+    @memset(ret, null);
+
+    for (self.brickmap_tracker, 0..self.config.no_brickmaps) |v, i| if (v.valid) {
+        const g_brickmap_coords = v.brickmap_coords.cast(isize).?;
+        const g_origin_coords = brickgrid_origin.cast(isize).?;
+
+        const bl_brickmap_coords = wgm.sub(g_brickmap_coords, g_origin_coords);
+        const below_bounds = wgm.any(wgm.less_than(
+            bl_brickmap_coords,
+            wgm.splat3z(0),
+        ));
+        const no_greater_than_bounds = wgm.all(wgm.less_than(
+            bl_brickmap_coords,
+            (wgm.Vec3uz{ .el = self.config.grid_dimensions }).cast(isize).?,
+        ));
+
+        if (below_bounds or !no_greater_than_bounds) continue;
+
+        const blc = bl_brickmap_coords.cast(usize).?;
+        const idx = blc.x() +
+            blc.y() * self.config.grid_dimensions[0] +
+            blc.z() * (self.config.grid_dimensions[0] * self.config.grid_dimensions[1]);
+
+        ret[idx] = i;
+    };
+
+    return ret;
+}
+
+fn find_slot(self: *Self, coord_hint: ?BrickmapCoordinates) usize {
+    if (coord_hint) |w| {
+        for (0..self.config.no_brickmaps, self.brickmap_tracker) |i, v| {
+            if (v.valid and wgm.all(wgm.equal(v.brickmap_coords, w))) {
+                return i;
+            }
+        }
+    }
+
+    for (0..self.config.no_brickmaps, self.brickmap_tracker) |i, v| {
+        if (!v.valid) return i;
+    }
+
+    @panic("there's no eviction strategy rn");
+}
+
+fn upload_brickmap(self: *Self, slot: usize, brickmap: *const Brickmap, queue: wgpu.Queue) void {
+    if (Brickmap.Traits.NodeType == u8) {
+        // uploading layer 1 is too much trouble for too little gain
+        queue.write_buffer(self.bricktree_buffers[slot], 0, brickmap.tree[1..]);
+    } else {
+        @compileError("NYI: u64 trees");
+    }
+
+    // TODO: upload the actual thing
+}
+
 /// Call this before doing anything in render().
-pub fn before_render(self: *Self) void {
-    _ = self;
+pub fn before_render(self: *Self, queue: wgpu.Queue) !void {
+    const previous_queue = blk: {
+        self.bigass_mutex.lock();
+        defer self.bigass_mutex.unlock();
+
+        const ret = self.brickmap_queue;
+
+        self.brickmap_queue = std.ArrayList(QueuedBrickmap).init(g.biframe_alloc);
+
+        break :blk ret;
+    };
+
+    for (previous_queue.items) |brickmap| {
+        std.log.debug("brickmap!", .{});
+
+        const slot = self.find_slot(brickmap.coords);
+
+        self.upload_brickmap(slot, brickmap.brickmap, queue);
+
+        const alloc = previous_queue.allocator;
+        alloc.destroy(brickmap.brickmap);
+    }
+
+    previous_queue.deinit();
+
+    const data = try g.frame_alloc.alloc(u32, self.config.grid_size());
+
+    const local_brickgrid = try self.generate_brickgrid(wgm.vec3uz(0, 0, 0), g.frame_alloc);
+
+    for (0..data.len) |i| {
+        data[i] = if (local_brickgrid[i]) |v| @intCast(v) else std.math.maxInt(u32);
+    }
+
+    queue.write_texture(
+        wgpu.ImageCopyTexture{
+            .texture = self.brickgrid_texture,
+        },
+        std.mem.sliceAsBytes(data),
+        wgpu.Extent3D{
+            .width = @intCast(self.config.grid_dimensions[0]),
+            .height = @intCast(self.config.grid_dimensions[1]),
+            .depth_or_array_layers = @intCast(self.config.grid_dimensions[2]),
+        },
+        wgpu.TextureDataLayout{
+            .offset = 0,
+            .bytes_per_row = @intCast(self.config.grid_dimensions[0] * 4),
+            .rows_per_image = @intCast(self.config.grid_dimensions[1]),
+        },
+    );
 }

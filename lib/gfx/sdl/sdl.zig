@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const blas = @import("blas");
+const wgm = @import("wgm");
 const wgpu = @import("../wgpu/wgpu.zig");
 
 pub const c = @cImport({
@@ -73,7 +73,7 @@ pub const Window = struct {
 
     handle: *c.SDL_Window,
 
-    pub fn init(title: [:0]const u8, dims: blas.Vec2uz) Error!Window {
+    pub fn init(title: [:0]const u8, dims: wgm.Vec2uz) Error!Window {
         const window = c.SDL_CreateWindow(title.ptr, @intCast(dims.width()), @intCast(dims.height()), c.SDL_WINDOW_RESIZABLE) orelse {
             std.log.err("SDL_CreateWindow failed: {s}", .{c.SDL_GetError()});
             return Error.Failed;
@@ -92,21 +92,21 @@ pub const Window = struct {
         return c.SDL_GetWindowID(self.handle);
     }
 
-    pub fn resize(self: Window, dims: blas.Vec2uz) !void {
+    pub fn resize(self: Window, dims: wgm.Vec2uz) !void {
         if (!c.SDL_SetWindowSize(self.handle, @intCast(dims.width()), @intCast(dims.height()))) {
             log_error("SDL_SetWindowSize");
             return Error.Failed;
         }
     }
 
-    pub fn get_size(self: Window) !blas.Vec2uz {
+    pub fn get_size(self: Window) !wgm.Vec2uz {
         var out: [2]c_int = undefined;
         if (!c.SDL_GetWindowSizeInPixels(self.handle, &out[0], &out[1])) {
             log_error("SDL_GetWindowSize");
             return Error.Failed;
         }
 
-        return blas.vec2uz(@intCast(out[0]), @intCast(out[1]));
+        return wgm.vec2uz(@intCast(out[0]), @intCast(out[1]));
     }
 
     pub fn get_surface(self: @This(), instance: wgpu.Instance) !wgpu.Surface {
@@ -149,7 +149,7 @@ pub const Window = struct {
     }
 
     /// Sets the cursor position relative to the window
-    pub fn set_cursor_pos(self: Window, coords: blas.Vec2f) void {
+    pub fn set_cursor_pos(self: Window, coords: wgm.Vec2f) void {
         c.SDL_WarpMouseInWindow(self.handle, coords.x(), coords.y());
     }
 };

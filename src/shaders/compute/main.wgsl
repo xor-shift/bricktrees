@@ -2,9 +2,38 @@
 
 @group(1) @binding(0) var texture_radiance: texture_storage_2d<bgra8unorm, write>;
 
+struct BricktreeWrapper {
+    tree: array<u32>,
+};
+
 @group(2) @binding(0) var brickgrid: texture_3d<u32>;
-// @group(2) @binding(1) var bricktrees: binding_array<array<u32>>;
+@group(2) @binding(1) var<storage, read> bricktrees: binding_array<BricktreeWrapper>;
 @group(2) @binding(2) var brickmaps: binding_array<texture_3d<u32>>;
+
+fn blinkenlights(n: u32, pixel: vec2<u32>, out_color: ptr<function, vec3<f32>>) -> bool {
+    let tree_length = arrayLength(&(bricktrees[n].tree));
+
+    if (all(pixel >= vec2<u32>(6)) && all(pixel < vec2<u32>(10 + tree_length, 42))) {
+        if (any(pixel < vec2<u32>(8)) || any(pixel >= vec2<u32>(8 + tree_length, 40))) {
+            *out_color = vec3<f32>(1, select(0.0, 0.5, (pixel.x ^ pixel.y) % 2 == 0), 1);
+            return true;
+        }
+
+        let bit = pixel.y - 8;
+        let byte = pixel.x - 8;
+        let value = bricktrees[n].tree[byte];
+
+        *out_color = select(
+            vec3<f32>(0),
+            vec3<f32>(1),
+            ((value >> bit) & 1) != 0
+        );
+
+        return true;
+    }
+
+    return false;
+}
 
 @compute @workgroup_size(8, 8, 1) fn cs_main(
     @builtin(global_invocation_id)   global_id: vec3<u32>,
@@ -13,12 +42,35 @@
     @builtin(local_invocation_index) local_idx: u32,
 ) {
     let pixel = global_id.xy;
-    textureStore(
-        texture_radiance,
-        pixel,
-        vec4<f32>(
-            vec2<f32>(pixel) / vec2<f32>(uniforms.width, uniforms.height),
-            0., 1.,
-        ),
+
+    var blinkenlight: vec3<f32>;
+    if (blinkenlights(0u, pixel, &blinkenlight)) {
+        textureStore(texture_radiance, pixel, vec4<f32>(blinkenlight, 1));
+        return;
+    }
+
+    var ray = generate_ray(pixel);
+
+    var out_t: f32;
+    let slab_res = slab(
+        ray.origin,
+        ray.direction,
+        vec3<f32>(-0.5, -0.5, 2),
+        vec3<f32>(0.5, 0.5, 4),
+        &out_t,
     );
+
+    var color = vec3<f32>(0);
+
+    switch (uniforms.debug_mode) {
+        case 0u: { color = vec3<f32>(0.2, 0.3, 0.4); }
+        case 1u: { color = ray.direction; }
+        case 2u: { color = ray.origin; }
+        case 3u: { color = vec3<f32>(select(0.0, 1.0, slab_res), 0, 0); }
+        case 4u: { color = vec3<f32>(out_t / 5, 0, 0); }
+        default: {}
+    }
+
+    textureStore(texture_radiance, pixel, vec4<f32>(color, 1.));
 }
+

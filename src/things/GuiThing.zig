@@ -1,11 +1,11 @@
 const std = @import("std");
 
-const blas = @import("blas");
+const wgm = @import("wgm");
 const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
-const AnyThing = @import("../thing.zig").AnyThing;
+const AnyThing = @import("../AnyThing.zig");
 
 const g = &@import("../main.zig").g;
 
@@ -22,7 +22,7 @@ pub const Any = struct {
         on_alloc.destroy(@as(*Self, @ptrCast(@alignCast(self_arg))));
     }
 
-    pub fn on_resize(self_arg: *anyopaque, dims: blas.Vec2uz) anyerror!void {
+    pub fn on_resize(self_arg: *anyopaque, dims: wgm.Vec2uz) anyerror!void {
         try @as(*Self, @ptrCast(@alignCast(self_arg))).on_resize(dims);
     }
 
@@ -69,7 +69,7 @@ pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView)
     try self.context.render(encoder, onto);
 }
 
-pub fn on_resize(self: *Self, dims: blas.Vec2uz) !void {
+pub fn on_resize(self: *Self, dims: wgm.Vec2uz) !void {
     const _ctx_guard = self.ctx_guard();
     defer _ctx_guard.deinit();
 

@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const blas = @import("blas");
+const wgm = @import("wgm");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
@@ -371,8 +371,8 @@ pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView)
             render_pass.set_vertex_buffer(0, self.vtx_buffer.buffer, 0, @intCast(self.vtx_buffer.desc.size));
             render_pass.set_index_buffer(self.idx_buffer.buffer, .Uint32, 0, @intCast(self.idx_buffer.desc.size));
             render_pass.set_scissor_rect(
-                blas.vec2u(@intFromFloat(command.ClipRect.x), @intFromFloat(command.ClipRect.y)),
-                blas.vec2u(
+                wgm.vec2u(@intFromFloat(command.ClipRect.x), @intFromFloat(command.ClipRect.y)),
+                wgm.vec2u(
                     @intFromFloat(command.ClipRect.z - command.ClipRect.x),
                     @intFromFloat(command.ClipRect.w - command.ClipRect.y),
                 ),

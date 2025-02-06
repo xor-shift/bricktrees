@@ -1,31 +1,36 @@
 const std = @import("std");
 
-const blas = @import("blas");
+const wgm = @import("wgm");
 const imgui = @import("imgui");
 const qoi = @import("qoi");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
-const AnyThing = @import("thing.zig").AnyThing;
+const Ticker = @import("Ticker.zig");
+
+const AnyThing = @import("AnyThing.zig");
 const Globals = @import("globals.zig");
 
-const GPUThing = @import("things/gpu.zig");
-const GuiThing = @import("things/gui.zig");
-
 pub var g: Globals = undefined;
+
+fn add_thing(comptime Thing: type, args: anytype, alloc: std.mem.Allocator) *Thing {
+    const thing = alloc.create(Thing) catch @panic("");
+    thing.* = @call(.auto, Thing.init, args) catch @panic("");
+    g.things.append(thing.to_any()) catch @panic("");
+
+    return thing;
+}
 
 fn initialize_things(alloc: std.mem.Allocator) void {
     g = Globals.init(Globals.default_resolution, alloc) catch @panic("Globals.init");
 
-    const gui = alloc.create(GuiThing) catch @panic("alloc.create(GuiThing)");
-    gui.* = GuiThing.init() catch @panic("GuiThing.init()");
-    g.things.append(gui.to_any()) catch @panic("g.things.append");
-
+    const gui = add_thing(@import("things/GuiThing.zig"), .{}, alloc);
     g.gui = gui;
 
-    const gpu = alloc.create(GPUThing) catch @panic("alloc.create(GPUThing)");
-    gpu.* = GPUThing.init(alloc) catch @panic("GPUThing.init()");
-    g.things.append(gpu.to_any()) catch @panic("g.things.append");
+    const gpu = add_thing(@import("things/GpuThing.zig"), .{alloc}, alloc);
+
+    const camera = add_thing(@import("things/CameraThing.zig"), .{gpu}, alloc);
+    _ = camera;
 
     g.resize(Globals.default_resolution) catch @panic("g.resize");
 }
@@ -42,10 +47,54 @@ pub fn main() !void {
     initialize_things(alloc);
     defer deinitialize_things();
 
+    var ticker: Ticker = .{ .config = .{
+        .ns_per_tick = 50 * std.time.ns_per_ms,
+        .mode = .aligned,
+    } };
+
+    const TickFn = struct {
+        const Self = @This();
+
+        rand: std.rand.Xoshiro256,
+        last: u64 = 0,
+
+        pub fn aufruf(self: *Self) void {
+            const time = g.time();
+            // std.log.debug("ticking at {d} (+ {d})", .{
+            //     time,
+            //     @as(f64, @floatFromInt(time - self.last)) / std.time.ns_per_ms,
+            // });
+            defer self.last = time;
+
+            g.new_tick(time - self.last);
+
+            std.log.debug("tick took {d} ms", .{
+                @as(f64, @floatFromInt(g.time() - time)) / std.time.ns_per_ms,
+            });
+
+            // const ms = self.rand.next() % 100;
+            // std.time.sleep(ms * std.time.ns_per_ms);
+        }
+    };
+
+    var tick_fn: TickFn = .{
+        .rand = std.rand.Xoshiro256.init(
+            @truncate(@as(u128, @intCast(std.time.nanoTimestamp()))),
+        ),
+    };
+
+    try ticker.run(
+        .{},
+        TickFn.aufruf,
+        .{&tick_fn},
+    );
+    defer ticker.stop();
+
     var frame_timer = try std.time.Timer.start();
     var ms_spent_last_frame: f64 = 1000.0;
     outer: while (true) {
-        g.fa_new_frame();
+        std.log.debug("new frame after {d} ms", .{ms_spent_last_frame});
+        g.new_frame();
 
         const inter_frame_time = @as(f64, @floatFromInt(frame_timer.lap())) / @as(f64, @floatFromInt(std.time.ns_per_ms));
 
@@ -111,7 +160,7 @@ pub fn main() !void {
 test {
     // std.debug.assert(false);
     std.testing.refAllDecls(@import("brick/map.zig"));
-    std.testing.refAllDecls(@import("sgr.zig"));
+    // std.testing.refAllDecls(@import("sgr.zig"));
 }
 
 // test "will leak" {

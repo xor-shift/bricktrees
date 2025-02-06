@@ -1,5 +1,7 @@
-const Matrix = @import("root.zig").Matrix;
-const Vector = @import("root.zig").Vector;
+const defns = @import("defns.zig");
+
+const Vector = defns.Vector;
+const Matrix = defns.Matrix;
 
 pub fn explode(comptime T: type, comptime Dims: usize, v: T) Vector(T, Dims) {
     var ret: Vector(T, Dims) = undefined;
@@ -8,6 +10,10 @@ pub fn explode(comptime T: type, comptime Dims: usize, v: T) Vector(T, Dims) {
 }
 
 // zig fmt: off
+pub const Vec2b = Vector(bool, 2);
+pub const Vec3b = Vector(bool, 3);
+pub const Vec4b = Vector(bool, 4);
+
 pub const Vec2f = Vector(f32, 2);
 pub const Vec3f = Vector(f32, 3);
 pub const Vec4f = Vector(f32, 4);
@@ -37,6 +43,9 @@ pub const Mat3f = Matrix(f32, 3, 3);
 pub const Mat4f = Matrix(f32, 4, 4);
 
 //pub fn vec(comptime T: type, args: anytype) Vector(T, determine_vector_size(@TypeOf(args))) {}
+pub fn vec2b(x: bool, y: bool) Vec2b { return .{ .el = .{x, y} }; }
+pub fn vec3b(x: bool, y: bool, z: bool) Vec3b { return .{ .el = .{x, y, z} }; }
+pub fn vec4b(x: bool, y: bool, z: bool, w: bool) Vec4b { return .{ .el = .{x, y, z, w} }; }
 
 pub fn vec2f(x: f32, y: f32) Vec2f { return .{ .el = .{x, y} }; }
 pub fn vec3f(x: f32, y: f32, z: f32) Vec3f { return .{ .el = .{x, y, z} }; }
@@ -58,6 +67,10 @@ pub fn vec4uz(x: usize, y: usize, z: usize, w: usize) Vec4uz { return .{ .el = .
 pub fn vec2z(x: isize, y: isize) Vec2z { return .{ .el = .{x, y} }; }
 pub fn vec3z(x: isize, y: isize, z: isize) Vec3z { return .{ .el = .{x, y, z} }; }
 pub fn vec4z(x: isize, y: isize, z: isize, w: isize) Vec4z { return .{ .el = .{x, y, z, w} }; }
+
+pub fn splat2b(v: bool) Vec2b { return explode(bool, 2, v); }
+pub fn splat3b(v: bool) Vec3b { return explode(bool, 3, v); }
+pub fn splat4b(v: bool) Vec4b { return explode(bool, 4, v); }
 
 pub fn splat2f(v: f32) Vec2f { return explode(f32, 2, v); }
 pub fn splat3f(v: f32) Vec3f { return explode(f32, 3, v); }
