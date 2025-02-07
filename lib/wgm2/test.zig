@@ -4,7 +4,7 @@ const wgm = @import("root.zig");
 
 const Canonical = wgm.Canonical;
 const Helper = wgm.Helper;
-const He = wgm.He;
+const He = wgm.Helper;
 
 const vec = wgm.vec;
 

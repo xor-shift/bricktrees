@@ -1,12 +1,19 @@
 const std = @import("std");
 
+const determinant = @import("determinant.zig");
+const invert = @import("invert.zig");
 const special = @import("special_matrices.zig");
 
+pub usingnamespace determinant;
+pub usingnamespace invert;
 pub usingnamespace special;
 
 const do_simd = true;
 
 test {
+    std.testing.refAllDecls(determinant);
+    std.testing.refAllDecls(invert);
+    std.testing.refAllDecls(special);
     std.testing.refAllDecls(@import("test.zig"));
 }
 
@@ -101,7 +108,7 @@ pub fn Helper(comptime Mat: type) type {
     };
 }
 
-pub const He = Helper;
+const He = Helper;
 
 pub fn transpose(mat: anytype) He(@TypeOf(mat)).Transposed {
     const H = He(@TypeOf(mat));
@@ -455,4 +462,42 @@ pub fn compare(comptime reduction: BooleanReduction, lhs: anytype, comptime comp
         .some => @reduce(.Or, comp_res),
         .none => !@reduce(.Or, comp_res),
     };
+}
+
+pub fn length(v: anytype) He(@TypeOf(v)).T {
+    const H = He(@TypeOf(v));
+
+    std.debug.assert(H.cols == 1);
+
+    if (!do_simd) {
+        var ret: H.T = 0;
+        for (0..H.rows) |r| {
+            const v_r = H.get(&v, r, 0);
+            ret += v_r * v_r;
+        }
+        return ret;
+    }
+
+    const vv: @Vector(H.rows, H.T) = H.cfp(&v).*;
+    const vvvv = vv * vv;
+    return @reduce(.Add, vvvv);
+}
+
+pub fn normalized(v: anytype) @TypeOf(v) {
+    return div(v, length(v));
+}
+
+pub fn lossy_cast(comptime To: type, m: anytype) Matrix(To, He(@TypeOf(m)).rows, He(@TypeOf(m)).cols) {
+    const M = @TypeOf(m);
+    const H = He(M);
+
+    const Ret = Matrix(To, H.rows, H.cols);
+    const RH = He(Ret);
+
+    var ret: Ret = undefined;
+    for (0..H.rows * H.cols) |i| {
+        RH.fp(&ret)[i] = std.math.lossyCast(To, H.cfp(&m)[i]);
+    }
+
+    return ret;
 }

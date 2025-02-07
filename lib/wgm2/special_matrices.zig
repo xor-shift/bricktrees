@@ -81,7 +81,7 @@ pub fn rotation_3d(comptime T: type, yaw: T, pitch: T, roll: T) Matrix(T, 3, 3) 
         .{ 0, 0, 1 },
     };
 
-    return transpose(mulmm(mulmm(pitch_mat, yaw_mat), roll_mat));
+    return transpose(mulmm(mulmm(yaw_mat, pitch_mat), roll_mat));
 }
 
 pub fn rotation_3d_affine(comptime T: type, yaw: T, pitch: T, roll: T) Matrix(T, 4, 4) {
@@ -155,4 +155,34 @@ pub fn perspective(near: anytype, far: @TypeOf(near)) SquareMat(He(@TypeOf(near)
     const H = He(@TypeOf(near));
 
     return mulmm(ortho(near, far), z_scale(H.T, H.z(near), H.z(far)));
+}
+
+pub fn perspective_fov(comptime T: type, near: T, far: T, fovy: T, aspect: T) Matrix(T, 4, 4) {
+    const angle = fovy / 2;
+    const ymax = near * @tan(angle);
+    const xmax = ymax * aspect;
+
+    const near_vec = [3]T{
+        -xmax,
+        -ymax,
+        near,
+    };
+
+    const far_vec = [3]T{
+        xmax,
+        ymax,
+        far,
+    };
+
+    if (@inComptime()) @setEvalBranchQuota(1500);
+    return perspective(near_vec, far_vec);
+}
+
+pub fn negate(m: anytype) @TypeOf(m) {
+    const H = He(@TypeOf(m));
+
+    var ret: @TypeOf(m) = undefined;
+    for (0..H.rows * H.cols) |i| H.fp(&ret)[i] = -H.cfp(&m)[i];
+
+    return ret;
 }

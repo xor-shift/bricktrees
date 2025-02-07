@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const wgm = @import("wgm");
+const wgm2 = @import("wgm2");
 const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
@@ -67,8 +68,8 @@ pub const Any = struct {
 
 // Be careful: the vecN<T> of WGSL and the [N]T of C/Zig may not have the same alignment!
 const Uniforms = extern struct {
-    transform: [16]f32 = .{ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 },
-    inverse_transform: [16]f32 = .{ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 },
+    transform: [4][4]f32 = wgm2.identity(f32, 4),
+    inverse_transform: [4][4]f32 = wgm2.identity(f32, 4),
 
     dims: [2]f32,
     debug_mode: u32 = 0,
