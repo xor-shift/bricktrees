@@ -1,180 +1,518 @@
 const std = @import("std");
-const builtin = std.builtin;
 
-const convenience = @import("convenience.zig");
-const defns = @import("defns.zig");
+const determinant = @import("determinant.zig");
 const invert = @import("invert.zig");
-const map = @import("map.zig");
-const ops = @import("ops.zig");
-const opt = @import("opt.zig");
-const reduction = @import("reduce.zig");
-const special = @import("special_mat.zig");
+const special = @import("special_matrices.zig");
 
-pub usingnamespace convenience;
+pub usingnamespace determinant;
 pub usingnamespace invert;
-pub usingnamespace map;
-pub usingnamespace ops;
-pub usingnamespace reduction;
 pub usingnamespace special;
 
-pub const Traits = defns.Traits;
-
-pub const Vector = defns.Vector;
-pub const Matrix = defns.Matrix;
+const do_simd = true;
 
 test {
-    std.testing.refAllDecls(convenience);
-    std.testing.refAllDecls(defns);
+    std.testing.refAllDecls(determinant);
     std.testing.refAllDecls(invert);
-    std.testing.refAllDecls(map);
-    std.testing.refAllDecls(ops);
-    std.testing.refAllDecls(opt);
-    std.testing.refAllDecls(reduction);
     std.testing.refAllDecls(special);
+    std.testing.refAllDecls(@import("test.zig"));
 }
 
-pub fn mulmm(lhs: anytype, rhs: anytype) Traits(@TypeOf(lhs)).Resize(@TypeOf(lhs).rows, @TypeOf(rhs).cols) {
+pub fn Canonical(comptime Mat: type) type {
+    const H = Helper(Mat);
+
+    if (H.cols == 1) {
+        return if (H.rows == 1) H.T else [H.rows]H.T;
+    } else {
+        return [H.cols][H.rows]H.T;
+    }
+}
+
+pub fn Vector(comptime T: type, comptime rows: usize) type {
+    return Canonical([1][rows]T);
+}
+
+pub fn Matrix(comptime T: type, comptime rows: usize, comptime cols: usize) type {
+    return Canonical([cols][rows]T);
+}
+
+pub fn Verbose(comptime Mat: type) type {
+    const H = Helper(Mat);
+    return [H.cols][H.rows]H.T;
+}
+
+pub fn Helper(comptime Mat: type) type {
+    return struct {
+        fn tcr() struct { type, usize, usize } {
+            return switch (@typeInfo(Mat)) {
+                .Array => |v| switch (@typeInfo(v.child)) {
+                    .Array => |r| .{ r.child, v.len, r.len }, // v columns, r rows
+                    else => .{ v.child, 1, v.len }, // v rows
+                },
+                else => .{ Mat, 1, 1 },
+            };
+        }
+
+        pub const T = tcr().@"0";
+        pub const cols = tcr().@"1";
+        pub const rows = tcr().@"2";
+
+        pub const Identity = Canonical([cols][rows]T);
+        pub const Transposed = Canonical([rows][cols]T);
+
+        /// Turns `mat` (a pointer to type `Mat`) into `*[cols][rows]T`
+        /// regardless of whether `mat.*` is canonical.
+        pub fn p(mat: anytype) *Verbose(Mat) {
+            return @constCast(cp(mat));
+        }
+
+        /// Turns `mat` (a pointer to type `Mat`) into `*const [cols][rows]T`
+        /// regardless of whether `mat.*` is canonical.
+        pub fn cp(mat: anytype) *const Verbose(Mat) {
+            const self: *const Verbose(Mat) = @ptrCast(mat);
+            return self;
+        }
+
+        /// Turns `mat` (a pointer to type `Mat`) into `*[cols * rows]T`
+        /// regardless of whether `mat.*` is canonical.
+        pub fn fp(mat: anytype) *[rows * cols]T {
+            return @constCast(cfp(mat));
+        }
+
+        /// Turns `mat` (a pointer to type `Mat`) into `*const [cols * rows]T`
+        /// regardless of whether `mat.*` is canonical.
+        pub fn cfp(mat: anytype) *const [rows * cols]T {
+            const self: *const [rows * cols]T = @ptrCast(mat);
+            return self;
+        }
+
+        pub fn get(mat: anytype, row: usize, col: usize) T {
+            std.debug.assert(col < cols);
+            std.debug.assert(row < rows);
+
+            return cp(mat)[col][row];
+        }
+
+        pub fn set(mat: anytype, row: usize, col: usize, v: T) void {
+            std.debug.assert(col < cols);
+            std.debug.assert(row < rows);
+
+            p(mat)[col][row] = v;
+        }
+
+        // zig fmt: off
+        pub fn x(mat: anytype) T { return get(&mat, 0, 0); }
+        pub fn y(mat: anytype) T { return get(&mat, 1, 0); }
+        pub fn z(mat: anytype) T { return get(&mat, 2, 0); }
+        pub fn w(mat: anytype) T { return get(&mat, 3, 0); }
+        // zig fmt: on
+    };
+}
+
+const He = Helper;
+
+pub fn transpose(mat: anytype) He(@TypeOf(mat)).Transposed {
+    const H = He(@TypeOf(mat));
+    const RH = He(H.Transposed);
+
+    var ret: H.Transposed = undefined;
+    for (0..H.cols) |col| for (0..H.rows) |row| {
+        const v = H.get(&mat, row, col);
+        RH.set(&ret, col, row, v);
+    };
+
+    return ret;
+}
+
+pub fn vec(comptime T: type, values: anytype) Vector(T, values.len) {
+    const H = Helper(Vector(T, values.len));
+
+    var ret: Vector(T, values.len) = undefined;
+    inline for (values, 0..) |v, i| H.set(&ret, i, 0, @as(T, v));
+
+    return ret;
+}
+
+pub fn dot(lhs: anytype, rhs: @TypeOf(lhs)) He(@TypeOf(lhs)).T {
+    const H = He(@TypeOf(lhs));
+
+    if (H.cols != 1) @compileError("`dot` is meant for vectors");
+
+    if (do_simd) {
+        const lv: @Vector(H.rows, H.T) = lhs;
+        const rv: @Vector(H.rows, H.T) = rhs;
+
+        return @reduce(.Add, lv * rv);
+    }
+
+    var ret: H.T = 0;
+    for (0..H.rows) |i| {
+        const v = H.get(&lhs, i, 0) * H.get(&rhs, i, 0);
+        ret += v;
+    }
+
+    return ret;
+}
+
+fn ArithmeticResult(comptime Lhs: type, comptime Rhs: type) type {
+    const LRet = Canonical(Lhs);
+    const RRet = Canonical(Rhs);
+
+    const LH = He(Lhs);
+    const RH = He(Rhs);
+
+    const l_scalar = LH.rows == 1 and LH.cols == 1;
+    const r_scalar = RH.rows == 1 and RH.cols == 1;
+
+    if (LRet == RRet) return LRet;
+    if (l_scalar and r_scalar) return LRet;
+
+    if (!l_scalar and r_scalar) return LRet;
+    if (l_scalar and !r_scalar) return RRet;
+
+    @compileError("can't perform an arithmetic operation on two differently-sized matrices");
+}
+
+// glorified macros
+const binary_ops = struct {
+    const add = struct {
+        fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs + rhs) {
+            return lhs + rhs;
+        }
+
+        fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
+            return lhs + rhs;
+        }
+    };
+
+    const sub = struct {
+        fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs - rhs) {
+            return lhs - rhs;
+        }
+
+        fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
+            return lhs - rhs;
+        }
+    };
+
+    const mul = struct {
+        fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs * rhs) {
+            return lhs * rhs;
+        }
+
+        fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
+            return lhs * rhs;
+        }
+    };
+
+    const div = struct {
+        fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs + rhs) {
+            if (@typeInfo(@TypeOf(lhs)) == .Int) return @divTrunc(lhs, rhs) //
+            else return lhs / rhs;
+        }
+
+        fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
+            return lhs / rhs;
+        }
+    };
+};
+
+fn bopvv(comptime Op: type, comptime H: type, lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
+    const Ret = ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs));
+
+    if (do_simd) {
+        const elem_ct = H.rows * H.cols;
+        const VecType = @Vector(elem_ct, H.T);
+
+        const lv: VecType = @as(*const [elem_ct]H.T, @ptrCast(&lhs)).*;
+        const rv: VecType = @as(*const [elem_ct]H.T, @ptrCast(&rhs)).*;
+
+        const resv = Op.simd(H.T, elem_ct, lv, rv);
+        const res: [elem_ct]H.T = resv;
+
+        return @as(*const Ret, @ptrCast(&res)).*;
+    }
+
+    var ret: Ret = undefined;
+    for (0..H.cols) |c| for (0..H.rows) |r| {
+        const v = Op.scalar(H.get(&lhs, r, c), H.get(&rhs, r, c));
+        H.set(&ret, r, c, v);
+    };
+
+    return ret;
+}
+
+fn bopvs(comptime Op: type, comptime H: type, vector: anytype, scalar: anytype) ArithmeticResult(@TypeOf(vector), @TypeOf(scalar)) {
+    const Ret = ArithmeticResult(@TypeOf(vector), @TypeOf(scalar));
+
+    if (do_simd) {
+        const elem_ct = H.rows * H.cols;
+        const VecType = @Vector(elem_ct, H.T);
+
+        const vv: VecType = @as(*const [elem_ct]H.T, @ptrCast(&vector)).*;
+        const sv: VecType = @splat(scalar);
+
+        const resv = Op.simd(H.T, elem_ct, vv, sv);
+        const res: [elem_ct]H.T = resv;
+
+        return @as(*const Ret, @ptrCast(&res)).*;
+    }
+
+    var ret: Ret = undefined;
+    for (0..H.cols) |c| for (0..H.rows) |r| {
+        const v = Op.scalar(H.get(&vector, r, c), scalar);
+        H.set(&ret, r, c, v);
+    };
+
+    return ret;
+}
+
+fn bop(comptime Op: type, lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
+    const Lhs = @TypeOf(lhs);
+    const Rhs = @TypeOf(rhs);
+    const Ret = ArithmeticResult(Lhs, Rhs);
+
+    const LH = He(Lhs);
+    const RH = He(Rhs);
+    const H = He(Ret);
+
+    const l_scalar = LH.rows == 1 and LH.cols == 1;
+    const r_scalar = RH.rows == 1 and RH.cols == 1;
+
+    if (l_scalar and r_scalar) {
+        const lv = @as(*const LH.T, @ptrCast(&lhs)).*;
+        const rv = @as(*const RH.T, @ptrCast(&rhs)).*;
+        return Op.scalar(lv, rv);
+    }
+
+    if (!l_scalar and !r_scalar) return bopvv(Op, H, lhs, rhs);
+
+    const scalar = if (l_scalar) lhs else rhs;
+    const vector = if (l_scalar) rhs else lhs;
+
+    return bopvs(Op, H, vector, @as(H.T, scalar));
+}
+
+pub fn add(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
+    return bop(binary_ops.add, lhs, rhs);
+}
+
+pub fn sub(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
+    return bop(binary_ops.sub, lhs, rhs);
+}
+
+pub fn mulew(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
+    return bop(binary_ops.mul, lhs, rhs);
+}
+
+/// No sane man would expect this to do actual matrix division and so it's
+/// named "div" instead of "divew". Go invert and multiply if you want actual
+/// division.
+pub fn div(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
+    return bop(binary_ops.div, lhs, rhs);
+}
+
+pub fn mulmm(lhs: anytype, rhs: anytype) Matrix(He(@TypeOf(lhs)).T, He(@TypeOf(lhs)).rows, He(@TypeOf(rhs)).cols) {
     const Lhs = @TypeOf(lhs);
     const Rhs = @TypeOf(rhs);
 
-    if (Lhs.ValueType != Rhs.ValueType) @compileError(std.fmt.comptimePrint("incompatible matrix value-types: {any}, {any}", .{ Lhs.ValueType, Rhs.ValueType }));
-    if (Lhs.cols != Rhs.rows) @compileError(std.fmt.comptimePrint("lhs.cols ({d}) must equal rhs.rows ({d})", .{ Lhs.cols, Rhs.rows }));
+    const LH = He(Lhs);
+    const RH = He(Rhs);
 
-    var ret: Traits(@TypeOf(lhs)).Resize(@TypeOf(lhs).rows, @TypeOf(rhs).cols) = undefined;
+    std.debug.assert(LH.T == RH.T);
+    std.debug.assert(LH.cols == RH.rows);
 
-    for (0..Lhs.rows) |out_row| {
-        for (0..Rhs.cols) |out_col| {
-            var sum: Lhs.ValueType = 0;
-            for (0..Lhs.cols) |i| {
-                sum += lhs.get(out_row, i) * rhs.get(i, out_col);
+    const Ret = Matrix(LH.T, LH.rows, RH.cols);
+    const H = He(Ret);
+
+    var ret: Ret = undefined;
+
+    if (!do_simd) {
+        for (0..RH.cols) |o_c| for (0..LH.rows) |o_r| {
+            var v: H.T = 0;
+
+            for (0..LH.cols) |i| {
+                const l = LH.get(&lhs, o_r, i);
+                const r = RH.get(&rhs, i, o_c);
+                v += l * r;
             }
-            ret.set(out_row, out_col, sum);
+
+            H.set(&ret, o_r, o_c, v);
+        };
+
+        return ret;
+    }
+
+    const LTH = He(LH.Transposed);
+    const lhs_t = transpose(lhs);
+
+    // a b * x y z
+    // c d   i j k
+    // e f
+    //
+    // a c e
+    // b d f
+
+    for (0..RH.cols) |o_c| for (0..LH.rows) |o_r| {
+        const l: @Vector(LTH.rows, H.T) = LTH.cp(&lhs_t)[o_r];
+        const r: @Vector(RH.rows, H.T) = RH.cp(&rhs)[o_c];
+        const v = @reduce(.Add, l * r);
+        H.set(&ret, o_r, o_c, v);
+    };
+
+    return ret;
+}
+
+const BooleanReduction = enum {
+    all, // and
+    not_all, // nand
+
+    some_not_all, // xor
+    none_or_all, // xnor
+
+    some, // or
+    none, // nor
+};
+
+const Comparison = enum {
+    equal,
+    not_equal,
+
+    greater_than,
+    greater_than_equal,
+
+    less_than,
+    less_than_equal,
+};
+
+/// Returns whether (`some`|`all`|...) of the elements of `lhs` are
+/// (`equal`|`not_equal`|...) to `rhs`.
+pub fn compare(comptime reduction: BooleanReduction, lhs: anytype, comptime comparison: Comparison, rhs: anytype) bool {
+    const Lhs = @TypeOf(lhs);
+    const Rhs = @TypeOf(rhs);
+
+    const LH = He(Lhs);
+    const RH = He(Rhs);
+
+    std.debug.assert(LH.rows == RH.rows);
+    std.debug.assert(LH.cols == RH.cols);
+
+    if (!do_simd) {
+        var got_true = false;
+        var got_false = false;
+
+        for (0..LH.cols) |c| for (0..RH.rows) |r| {
+            const lv = LH.get(&lhs, r, c);
+            const rv = LH.get(&rhs, r, c);
+
+            const negate = switch (comparison) {
+                .not_equal, .less_than_equal, .greater_than_equal => true,
+                else => false,
+            };
+
+            const comp_res = switch (comparison) {
+                .equal, .not_equal => lv == rv,
+                .less_than, .greater_than_equal => lv < rv,
+                .greater_than, .less_than_equal => lv > rv,
+            };
+
+            const res = comp_res and !negate or !comp_res and negate;
+
+            switch (reduction) {
+                .all => if (!res) return false,
+                .not_all => if (!res) return true,
+                .some_not_all => if (res and got_false or !res and got_true) return true,
+                .none_or_all => if (res and got_false or !res and got_true) return false,
+                .some => if (res) return true,
+                .none => if (res) return false,
+            }
+
+            got_true = got_true or res;
+            got_false = got_false or !res;
+        };
+
+        return switch (reduction) {
+            .all => true,
+            .not_all => false,
+            .some_not_all => false,
+            .none_or_all => true,
+            .some => false,
+            .none => true,
+        };
+    }
+
+    std.debug.assert(LH.T == RH.T);
+
+    const lv: @Vector(LH.rows * LH.cols, LH.T) = LH.cfp(&lhs).*;
+    const rv: @Vector(RH.rows * RH.cols, RH.T) = RH.cfp(&rhs).*;
+
+    const comp_res = switch (comparison) {
+        .equal => lv == rv,
+        .not_equal => lv != rv,
+        .greater_than => lv > rv,
+        .greater_than_equal => lv >= rv,
+        .less_than => lv < rv,
+        .less_than_equal => lv <= rv,
+    };
+
+    return switch (reduction) {
+        .all => @reduce(.And, comp_res),
+        .not_all => !@reduce(.And, comp_res),
+        .some_not_all => @reduce(.Xor, comp_res),
+        .none_or_all => !@reduce(.Xor, comp_res),
+        .some => @reduce(.Or, comp_res),
+        .none => !@reduce(.Or, comp_res),
+    };
+}
+
+pub fn length(v: anytype) He(@TypeOf(v)).T {
+    const H = He(@TypeOf(v));
+
+    std.debug.assert(H.cols == 1);
+
+    if (!do_simd) {
+        var ret: H.T = 0;
+        for (0..H.rows) |r| {
+            const v_r = H.get(&v, r, 0);
+            ret += v_r * v_r;
         }
+        return ret;
+    }
+
+    const vv: @Vector(H.rows, H.T) = H.cfp(&v).*;
+    const vvvv = vv * vv;
+    return @sqrt(@reduce(.Add, vvvv));
+}
+
+pub fn normalized(v: anytype) @TypeOf(v) {
+    return div(v, length(v));
+}
+
+pub fn lossy_cast(comptime To: type, m: anytype) Matrix(To, He(@TypeOf(m)).rows, He(@TypeOf(m)).cols) {
+    const M = @TypeOf(m);
+    const H = He(M);
+
+    const Ret = Matrix(To, H.rows, H.cols);
+    const RH = He(Ret);
+
+    var ret: Ret = undefined;
+    for (0..H.rows * H.cols) |i| {
+        RH.fp(&ret)[i] = std.math.lossyCast(To, H.cfp(&m)[i]);
     }
 
     return ret;
 }
 
-test "matrix multiplication" {
-    const lhs: Matrix(u32, 2, 3) = .{ .el = .{
-        1, 2, 3,
-        4, 5, 6,
-    } };
+pub fn cast(comptime To: type, m: anytype) ?Matrix(To, He(@TypeOf(m)).rows, He(@TypeOf(m)).cols) {
+    const M = @TypeOf(m);
+    const H = He(M);
 
-    const rhs: Matrix(u32, 3, 2) = .{ .el = .{
-        1, 2,
-        3, 4,
-        5, 6,
-    } };
+    const Ret = Matrix(To, H.rows, H.cols);
+    const RH = He(Ret);
 
-    const res: Matrix(u32, 2, 2) = mulmm(lhs, rhs);
-    const expected: Matrix(u32, 2, 2) = .{ .el = .{
-        22, 28,
-        49, 64,
-    } };
-    try std.testing.expectEqual(expected, res);
-}
-
-pub fn det(mat: anytype) @TypeOf(mat).ValueType {
-    const Mat = @TypeOf(mat);
-    const Rows = Mat.rows;
-    const Cols = Mat.cols;
-
-    if (Rows != Cols) @compileError(std.fmt.comptimePrint("determinants are only supported for square matrices (tried to get the determinant of a {d}x{d} one)", .{ Rows, Cols }));
-
-    return switch (Rows) {
-        1 => mat.get(0, 0),
-        2 => mat.get(0, 0) * mat.get(1, 1) - mat.get(0, 1) * mat.get(1, 0),
-        3 => val: {
-            // zig fmt: off
-            const a = mat.get(0, 0); const b = mat.get(0, 1); const c = mat.get(0, 2);
-            const d = mat.get(1, 0); const e = mat.get(1, 1); const f = mat.get(1, 2);
-            const g = mat.get(2, 0); const h = mat.get(2, 1); const i = mat.get(2, 2);
-            // zig fmt: on
-
-            break :val a * e * i + b * f * g + c * d * h - c * e * g - b * d * i - a * f * h;
-        },
-
-        else => @compileError("NYI"),
-    };
-}
-
-test det {
-    try std.testing.expectEqual(-2, det(Matrix(isize, 2, 2){ .el = .{ 1, 2, 3, 4 } }));
-
-    try std.testing.expectEqual(0, det(Matrix(isize, 3, 3){ .el = .{
-        1, 2, 3,
-        4, 5, 6,
-        7, 8, 9,
-    } }));
-
-    try std.testing.expectEqual(-2, det(Matrix(isize, 3, 3){ .el = .{
-        1,  1,  2,
-        3,  5,  8,
-        13, 21, 33,
-    } }));
-}
-
-pub fn length(mat: anytype) @TypeOf(mat).ValueType {
-    const MatTraits = Traits(@TypeOf(mat));
-    var ret: @TypeOf(mat).ValueType = 0;
-
-    for (0..MatTraits.rows) |row| for (0..MatTraits.cols) |col| {
-        const v = mat.get(row, col);
-        ret += v * v;
-    };
-
-    return @sqrt(ret);
-}
-
-pub fn normalized(mat: anytype) Traits(@TypeOf(mat)).EquivMat {
-    const MatTraits = Traits(@TypeOf(mat));
-    var ret: MatTraits.EquivMat = undefined;
-
-    const len = length(mat);
-
-    for (0..MatTraits.rows) |row| for (0..MatTraits.cols) |col| {
-        ret.set(row, col, mat.get(row, col) / len);
-    };
-
-    return ret;
-}
-
-pub fn from_homogenous(comptime T: type, v: Vector(T, 4)) Vector(T, 3) {
-    return ops.divew(Vector(T, 3){ .el = .{ v.x(), v.y(), v.z() } }, v.w());
-}
-
-pub fn dot(lhs: anytype, rhs: @TypeOf(lhs)) @TypeOf(lhs).ValueType {
-    const Vec = @TypeOf(lhs);
-    const VecTraits = Traits(Vec);
-
-    if (VecTraits.cols != 1) @compileError("the dot product is for vectors");
-
-    var ret: VecTraits.ValueType = 0;
-    for (0..VecTraits.rows) |i| {
-        ret += lhs.get(i, 0) * rhs.get(i, 0);
+    var ret: Ret = undefined;
+    for (0..H.rows * H.cols) |i| {
+        RH.fp(&ret)[i] = std.math.cast(To, H.cfp(&m)[i]) orelse return null;
     }
 
     return ret;
-}
-
-pub fn cross(lhs: anytype, rhs: @TypeOf(lhs)) @TypeOf(lhs) {
-    const Vec = @TypeOf(lhs);
-
-    if (Vec.rows != 3 or Vec.cols != 1) {
-        @compileError("the cross product is only for 3x1 matrices");
-    }
-
-    const a1 = lhs.get(0, 0);
-    const a2 = lhs.get(1, 0);
-    const a3 = lhs.get(2, 0);
-    const b1 = rhs.get(0, 0);
-    const b2 = rhs.get(1, 0);
-    const b3 = rhs.get(2, 0);
-
-    return Vec{.el = .{
-        a2 * b3 - a3 * b2,
-        a3 * b1 - a1 * b3,
-        a1 * b2 - a2 * b1,
-    }};
 }

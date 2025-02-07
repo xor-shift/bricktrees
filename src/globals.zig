@@ -16,7 +16,7 @@ const GuiThing = @import("things/GuiThing.zig");
 const RotatingArenaConfig = rotating_arena.Config;
 const RotatingArena = rotating_arena.RotatingArena;
 
-pub const default_resolution: wgm.Vec2uz = wgm.vec2uz(1280, 720);
+pub const default_resolution: [2]usize = .{ 1280, 720 };
 
 clock_mutex: std.Thread.Mutex,
 clock: std.time.Timer,
@@ -80,7 +80,7 @@ const Any = struct {
 
     pub fn on_shutdown(_: *anyopaque) anyerror!void {}
 
-    pub fn on_resize(_: *anyopaque, new: wgm.Vec2uz) anyerror!void {
+    pub fn on_resize(_: *anyopaque, new: [2]usize) anyerror!void {
         try g.resize_impl(new);
     }
 
@@ -103,7 +103,7 @@ const Self = @This();
 
 /// Initializes just the WebGPU stuff.
 /// Assign to `g.gui` and then call `g.resize` after calling this.
-pub fn init(dims: wgm.Vec2uz, alloc: std.mem.Allocator) !Self {
+pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
     try sdl.init(.{ .video = true });
     errdefer sdl.deinit();
 
@@ -256,14 +256,14 @@ pub fn new_tick(self: *Self, delta_ns: u64) void {
     self.call_on_every_thing("on_tick", .{delta_ns});
 }
 
-fn resize_impl(self: *Self, dims: wgm.Vec2uz) !void {
+fn resize_impl(self: *Self, dims: [2]usize) !void {
     try self.surface.configure(.{
         .device = self.device,
         .format = .BGRA8Unorm,
         .usage = .{ .render_attachment = true },
         .view_formats = &.{.BGRA8UnormSrgb},
-        .width = @intCast(dims.x()),
-        .height = @intCast(dims.y()),
+        .width = @intCast(dims[0]),
+        .height = @intCast(dims[1]),
         .present_mode = .Fifo,
     });
 }
@@ -272,7 +272,7 @@ fn on_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     switch (ev.common.type) {
         sdl.c.SDL_EVENT_WINDOW_RESIZED => {
             const event = ev.window;
-            const dims = wgm.vec2uz(@intCast(event.data1), @intCast(event.data2));
+            const dims: [2]usize = .{ @intCast(event.data1), @intCast(event.data2) };
 
             try self.resize(dims);
         },
@@ -300,7 +300,7 @@ fn call_on_every_thing(self: *Self, comptime fun_str: []const u8, args: anytype)
     }
 }
 
-pub fn resize(self: *Self, dims: wgm.Vec2uz) !void {
+pub fn resize(self: *Self, dims: [2]usize) !void {
     self.call_on_every_thing("on_resize", .{dims});
 }
 

@@ -1,7 +1,7 @@
 const wgm = @import("wgm");
 
-pub const BrickmapCoordinates = wgm.Vec3uz;
-pub const VoxelCoordinates = wgm.Vec3uz;
+pub const BrickmapCoordinates = [3]usize;
+pub const VoxelCoordinates = [3]usize;
 
 pub const U8Map = @import("brick/map.zig").U8Map;
 

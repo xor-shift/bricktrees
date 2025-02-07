@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const wgm2 = @import("wgm2");
+const wgm = @import("wgm");
 const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
@@ -135,7 +135,7 @@ pub fn on_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
             const button_state = sdl.c.SDL_GetMouseState(null, null);
 
             if ((button_state & sdl.c.SDL_BUTTON_MASK(sdl.c.SDL_BUTTON_LEFT)) != 0) {
-                self.mouse_delta = wgm2.add(self.mouse_delta, [2]f32{ event.xrel, event.yrel });
+                self.mouse_delta = wgm.add(self.mouse_delta, [2]f32{ event.xrel, event.yrel });
             }
         },
 
@@ -168,9 +168,8 @@ pub fn on_tick(self: *Self, delta_ns: u64) !void {
     // _ = input_state;
 
     {
-        const wgm = @import("wgm");
         var ret = std.mem.zeroes(Brickmap);
-        const bm_coords: BrickmapCoordinates = wgm.splat3uz(0);
+        const bm_coords: BrickmapCoordinates = .{ 0, 0, 0 };
 
         const base_coords: VoxelCoordinates = wgm.mulew(
             bm_coords,
@@ -178,18 +177,18 @@ pub fn on_tick(self: *Self, delta_ns: u64) !void {
         );
 
         for (0..Brickmap.Traits.volume) |voxel_index| {
-            const local_coords: VoxelCoordinates = wgm.vec3uz(
+            const local_coords: VoxelCoordinates = .{
                 voxel_index % Brickmap.Traits.side_length,
                 (voxel_index / Brickmap.Traits.side_length) % Brickmap.Traits.side_length,
                 voxel_index / (Brickmap.Traits.side_length * Brickmap.Traits.side_length),
-            );
+            };
 
             const coords = wgm.add(base_coords, local_coords);
 
             _ = coords;
 
-            const t = wgm.divew(
-                local_coords.lossy_cast(f32),
+            const t = wgm.div(
+                wgm.lossy_cast(f32, local_coords),
                 @as(f32, @floatFromInt(Brickmap.Traits.side_length)),
             );
 
@@ -208,7 +207,7 @@ pub fn on_tick(self: *Self, delta_ns: u64) !void {
 
         ret.generate_tree();
 
-        try self.gpu_thing.map.queue_brickmap(wgm.splat3uz(0), &ret);
+        try self.gpu_thing.map.queue_brickmap(.{ 0, 0, 0 }, &ret);
     }
 }
 
@@ -224,45 +223,45 @@ pub fn render(self: *Self, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
     const input_state = self.input_state;
 
     var movement = [_]i32{0} ** 3;
-    if (input_state.forward) movement = wgm2.add(movement, [_]i32{ 0, 0, 1 });
-    if (input_state.left) movement = wgm2.add(movement, [_]i32{ -1, 0, 0 });
-    if (input_state.backward) movement = wgm2.add(movement, [_]i32{ 0, 0, -1 });
-    if (input_state.right) movement = wgm2.add(movement, [_]i32{ 1, 0, 0 });
-    if (input_state.up) movement = wgm2.add(movement, [_]i32{ 0, 1, 0 });
-    if (input_state.down) movement = wgm2.add(movement, [_]i32{ 0, -1, 0 });
+    if (input_state.forward) movement = wgm.add(movement, [_]i32{ 0, 0, 1 });
+    if (input_state.left) movement = wgm.add(movement, [_]i32{ -1, 0, 0 });
+    if (input_state.backward) movement = wgm.add(movement, [_]i32{ 0, 0, -1 });
+    if (input_state.right) movement = wgm.add(movement, [_]i32{ 1, 0, 0 });
+    if (input_state.up) movement = wgm.add(movement, [_]i32{ 0, 1, 0 });
+    if (input_state.down) movement = wgm.add(movement, [_]i32{ 0, -1, 0 });
 
-    if (wgm2.compare(.some, movement, .not_equal, [_]i32{0} ** 3)) {
-        const movement_f = wgm2.mulew(
-            wgm2.normalized(wgm2.lossy_cast(f64, movement)),
+    if (wgm.compare(.some, movement, .not_equal, [_]i32{0} ** 3)) {
+        const movement_f = wgm.mulew(
+            wgm.normalized(wgm.lossy_cast(f64, movement)),
             secs_elapsed * if (input_state.fast) speed_fast else speed_slow,
         );
 
-        self.global_coords = wgm2.add(self.global_coords, movement_f);
+        self.global_coords = wgm.add(self.global_coords, movement_f);
     }
 
-    const radian_delta = wgm2.mulew(wgm2.lossy_cast(f64, self.mouse_delta), rotation_speed);
-    self.look = wgm2.add(self.look, [3]f64{
+    const radian_delta = wgm.mulew(wgm.lossy_cast(f64, self.mouse_delta), rotation_speed);
+    self.look = wgm.add(self.look, [3]f64{
         radian_delta[0],
         radian_delta[1],
         0,
     });
     self.mouse_delta = .{ 0, 0 };
 
-    const perspective = comptime wgm2.perspective_fov(f64, 0.01, 1000.0, 1.5, 16.0 / 9.0);
+    const perspective = comptime wgm.perspective_fov(f64, 0.01, 1000.0, 1.5, 16.0 / 9.0);
 
-    const view = wgm2.mulmm(
-        wgm2.rotation_3d_affine(f64, -self.look[0], -self.look[1], 0),
-        wgm2.translate_3d(wgm2.negate(self.global_coords)),
+    const view = wgm.mulmm(
+        wgm.rotation_3d_affine(f64, -self.look[0], -self.look[1], 0),
+        wgm.translate_3d(wgm.negate(self.global_coords)),
     );
 
-    const transform = wgm2.mulmm(perspective, view);
+    const transform = wgm.mulmm(perspective, view);
 
-    const inverse_transform = wgm2.inverse(transform).?;
+    const inverse_transform = wgm.inverse(transform).?;
 
-    self.gpu_thing.uniforms.transform = wgm2.lossy_cast(f32, transform);
-    self.gpu_thing.uniforms.inverse_transform = wgm2.lossy_cast(f32, inverse_transform);
+    self.gpu_thing.uniforms.transform = wgm.lossy_cast(f32, transform);
+    self.gpu_thing.uniforms.inverse_transform = wgm.lossy_cast(f32, inverse_transform);
 
-     self.gpu_thing.uniforms.pos = wgm2.lossy_cast(f32, self.global_coords);
+    self.gpu_thing.uniforms.pos = wgm.lossy_cast(f32, self.global_coords);
 }
 
 pub fn do_gui(self: *Self) !void {

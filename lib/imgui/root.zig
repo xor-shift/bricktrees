@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const wgm = @import("wgm");
-
 pub const c = @cImport({
     @cDefine("CIMGUI_DEFINE_ENUMS_AND_STRUCTS", "");
     @cInclude("cimgui.h");
@@ -154,10 +152,10 @@ pub fn end() void {
     return c.igEnd();
 }
 
-pub fn button(label: [:0]const u8, size: ?wgm.Vec2f) bool {
+pub fn button(label: [:0]const u8, size: ?[2]f32) bool {
     return c.igButton(
         label.ptr,
-        if (size) |v| .{ .x = v.width(), .y = v.height() } //
+        if (size) |v| .{ .x = v[0], .y = v[1] } //
         else .{ .x = 0, .y = 0 },
     );
 }

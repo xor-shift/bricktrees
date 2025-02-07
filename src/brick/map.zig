@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const wgm = @import("wgm");
-
 const defns = @import("defns.zig");
 const util = @import("util.zig");
 
@@ -113,10 +111,10 @@ pub fn U8Map(comptime depth: u6) type {
 
         pub const Traits = MkTraits(u8, depth);
 
-        pub fn to_index(coord: wgm.Vec3uz) usize {
-            return coord.x() +
-                coord.y() * Traits.side_length +
-                coord.z() * Traits.side_length * Traits.side_length;
+        pub fn to_index(coord: [3]usize) usize {
+            return coord[0] +
+                coord[1] * Traits.side_length +
+                coord[2] * Traits.side_length * Traits.side_length;
         }
 
         pub fn tree_at_level(self: *Self, level: u6) []u8 {
@@ -145,7 +143,7 @@ pub fn U8Map(comptime depth: u6) type {
             }
         }
 
-        pub fn set(self: *Self, coord: wgm.Vec3uz, voxel: PackedVoxel) void {
+        pub fn set(self: *Self, coord: [3]usize, voxel: PackedVoxel) void {
             self.voxels[to_index(coord)] = voxel;
         }
 
@@ -199,17 +197,17 @@ test generate_tree_scalar_u8 {
 
     const dummy = PackedVoxel{ .r = 255, .g = 0, .b = 0, .i = 1 };
 
-    map.set(wgm.vec3uz(0, 0, 0), dummy);
-    map.set(wgm.vec3uz(1, 0, 0), dummy);
-    map.set(wgm.vec3uz(1, 1, 0), dummy);
+    map.set(.{0, 0, 0}, dummy);
+    map.set(.{1, 0, 0}, dummy);
+    map.set(.{1, 1, 0}, dummy);
 
-    map.set(wgm.vec3uz(0, 2, 0), dummy);
-    map.set(wgm.vec3uz(2, 2, 0), dummy);
+    map.set(.{0, 2, 0}, dummy);
+    map.set(.{2, 2, 0}, dummy);
 
-    map.set(wgm.vec3uz(0, 0, 2), dummy);
-    map.set(wgm.vec3uz(0, 2, 2), dummy);
-    map.set(wgm.vec3uz(2, 2, 2), dummy);
-    map.set(wgm.vec3uz(4, 2, 2), dummy);
+    map.set(.{0, 0, 2}, dummy);
+    map.set(.{0, 2, 2}, dummy);
+    map.set(.{2, 2, 2}, dummy);
+    map.set(.{4, 2, 2}, dummy);
 
     generate_tree_scalar_u8(Map.Traits, 4, @ptrCast(level_4.ptr), map.voxels[0..]);
     try std.testing.expectEqualSlices(u8, &.{

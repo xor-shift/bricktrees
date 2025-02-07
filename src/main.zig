@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const wgm = @import("wgm");
 const imgui = @import("imgui");
 const qoi = @import("qoi");
 const sdl = @import("gfx").sdl;

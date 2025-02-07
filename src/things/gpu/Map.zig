@@ -57,7 +57,7 @@ pub const BrickmapInfo = struct {
     last_accessed: usize = undefined,
 
     /// Value is undefined if `!valid`.
-    brickmap_coords: wgm.Vec3uz = undefined,
+    brickmap_coords: [3]usize = undefined,
 };
 
 pub const MapConfig = struct {
@@ -275,25 +275,29 @@ fn generate_brickgrid(self: *Self, brickgrid_origin: BrickmapCoordinates, alloc:
     @memset(ret, null);
 
     for (self.brickmap_tracker, 0..self.config.no_brickmaps) |v, i| if (v.valid) {
-        const g_brickmap_coords = v.brickmap_coords.cast(isize).?;
-        const g_origin_coords = brickgrid_origin.cast(isize).?;
+        const g_brickmap_coords = wgm.cast(isize, v.brickmap_coords).?;
+        const g_origin_coords = wgm.cast(isize, brickgrid_origin).?;
 
         const bl_brickmap_coords = wgm.sub(g_brickmap_coords, g_origin_coords);
-        const below_bounds = wgm.any(wgm.less_than(
+        const below_bounds = wgm.compare(
+            .some,
             bl_brickmap_coords,
-            wgm.splat3z(0),
-        ));
-        const no_greater_than_bounds = wgm.all(wgm.less_than(
+            .less_than,
+            [_]isize{0} ** 3,
+        );
+        const no_greater_than_bounds = wgm.compare(
+            .all,
             bl_brickmap_coords,
-            (wgm.Vec3uz{ .el = self.config.grid_dimensions }).cast(isize).?,
-        ));
+            .less_than,
+            wgm.cast(isize, self.config.grid_dimensions).?,
+        );
 
         if (below_bounds or !no_greater_than_bounds) continue;
 
-        const blc = bl_brickmap_coords.cast(usize).?;
-        const idx = blc.x() +
-            blc.y() * self.config.grid_dimensions[0] +
-            blc.z() * (self.config.grid_dimensions[0] * self.config.grid_dimensions[1]);
+        const blc = wgm.cast(usize, bl_brickmap_coords).?;
+        const idx = blc[0] +
+            blc[1] * self.config.grid_dimensions[0] +
+            blc[2] * (self.config.grid_dimensions[0] * self.config.grid_dimensions[1]);
 
         ret[idx] = i;
     };
@@ -304,7 +308,7 @@ fn generate_brickgrid(self: *Self, brickgrid_origin: BrickmapCoordinates, alloc:
 fn find_slot(self: *Self, coord_hint: ?BrickmapCoordinates) usize {
     if (coord_hint) |w| {
         for (0..self.config.no_brickmaps, self.brickmap_tracker) |i, v| {
-            if (v.valid and wgm.all(wgm.equal(v.brickmap_coords, w))) {
+            if (v.valid and wgm.compare(.all, v.brickmap_coords, .equal, w)) {
                 return i;
             }
         }
@@ -356,7 +360,7 @@ pub fn before_render(self: *Self, queue: wgpu.Queue) !void {
 
     const data = try g.frame_alloc.alloc(u32, self.config.grid_size());
 
-    const local_brickgrid = try self.generate_brickgrid(wgm.vec3uz(0, 0, 0), g.frame_alloc);
+    const local_brickgrid = try self.generate_brickgrid(.{ 0, 0, 0 }, g.frame_alloc);
 
     for (0..data.len) |i| {
         data[i] = if (local_brickgrid[i]) |v| @intCast(v) else std.math.maxInt(u32);

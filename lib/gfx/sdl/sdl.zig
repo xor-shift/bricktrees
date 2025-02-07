@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const wgm = @import("wgm");
 const wgpu = @import("../wgpu/wgpu.zig");
 
 pub const c = @cImport({
@@ -73,8 +72,8 @@ pub const Window = struct {
 
     handle: *c.SDL_Window,
 
-    pub fn init(title: [:0]const u8, dims: wgm.Vec2uz) Error!Window {
-        const window = c.SDL_CreateWindow(title.ptr, @intCast(dims.width()), @intCast(dims.height()), c.SDL_WINDOW_RESIZABLE) orelse {
+    pub fn init(title: [:0]const u8, dims: [2]usize) Error!Window {
+        const window = c.SDL_CreateWindow(title.ptr, @intCast(dims[0]), @intCast(dims[1]), c.SDL_WINDOW_RESIZABLE) orelse {
             std.log.err("SDL_CreateWindow failed: {s}", .{c.SDL_GetError()});
             return Error.Failed;
         };
@@ -92,21 +91,21 @@ pub const Window = struct {
         return c.SDL_GetWindowID(self.handle);
     }
 
-    pub fn resize(self: Window, dims: wgm.Vec2uz) !void {
+    pub fn resize(self: Window, dims: [2]usize) !void {
         if (!c.SDL_SetWindowSize(self.handle, @intCast(dims.width()), @intCast(dims.height()))) {
             log_error("SDL_SetWindowSize");
             return Error.Failed;
         }
     }
 
-    pub fn get_size(self: Window) !wgm.Vec2uz {
+    pub fn get_size(self: Window) ![2]usize {
         var out: [2]c_int = undefined;
         if (!c.SDL_GetWindowSizeInPixels(self.handle, &out[0], &out[1])) {
             log_error("SDL_GetWindowSize");
             return Error.Failed;
         }
 
-        return wgm.vec2uz(@intCast(out[0]), @intCast(out[1]));
+        return [2]usize{ @intCast(out[0]), @intCast(out[1]) };
     }
 
     pub fn get_surface(self: @This(), instance: wgpu.Instance) !wgpu.Surface {
@@ -149,8 +148,8 @@ pub const Window = struct {
     }
 
     /// Sets the cursor position relative to the window
-    pub fn set_cursor_pos(self: Window, coords: wgm.Vec2f) void {
-        c.SDL_WarpMouseInWindow(self.handle, coords.x(), coords.y());
+    pub fn set_cursor_pos(self: Window, coords: [2]f32) void {
+        c.SDL_WarpMouseInWindow(self.handle, coords[0], coords[1]);
     }
 };
 

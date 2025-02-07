@@ -1,7 +1,6 @@
 const std = @import("std");
 
 const wgm = @import("wgm");
-const wgm2 = @import("wgm2");
 const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
@@ -49,7 +48,7 @@ pub const Any = struct {
         on_alloc.destroy(@as(*Self, @ptrCast(@alignCast(self_arg))));
     }
 
-    pub fn on_resize(self_arg: *anyopaque, dims: wgm.Vec2uz) anyerror!void {
+    pub fn on_resize(self_arg: *anyopaque, dims: [2]usize) anyerror!void {
         try @as(*Self, @ptrCast(@alignCast(self_arg))).on_resize(dims);
     }
 
@@ -68,8 +67,8 @@ pub const Any = struct {
 
 // Be careful: the vecN<T> of WGSL and the [N]T of C/Zig may not have the same alignment!
 const Uniforms = extern struct {
-    transform: [4][4]f32 = wgm2.identity(f32, 4),
-    inverse_transform: [4][4]f32 = wgm2.identity(f32, 4),
+    transform: [4][4]f32 = wgm.identity(f32, 4),
+    inverse_transform: [4][4]f32 = wgm.identity(f32, 4),
 
     dims: [2]f32,
     debug_mode: u32 = 0,
@@ -84,8 +83,8 @@ visualisation_shader: wgpu.ShaderModule,
 
 uniforms: Uniforms = .{
     .dims = .{
-        @floatFromInt(@TypeOf(g.*).default_resolution.width()),
-        @floatFromInt(@TypeOf(g.*).default_resolution.height()),
+        @floatFromInt(@TypeOf(g.*).default_resolution[0]),
+        @floatFromInt(@TypeOf(g.*).default_resolution[1]),
     },
 },
 uniform_buffer: wgpu.Buffer,
@@ -305,10 +304,10 @@ pub fn to_any(self: *Self) AnyThing {
     return Self.Any.init(self);
 }
 
-pub fn on_resize(self: *Self, dims: wgm.Vec2uz) !void {
+pub fn on_resize(self: *Self, dims: [2]usize) !void {
     self.uniforms.dims = .{
-        @floatFromInt(dims.width()),
-        @floatFromInt(dims.height()),
+        @floatFromInt(dims[0]),
+        @floatFromInt(dims[1]),
     };
 
     const visualisation_texture = try TextureAndView.init(g.device, .{
@@ -316,8 +315,8 @@ pub fn on_resize(self: *Self, dims: wgm.Vec2uz) !void {
         .usage = .{ .texture_binding = true, .storage_binding = true },
         .dimension = .D2,
         .size = .{
-            .width = @intCast(dims.x()),
-            .height = @intCast(dims.y()),
+            .width = @intCast(dims[0]),
+            .height = @intCast(dims[1]),
             .depth_or_array_layers = 1,
         },
         .format = .BGRA8Unorm,
@@ -400,17 +399,17 @@ pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView)
         compute_pass.set_bind_group(1, self.compute_textures_bg, null);
         compute_pass.set_bind_group(2, self.map.map_bg, null);
 
-        const wg_sz = wgm.vec2uz(8, 8);
-        const wg_count = wgm.divew(
+        const wg_sz: [2]usize = .{ 8, 8 };
+        const wg_count = wgm.div(
             wgm.sub(
                 wgm.add(dims, wg_sz),
-                wgm.vec2uz(1, 1),
+                [2]usize{ 1, 1 },
             ),
             wg_sz,
         );
         compute_pass.dispatch_workgroups(.{
-            @intCast(wg_count.width()),
-            @intCast(wg_count.height()),
+            @intCast(wg_count[0]),
+            @intCast(wg_count[1]),
             1,
         });
 

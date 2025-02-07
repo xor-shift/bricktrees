@@ -4,8 +4,6 @@ const auto = @import("../auto.zig");
 const common = @import("../common.zig");
 const wgpu = @import("../wgpu.zig");
 
-const wgm = @import("wgm");
-
 const c = common.c;
 
 const ConversionHelper = common.ConversionHelper;
@@ -110,8 +108,8 @@ pub fn set_index_buffer(self: RenderPass, buffer: Buffer, format: wgpu.IndexForm
     c.wgpuRenderPassEncoderSetIndexBuffer(self.handle, buffer.handle, @intFromEnum(format), offset, size);
 }
 
-pub fn set_scissor_rect(self: RenderPass, top_left: wgm.Vec2u, dims: wgm.Vec2u) void {
-    c.wgpuRenderPassEncoderSetScissorRect(self.handle, top_left.x(), top_left.y(), dims.width(), dims.height());
+pub fn set_scissor_rect(self: RenderPass, top_left: [2]u32, dims: [2]u32) void {
+    c.wgpuRenderPassEncoderSetScissorRect(self.handle, top_left[0], top_left[1], dims[0], dims[1]);
 }
 
 pub const DrawArgs = struct {

@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const wgm = @import("wgm");
 const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
@@ -25,8 +24,8 @@ on_shutdown: *const fn (self_arg: *anyopaque) anyerror!void = struct {
     pub fn aufruf(_: *anyopaque) anyerror!void {}
 }.aufruf,
 
-on_resize: *const fn (self_arg: *anyopaque, dims: wgm.Vec2uz) anyerror!void = struct {
-    pub fn aufruf(_: *anyopaque, _: wgm.Vec2uz) anyerror!void {}
+on_resize: *const fn (self_arg: *anyopaque, dims: [2]usize) anyerror!void = struct {
+    pub fn aufruf(_: *anyopaque, _: [2]usize) anyerror!void {}
 }.aufruf,
 
 /// If, for example, a resize event is received, both this function and `on_resize` will be called.
