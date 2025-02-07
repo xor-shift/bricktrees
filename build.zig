@@ -47,6 +47,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const wgm2 = b.addModule("wgm2", .{
+        .root_source_file = b.path("lib/wgm2/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const wgm = b.addModule("wgm", .{
         .root_source_file = b.path("lib/wgm/root.zig"),
         .target = target,
@@ -119,6 +125,7 @@ pub fn build(b: *std.Build) void {
         exe.root_module.addImport("core", core);
         exe.root_module.addImport("qoi", qoi);
         exe.root_module.addImport("wgm", wgm);
+        exe.root_module.addImport("wgm2", wgm2);
         exe.root_module.addImport("imgui", imgui);
         exe.root_module.addImport("gfx", gfx);
         // link_to_wgpu_and_sdl(b, exe);
@@ -140,7 +147,7 @@ pub fn build(b: *std.Build) void {
     }
 
     // executable's tests
-    if (false) {
+    {
         const exe_tests = b.addTest(.{
             .root_source_file = b.path("src/main.zig"),
             .test_runner = b.path("src/test_runner.zig"),
@@ -150,6 +157,7 @@ pub fn build(b: *std.Build) void {
         exe_tests.root_module.addImport("core", core);
         exe_tests.root_module.addImport("qoi", qoi);
         exe_tests.root_module.addImport("wgm", wgm);
+        exe_tests.root_module.addImport("wgm2", wgm2);
         exe_tests.root_module.addImport("imgui", imgui);
         // link_to_wgpu_and_sdl(b, exe_tests);
 
@@ -160,7 +168,7 @@ pub fn build(b: *std.Build) void {
     }
 
     // basic tests
-    inline for (.{ "wgm", "qoi", "imgui" }) |lib_name| {
+    inline for (.{ "wgm", "wgm2", "qoi", "imgui" }) |lib_name| {
         const tests = b.addTest(.{
             .root_source_file = b.path(std.fmt.comptimePrint("lib/{s}/root.zig", .{lib_name})),
             .test_runner = b.path("src/test_runner.zig"),
