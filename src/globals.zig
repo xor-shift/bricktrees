@@ -143,8 +143,9 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
         },
         .required_limits = .{
             .limits = .{
-                .max_sampled_textures_per_shader_stage = 2048,
-                .max_storage_buffers_per_shader_stage = 2048,
+                // .max_sampled_textures_per_shader_stage = 32768 + 64,
+                // .max_storage_buffers_per_shader_stage = 32768 + 64,
+                .max_buffer_size = 1 * 1024 * 1024 * 1024,
             },
         },
     });

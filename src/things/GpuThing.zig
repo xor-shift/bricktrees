@@ -8,9 +8,7 @@ const wgpu = @import("gfx").wgpu;
 const brick = @import("../brick.zig");
 
 const AnyThing = @import("../AnyThing.zig");
-const BufferArray = @import("gpu/BufferArray.zig");
 const Map = @import("gpu/Map.zig");
-const TVArray = @import("gpu/TVArray.zig");
 const TextureAndView = @import("gpu/TextureAndView.zig");
 
 const Brickmap = Map.Brickmap;
@@ -75,7 +73,10 @@ const Uniforms = extern struct {
     debug_level: u32 = 0,
 
     pos: [3]f32 = .{ 0, 0, 0 }, // redundant
-    _padding_1: [1]f32 = .{0},
+    _padding_0: u32 = undefined,
+
+    brickgrid_origin: [3]i32 = .{0} ** 3,
+    _padding_1: u32 = undefined,
 };
 
 compute_shader: wgpu.ShaderModule,
@@ -114,10 +115,11 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     const visualisation_shader = try g.device.create_shader_module_wgsl_from_file("visualisation shader", "shaders/visualiser.wgsl", alloc);
     errdefer visualisation_shader.deinit();
 
-    const target_sidelength: usize = 32;
+    const target_sidelength: usize = 128;
+    const grid_dimensions: [3]usize = .{target_sidelength / Brickmap.Traits.side_length} ** 3;
     var map = try Map.init(alloc, g.device, .{
-        .no_brickmaps = 256,
-        .grid_dimensions = .{target_sidelength / Brickmap.Traits.side_length} ** 3,
+        .no_brickmaps = grid_dimensions[0] * grid_dimensions[1] * grid_dimensions[2],
+        .grid_dimensions = grid_dimensions,
     });
     errdefer map.deinit();
 

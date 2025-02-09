@@ -13,9 +13,6 @@ const GPUThing = @import("GpuThing.zig");
 
 const Brickmap = @import("../things/gpu/Map.zig").Brickmap;
 
-const BrickmapCoordinates = brick.BrickmapCoordinates;
-const VoxelCoordinates = brick.VoxelCoordinates;
-
 const PackedVoxel = brick.PackedVoxel;
 const Voxel = brick.Voxel;
 
@@ -76,6 +73,7 @@ const InputState = packed struct(u32) {
 mouse_capture: bool = false,
 input_state: InputState = std.mem.zeroes(InputState),
 mouse_delta: [2]f32 = .{ 0, 0 },
+fov: f64 = 45.0,
 
 global_coords: [3]f64 = .{0} ** 3,
 look: [3]f64 = .{0} ** 3,
@@ -169,21 +167,21 @@ pub fn on_tick(self: *Self, delta_ns: u64) !void {
 
     {
         var ret = std.mem.zeroes(Brickmap);
-        const bm_coords: BrickmapCoordinates = .{ 0, 0, 0 };
+        const bm_coords: [3]isize = .{ 1, 1, 0 };
 
-        const base_coords: VoxelCoordinates = wgm.mulew(
+        const base_coords: [3]isize = wgm.mulew(
             bm_coords,
-            Brickmap.Traits.side_length,
+            Brickmap.Traits.side_length_i,
         );
 
         for (0..Brickmap.Traits.volume) |voxel_index| {
-            const local_coords: VoxelCoordinates = .{
+            const local_coords: [3]usize = .{
                 voxel_index % Brickmap.Traits.side_length,
                 (voxel_index / Brickmap.Traits.side_length) % Brickmap.Traits.side_length,
                 voxel_index / (Brickmap.Traits.side_length * Brickmap.Traits.side_length),
             };
 
-            const coords = wgm.add(base_coords, local_coords);
+            const coords = wgm.add(base_coords, wgm.cast(isize, local_coords).?);
 
             _ = coords;
 
@@ -207,18 +205,27 @@ pub fn on_tick(self: *Self, delta_ns: u64) !void {
 
         ret.generate_tree();
 
-        try self.gpu_thing.map.queue_brickmap(.{ 0, 0, 0 }, &ret);
+        try self.gpu_thing.map.queue_brickmap(bm_coords, &ret);
+        try self.gpu_thing.map.queue_brickmap(wgm.add(bm_coords, [_]isize{0, 0, 3}), &ret);
     }
 }
 
-pub fn render(self: *Self, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
-    const ns_elapsed: u64 = 16_500_000;
-
+fn process_input(self: *Self, ns_elapsed: u64) void {
     const secs_elapsed = @as(f64, @floatFromInt(ns_elapsed)) / std.time.ns_per_s;
 
     const speed_slow: f64 = 4.0; // units/sec
     const speed_fast: f64 = 40.0; // units/sec
     const rotation_speed = 0.01; // radians/pixel
+
+    const radian_delta = wgm.mulew(wgm.lossy_cast(f64, self.mouse_delta), rotation_speed);
+    self.look = wgm.add(self.look, [3]f64{
+        radian_delta[0],
+        radian_delta[1],
+        0,
+    });
+    self.look[1] = @min(self.look[1], std.math.pi / 2.0);
+    self.look[1] = @max(self.look[1], -std.math.pi / 2.0);
+    self.mouse_delta = .{ 0, 0 };
 
     const input_state = self.input_state;
 
@@ -231,30 +238,40 @@ pub fn render(self: *Self, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
     if (input_state.down) movement = wgm.add(movement, [_]i32{ 0, -1, 0 });
 
     if (wgm.compare(.some, movement, .not_equal, [_]i32{0} ** 3)) {
+        const rotation = wgm.rotate_y_3d(f64, self.look[0]);
         const movement_f = wgm.mulew(
-            wgm.normalized(wgm.lossy_cast(f64, movement)),
+            wgm.mulmm(rotation, wgm.normalized(wgm.lossy_cast(f64, movement))),
             secs_elapsed * if (input_state.fast) speed_fast else speed_slow,
         );
 
-        self.global_coords = wgm.add(self.global_coords, movement_f);
+        self.global_coords = wgm.add(
+            self.global_coords,
+            movement_f,
+        );
     }
+}
 
-    const radian_delta = wgm.mulew(wgm.lossy_cast(f64, self.mouse_delta), rotation_speed);
-    self.look = wgm.add(self.look, [3]f64{
-        radian_delta[0],
-        radian_delta[1],
-        0,
-    });
-    self.mouse_delta = .{ 0, 0 };
+pub fn render(self: *Self, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
+    self.process_input(16_500_000);
 
-    const perspective = comptime wgm.perspective_fov(f64, 0.01, 1000.0, 1.5, 16.0 / 9.0);
+    const dims = try g.window.get_size();
 
-    const view = wgm.mulmm(
-        wgm.rotation_3d_affine(f64, -self.look[0], -self.look[1], 0),
-        wgm.translate_3d(wgm.negate(self.global_coords)),
+    const transform = wgm.mulmm(
+        wgm.perspective_fov(
+            f64,
+            0.01,
+            1.0,
+            self.fov / std.math.pi,
+            @as(f64, @floatFromInt(dims[0])) / @as(f64, @floatFromInt(dims[1])),
+        ),
+        wgm.mulmm(
+            wgm.pad_affine(wgm.mulmm(
+                wgm.rotate_x_3d(f64, -self.look[1]),
+                wgm.rotate_y_3d(f64, -self.look[0]),
+            )),
+            wgm.translate_3d(wgm.negate(self.global_coords)),
+        ),
     );
-
-    const transform = wgm.mulmm(perspective, view);
 
     const inverse_transform = wgm.inverse(transform).?;
 
@@ -282,6 +299,8 @@ pub fn do_gui(self: *Self) !void {
             self.global_coords = .{0} ** 3;
             self.look = .{0} ** 3;
         }
+
+        _ = imgui.input_scalar(f64, "fov", &self.fov, 0.01, 0.1);
     }
     imgui.end();
 }

@@ -8,42 +8,11 @@ const brick = @import("../../brick.zig");
 const PackedVoxel = brick.PackedVoxel;
 const Voxel = brick.Voxel;
 
-const BrickmapCoordinates = brick.BrickmapCoordinates;
-const VoxelCoordinates = brick.VoxelCoordinates;
-
 const g = &@import("../../main.zig").g;
 
 const Self = @This();
 
 pub const Brickmap = brick.U8Map(5);
-
-const brickmap_texture_desc = wgpu.Texture.Descriptor{
-    .label = "some brickmap texture",
-    .size = .{
-        .width = Brickmap.Traits.side_length,
-        .height = Brickmap.Traits.side_length,
-        .depth_or_array_layers = Brickmap.Traits.side_length,
-    },
-    .usage = .{
-        .copy_dst = true,
-        .texture_binding = true,
-    },
-    .format = .RGBA8Uint,
-    .dimension = .D3,
-    .sampleCount = 1,
-    .mipLevelCount = 1,
-    .view_formats = &.{},
-};
-
-const bricktree_buffer_desc = wgpu.Buffer.Descriptor{
-    .label = "some bricktree texture",
-    .size = Brickmap.Traits.no_tree_bits / 8 - 1,
-    .usage = .{
-        .copy_dst = true,
-        .storage = true,
-    },
-    .mapped_at_creation = false,
-};
 
 pub const BrickmapInfo = struct {
     /// This is true in ~~two~~ one situation~~s~~:
@@ -57,7 +26,7 @@ pub const BrickmapInfo = struct {
     last_accessed: usize = undefined,
 
     /// Value is undefined if `!valid`.
-    brickmap_coords: [3]usize = undefined,
+    brickmap_coords: [3]isize = undefined,
 };
 
 pub const MapConfig = struct {
@@ -74,7 +43,7 @@ pub const MapConfig = struct {
 
 const QueuedBrickmap = struct {
     brickmap: *Brickmap,
-    coords: BrickmapCoordinates,
+    coords: [3]isize,
 };
 
 config: MapConfig,
@@ -88,31 +57,39 @@ bigass_mutex: std.Thread.Mutex = .{},
 
 brickmap_queue: std.ArrayList(QueuedBrickmap),
 
+bricktree_buffer: wgpu.Buffer,
+brickmap_buffer: wgpu.Buffer,
+
 alloc: std.mem.Allocator,
 
-brickmap_tracker: [*]BrickmapInfo,
-bricktree_buffers: [*]wgpu.Buffer,
-brickmap_textures: [*]wgpu.Texture,
-brickmap_texture_views: [*]wgpu.TextureView,
+brickmap_tracker: []BrickmapInfo,
 
 pub fn init(alloc: std.mem.Allocator, device: wgpu.Device, config: MapConfig) !Self {
-    var successful_initialisations: usize = 0;
-
     const brickmap_tracker = try alloc.alloc(BrickmapInfo, config.no_brickmaps);
     errdefer alloc.free(brickmap_tracker);
     @memset(brickmap_tracker, .{});
 
-    const bricktree_buffers = try alloc.alloc(wgpu.Buffer, config.no_brickmaps);
-    errdefer alloc.free(bricktree_buffers);
-    errdefer for (0..successful_initialisations) |i| bricktree_buffers[i].deinit();
+    const bricktree_buffer_size = (Brickmap.Traits.no_tree_bits / 8 - 1) * config.no_brickmaps;
+    const bricktree_buffer = try device.create_buffer(wgpu.Buffer.Descriptor{
+        .label = "master bricktree buffer",
+        .size = bricktree_buffer_size,
+        .usage = .{
+            .copy_dst = true,
+            .storage = true,
+        },
+        .mapped_at_creation = false,
+    });
 
-    const brickmap_textures = try alloc.alloc(wgpu.Texture, config.no_brickmaps);
-    errdefer alloc.free(brickmap_textures);
-    errdefer for (0..successful_initialisations) |i| brickmap_textures[i].deinit();
-
-    const brickmap_texture_views = try alloc.alloc(wgpu.TextureView, config.no_brickmaps);
-    errdefer alloc.free(brickmap_texture_views);
-    errdefer for (0..successful_initialisations) |i| brickmap_texture_views[i].deinit();
+    const brickmap_buffer_size = Brickmap.Traits.side_length * Brickmap.Traits.side_length * Brickmap.Traits.side_length * 4 * config.no_brickmaps;
+    const brickmap_buffer = try device.create_buffer(wgpu.Buffer.Descriptor{
+        .label = "master brickmap buffer",
+        .size = brickmap_buffer_size,
+        .usage = .{
+            .copy_dst = true,
+            .storage = true,
+        },
+        .mapped_at_creation = false,
+    });
 
     const brickgrid_texture = try device.create_texture(wgpu.Texture.Descriptor{
         .label = "brickgrid texture",
@@ -136,23 +113,6 @@ pub fn init(alloc: std.mem.Allocator, device: wgpu.Device, config: MapConfig) !S
     const brickgrid_texture_view = try brickgrid_texture.create_view(null);
     errdefer brickgrid_texture_view.deinit();
 
-    for (0..config.no_brickmaps) |i| {
-        const bricktree_buffer = try device.create_buffer(bricktree_buffer_desc);
-        errdefer bricktree_buffer.deinit();
-
-        const brickmap_texture = try device.create_texture(brickmap_texture_desc);
-        errdefer brickmap_texture.deinit();
-
-        const brickmap_texture_view = try brickgrid_texture.create_view(null);
-        errdefer brickmap_texture_view.deinit();
-
-        bricktree_buffers[i] = bricktree_buffer;
-        brickmap_textures[i] = brickmap_texture;
-        brickmap_texture_views[i] = brickmap_texture_view;
-
-        successful_initialisations += 1;
-    }
-
     const map_bgl = try device.create_bind_group_layout(wgpu.BindGroupLayout.Descriptor{
         .label = "map bgl",
         .entries = &.{
@@ -169,18 +129,16 @@ pub fn init(alloc: std.mem.Allocator, device: wgpu.Device, config: MapConfig) !S
                 .visibility = .{ .compute = true },
                 .layout = .{ .Buffer = .{
                     .type = .ReadOnlyStorage,
-                    .min_binding_size = Brickmap.Traits.no_tree_bits / 8 - 1,
+                    .min_binding_size = bricktree_buffer_size,
                 } },
-                .count = config.no_brickmaps,
             },
             wgpu.BindGroupLayout.Entry{
                 .binding = 2,
                 .visibility = .{ .compute = true },
-                .layout = .{ .Texture = .{
-                    .sample_type = .Uint,
-                    .view_dimension = .D3,
+                .layout = .{ .Buffer = .{
+                    .type = .ReadOnlyStorage,
+                    .min_binding_size = brickmap_buffer_size,
                 } },
-                .count = config.no_brickmaps,
             },
         },
     });
@@ -196,11 +154,15 @@ pub fn init(alloc: std.mem.Allocator, device: wgpu.Device, config: MapConfig) !S
             },
             wgpu.BindGroup.Entry{
                 .binding = 1,
-                .resource = .{ .BufferArray = bricktree_buffers },
+                .resource = .{ .Buffer = .{
+                    .buffer = bricktree_buffer,
+                } },
             },
             wgpu.BindGroup.Entry{
                 .binding = 2,
-                .resource = .{ .TextureViewArray = brickmap_texture_views },
+                .resource = .{ .Buffer = .{
+                    .buffer = brickmap_buffer,
+                } },
             },
         },
     });
@@ -218,35 +180,24 @@ pub fn init(alloc: std.mem.Allocator, device: wgpu.Device, config: MapConfig) !S
 
         .brickmap_queue = brickmap_queue,
 
+        .bricktree_buffer = bricktree_buffer,
+        .brickmap_buffer = brickmap_buffer,
+
         .alloc = alloc,
 
-        .brickmap_tracker = brickmap_tracker.ptr,
-        .bricktree_buffers = bricktree_buffers.ptr,
-        .brickmap_textures = brickmap_textures.ptr,
-        .brickmap_texture_views = brickmap_texture_views.ptr,
+        .brickmap_tracker = brickmap_tracker,
     };
 }
 
 pub fn deinit(self: *Self) void {
-    const bricktree_buffers = self.bricktree_buffers[0..self.config.no_brickmaps];
-    const brickmap_textures = self.brickmap_textures[0..self.config.no_brickmaps];
-    const brickmap_texture_views = self.brickmap_texture_views[0..self.config.no_brickmaps];
-
-    for (brickmap_texture_views) |v| v.deinit();
-    self.alloc.free(brickmap_texture_views);
-
-    for (brickmap_textures) |v| v.deinit();
-    self.alloc.free(brickmap_textures);
-
-    for (bricktree_buffers) |v| v.deinit();
-    self.alloc.free(bricktree_buffers);
-
-    self.brickgrid_texture.deinit();
-
-    self.alloc.free(self.brickmap_tracker[0..self.config.no_brickmaps]);
-
     self.map_bg.deinit();
     self.map_bgl.deinit();
+
+    self.brickgrid_texture.deinit();
+    self.bricktree_buffer.deinit();
+    self.brickmap_buffer.deinit();
+
+    self.alloc.free(self.brickmap_tracker);
 }
 
 /// Queues a brickmap for upload.
@@ -254,7 +205,7 @@ pub fn deinit(self: *Self) void {
 /// This function will make a copy of the brickmap given.
 ///
 /// This function is thread-safe.
-pub fn queue_brickmap(self: *Self, at_coords: BrickmapCoordinates, brickmap: *const Brickmap) !void {
+pub fn queue_brickmap(self: *Self, at_coords: [3]isize, brickmap: *const Brickmap) !void {
     self.bigass_mutex.lock();
     defer self.bigass_mutex.unlock();
 
@@ -270,11 +221,11 @@ pub fn queue_brickmap(self: *Self, at_coords: BrickmapCoordinates, brickmap: *co
     });
 }
 
-fn generate_brickgrid(self: *Self, brickgrid_origin: BrickmapCoordinates, alloc: std.mem.Allocator) ![]?usize {
+fn generate_brickgrid(self: *Self, brickgrid_origin: [3]isize, alloc: std.mem.Allocator) ![]?usize {
     var ret = try alloc.alloc(?usize, self.config.grid_size());
     @memset(ret, null);
 
-    for (self.brickmap_tracker, 0..self.config.no_brickmaps) |v, i| if (v.valid) {
+    for (self.brickmap_tracker, 0..) |v, i| if (v.valid) {
         const g_brickmap_coords = wgm.cast(isize, v.brickmap_coords).?;
         const g_origin_coords = wgm.cast(isize, brickgrid_origin).?;
 
@@ -305,16 +256,16 @@ fn generate_brickgrid(self: *Self, brickgrid_origin: BrickmapCoordinates, alloc:
     return ret;
 }
 
-fn find_slot(self: *Self, coord_hint: ?BrickmapCoordinates) usize {
+fn find_slot(self: *Self, coord_hint: ?[3]isize) usize {
     if (coord_hint) |w| {
-        for (0..self.config.no_brickmaps, self.brickmap_tracker) |i, v| {
+        for (0.., self.brickmap_tracker) |i, v| {
             if (v.valid and wgm.compare(.all, v.brickmap_coords, .equal, w)) {
                 return i;
             }
         }
     }
 
-    for (0..self.config.no_brickmaps, self.brickmap_tracker) |i, v| {
+    for (0.., self.brickmap_tracker) |i, v| {
         if (!v.valid) return i;
     }
 
@@ -324,7 +275,11 @@ fn find_slot(self: *Self, coord_hint: ?BrickmapCoordinates) usize {
 fn upload_brickmap(self: *Self, slot: usize, brickmap: *const Brickmap, queue: wgpu.Queue) void {
     if (Brickmap.Traits.NodeType == u8) {
         // uploading layer 1 is too much trouble for too little gain
-        queue.write_buffer(self.bricktree_buffers[slot], 0, brickmap.tree[1..]);
+        const tree_offset = (Brickmap.Traits.no_tree_bits / 8 - 1) * slot;
+        queue.write_buffer(self.bricktree_buffer, tree_offset, brickmap.tree[1..]);
+
+        const brickmap_offset = (Brickmap.Traits.volume * 4) * slot;
+        queue.write_buffer(self.brickmap_buffer, brickmap_offset, std.mem.asBytes(brickmap.voxels[0..]));
     } else {
         @compileError("NYI: u64 trees");
     }
@@ -351,6 +306,10 @@ pub fn before_render(self: *Self, queue: wgpu.Queue) !void {
         const slot = self.find_slot(brickmap.coords);
 
         self.upload_brickmap(slot, brickmap.brickmap, queue);
+        self.brickmap_tracker[slot] = .{
+            .valid = true,
+            .brickmap_coords = brickmap.coords,
+        };
 
         const alloc = previous_queue.allocator;
         alloc.destroy(brickmap.brickmap);

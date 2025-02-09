@@ -34,3 +34,10 @@ fn funny_merge_8_32(val: u32) -> u32 {
     return res >> 28;
 }
 
+/// `upto` is not inclusive
+fn power_sum(upto: u32, base_log_2: u32) -> u32 {
+    let a = (1u << (base_log_2 * upto)) - 1u;
+    let b = (1u << base_log_2) - 1;
+
+    return a / b;
+}

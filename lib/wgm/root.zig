@@ -404,7 +404,7 @@ pub fn compare(comptime reduction: BooleanReduction, lhs: anytype, comptime comp
             const lv = LH.get(&lhs, r, c);
             const rv = LH.get(&rhs, r, c);
 
-            const negate = switch (comparison) {
+            const do_negate = switch (comparison) {
                 .not_equal, .less_than_equal, .greater_than_equal => true,
                 else => false,
             };
@@ -415,7 +415,7 @@ pub fn compare(comptime reduction: BooleanReduction, lhs: anytype, comptime comp
                 .greater_than, .less_than_equal => lv > rv,
             };
 
-            const res = comp_res and !negate or !comp_res and negate;
+            const res = comp_res and !do_negate or !comp_res and do_negate;
 
             switch (reduction) {
                 .all => if (!res) return false,
@@ -513,6 +513,15 @@ pub fn cast(comptime To: type, m: anytype) ?Matrix(To, He(@TypeOf(m)).rows, He(@
     for (0..H.rows * H.cols) |i| {
         RH.fp(&ret)[i] = std.math.cast(To, H.cfp(&m)[i]) orelse return null;
     }
+
+    return ret;
+}
+
+pub fn negate(m: anytype) @TypeOf(m) {
+    const H = He(@TypeOf(m));
+
+    var ret: @TypeOf(m) = undefined;
+    for (0..H.rows * H.cols) |i| H.fp(&ret)[i] = -H.cfp(&m)[i];
 
     return ret;
 }

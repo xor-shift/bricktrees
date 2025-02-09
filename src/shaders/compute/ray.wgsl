@@ -2,15 +2,28 @@ struct Ray {
     origin: vec3<f32>,
     direction: vec3<f32>,
     direction_reciprocals: vec3<f32>,
+    iter_direction: vec3<i32>,
 };
 
-struct Intersection {
-    voxel_coords: vec3<u32>,
-    local_coords: vec3<f32>,
-    material: u32,
+struct Statistics {
     brickgrid_iterations: u32,
     bricktree_iterations: u32,
     brickmap_iterations: u32,
+}
+
+struct Intersection {
+    /// Coordinate of the voxel relative to the brickgrid origin
+    voxel_coords: vec3<u32>,
+
+    /// Coordinate of the intersection relative to the voxel intersected.
+    /// No axis should ever exceed 1 or go below 0.
+    local_coords: vec3<f32>,
+
+    distance: f32,
+
+    material: u32,
+
+    stats: Statistics,
 };
 
 fn generate_ray(pixel: vec2<u32>) -> Ray {
@@ -34,20 +47,25 @@ fn generate_ray(pixel: vec2<u32>) -> Ray {
 
     let uv = vec2<f32>(pixel) / uniforms.dims;
 
-    // bilinear gaming
+    let use_bilinear = true;
 
-    let near_h_t = near_arr_h[0] * (1 - uv.x) + near_arr_h[1] * uv.x;
-    let near_h_b = near_arr_h[2] * (1 - uv.x) + near_arr_h[3] * uv.x;
-    let near_h = near_h_t * (1 - uv.y) + near_h_b * uv.y;
+    var near_h: vec4<f32>;
+    var far_h: vec4<f32>;
 
-    let far_h_t = far_arr_h[0] * (1 - uv.x) + far_arr_h[1] * uv.x;
-    let far_h_b = far_arr_h[2] * (1 - uv.x) + far_arr_h[3] * uv.x;
-    let far_h = far_h_t * (1 - uv.y) + far_h_b * uv.y;
+    if (use_bilinear) {
+        let near_h_t = near_arr_h[0] * (1 - uv.x) + near_arr_h[1] * uv.x;
+        let near_h_b = near_arr_h[2] * (1 - uv.x) + near_arr_h[3] * uv.x;
+        near_h = near_h_t * (1 - uv.y) + near_h_b * uv.y;
 
-    // let pos = vec2<f32>(uv.x * 2 - 1, 1 - uv.y * 2);
+        let far_h_t = far_arr_h[0] * (1 - uv.x) + far_arr_h[1] * uv.x;
+        let far_h_b = far_arr_h[2] * (1 - uv.x) + far_arr_h[3] * uv.x;
+        far_h = far_h_t * (1 - uv.y) + far_h_b * uv.y;
+    } else {
+        let pos = vec2<f32>(uv.x * 2 - 1, 1 - uv.y * 2);
 
-    // let near_h = inv * vec4<f32>(pos, 0, 1);
-    // let far_h = inv * vec4<f32>(pos, 1, 1);
+        near_h = inv * vec4<f32>(pos, 0, 1);
+        far_h = inv * vec4<f32>(pos, 1, 1);
+    }
 
     let near = near_h.xyz / near_h.w;
     let far = far_h.xyz / far_h.w;
@@ -55,7 +73,17 @@ fn generate_ray(pixel: vec2<u32>) -> Ray {
     let origin = near;
     let direction = normalize(far - near);
 
-    return Ray(origin, direction, 1 / direction);
+    let iteration_direction = vec3<i32>(select(
+        vec3<i32>(-1), vec3<i32>(1),
+        direction >= vec3<f32>(0),
+    ));
+
+    return Ray(
+        origin,
+        direction,
+        1 / direction,
+        iteration_direction,
+    );
 }
 
 /// *out_t is always clobbered

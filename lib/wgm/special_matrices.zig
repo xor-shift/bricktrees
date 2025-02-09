@@ -58,34 +58,28 @@ pub fn rotation_2d(comptime T: type, theta: T) Matrix(T, 2, 2) {
     });
 }
 
-pub fn rotation_2d_affine(comptime T: type, theta: T) Matrix(T, 3, 3) {
-    return pad_affine(rotation_2d_affine(T, theta));
-}
-
-pub fn rotation_3d(comptime T: type, yaw: T, pitch: T, roll: T) Matrix(T, 3, 3) {
-    const Ret = Matrix(T, 3, 3);
-
-    const yaw_mat: Ret = .{
-        .{ @cos(yaw), 0, @sin(yaw) },
-        .{ 0, 1, 0 },
-        .{ -@sin(yaw), 0, @cos(yaw) },
-    };
-    const pitch_mat: Ret = .{
+pub fn rotate_x_3d(comptime T: type, r: T) [3][3]T {
+    return transpose([3][3]T{
         .{ 1, 0, 0 },
-        .{ 0, @cos(pitch), -@sin(pitch) },
-        .{ 0, @sin(pitch), @cos(pitch) },
-    };
-    const roll_mat: Ret = .{
-        .{ @cos(roll), -@sin(roll), 0 },
-        .{ @sin(roll), @cos(roll), 0 },
-        .{ 0, 0, 1 },
-    };
-
-    return transpose(mulmm(mulmm(yaw_mat, pitch_mat), roll_mat));
+        .{ 0, @cos(r), -@sin(r) },
+        .{ 0, @sin(r), @cos(r) },
+    });
 }
 
-pub fn rotation_3d_affine(comptime T: type, yaw: T, pitch: T, roll: T) Matrix(T, 4, 4) {
-    return pad_affine(rotation_3d(T, yaw, pitch, roll));
+pub fn rotate_y_3d(comptime T: type, r: T) [3][3]T {
+    return transpose([3][3]T{
+        .{ @cos(r), 0, @sin(r) },
+        .{ 0, 1, 0 },
+        .{ -@sin(r), 0, @cos(r) },
+    });
+}
+
+pub fn rotate_z_3d(comptime T: type, r: T) [3][3]T {
+    return transpose([3][3]T{
+        .{ @cos(r), -@sin(r), 0 },
+        .{ @sin(r), @cos(r), 0 },
+        .{ 0, 0, 1 },
+    });
 }
 
 pub fn translate_3d(vec: anytype) SquareMat(He(@TypeOf(vec)).T, He(@TypeOf(vec)).rows + 1) {
@@ -176,13 +170,4 @@ pub fn perspective_fov(comptime T: type, near: T, far: T, fovy: T, aspect: T) Ma
 
     if (@inComptime()) @setEvalBranchQuota(1500);
     return perspective(near_vec, far_vec);
-}
-
-pub fn negate(m: anytype) @TypeOf(m) {
-    const H = He(@TypeOf(m));
-
-    var ret: @TypeOf(m) = undefined;
-    for (0..H.rows * H.cols) |i| H.fp(&ret)[i] = -H.cfp(&m)[i];
-
-    return ret;
 }

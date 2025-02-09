@@ -29,6 +29,7 @@ pub fn MkTraits(comptime NodeTypeArg: type, comptime depth_arg: u6) type {
 
         pub const depth: u6 = depth_arg;
         pub const side_length: usize = 1 << (bits_per_axis_per_level * depth);
+        pub const side_length_i: isize = @intCast(side_length);
         pub const volume: usize = 1 << (3 * bits_per_axis_per_level * depth);
 
         pub const no_tree_bits: usize = power_sum(usize, depth, node_size_log_2);

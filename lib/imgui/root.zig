@@ -173,7 +173,7 @@ pub fn input_scalar(comptime T: type, label: [:0]const u8, v: *T, step: T, step_
         i64 => .{ c.ImGuiDataType_S64, if (is_ilp32) "%lld" else "%ld" },
         u64 => .{ c.ImGuiDataType_U64, if (is_ilp32) "%llu" else "%lu" },
         f32 => .{ c.ImGuiDataType_Float, "%f" },
-        f64 => .{ c.ImGuiDataType_Double, "%d" },
+        f64 => .{ c.ImGuiDataType_Double, "%f" },
         else => @compileError("unsupported type passed into input_scalar"),
     };
 

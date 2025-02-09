@@ -19,8 +19,8 @@ const BindGroup = @This();
 pub const BindingResource = union(enum) {
     Buffer: struct {
         buffer: Buffer,
-        offset: u64,
-        size: u64,
+        offset: u64 = 0,
+        size: ?u64 = null,
     },
 
     Sampler: Sampler,
@@ -46,7 +46,7 @@ pub const Entry = struct {
             .Buffer => |v| {
                 ret.buffer = v.buffer.handle;
                 ret.offset = v.offset;
-                ret.size = v.size;
+                ret.size = v.size orelse wgpu.whole_map_size;
             },
             .Sampler => |v| ret.sampler = v.handle,
             .TextureView => |v| ret.textureView = v.handle,

@@ -7,5 +7,8 @@ struct Uniforms {
     debug_level: u32,
 
     pos: vec3<f32>,
-    padding_1: f32,
+    padding_0: u32,
+
+    brickgrid_origin: vec3<i32>,
+    padding_1: u32,
 }
