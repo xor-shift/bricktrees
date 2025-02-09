@@ -8,10 +8,12 @@ const wgpu = @import("gfx").wgpu;
 const brick = @import("../brick.zig");
 
 const AnyThing = @import("../AnyThing.zig");
-const Map = @import("gpu/Map.zig");
+
+const MapThing = @import("MapThing.zig");
+
 const TextureAndView = @import("gpu/TextureAndView.zig");
 
-const Brickmap = Map.Brickmap;
+const Brickmap = MapThing.Brickmap;
 
 const PackedVoxel = brick.PackedVoxel;
 const Voxel = brick.Voxel;
@@ -100,28 +102,20 @@ visualisation_texture: TextureAndView,
 visualisation_pipeline_layout: wgpu.PipelineLayout,
 visualisation_pipeline: wgpu.RenderPipeline,
 
-map: Map,
-
 compute_textures_bgl: wgpu.BindGroupLayout,
 compute_textures_bg: wgpu.BindGroup,
 
 compute_pipeline_layout: wgpu.PipelineLayout,
 compute_pipeline: wgpu.ComputePipeline,
 
-pub fn init(alloc: std.mem.Allocator) !Self {
+map_thing: *MapThing = undefined,
+
+pub fn init(map: *MapThing, alloc: std.mem.Allocator) !Self {
     const compute_shader = try g.device.create_shader_module_wgsl_from_file("compute shader", "shaders/compute.wgsl", alloc);
     errdefer compute_shader.deinit();
 
     const visualisation_shader = try g.device.create_shader_module_wgsl_from_file("visualisation shader", "shaders/visualiser.wgsl", alloc);
     errdefer visualisation_shader.deinit();
-
-    const target_sidelength: usize = 128;
-    const grid_dimensions: [3]usize = .{target_sidelength / Brickmap.Traits.side_length} ** 3;
-    var map = try Map.init(alloc, g.device, .{
-        .no_brickmaps = grid_dimensions[0] * grid_dimensions[1] * grid_dimensions[2],
-        .grid_dimensions = grid_dimensions,
-    });
-    errdefer map.deinit();
 
     const uniform_buffer = try g.device.create_buffer(wgpu.Buffer.Descriptor{
         .label = "uniform buffer",
@@ -274,8 +268,6 @@ pub fn init(alloc: std.mem.Allocator) !Self {
         .visualisation_pipeline_layout = visualisation_pipeline_layout,
         .visualisation_pipeline = visualisation_pipeline,
 
-        .map = map,
-
         .compute_textures_bgl = compute_textures_bgl,
         .compute_textures_bg = .{},
 
@@ -295,8 +287,6 @@ pub fn deinit(self: *Self) void {
 
     self.compute_textures_bg.deinit();
     self.compute_textures_bgl.deinit();
-
-    self.map.deinit();
 
     self.visualisation_pipeline.deinit();
     self.visualisation_pipeline_layout.deinit();
@@ -386,8 +376,6 @@ pub fn do_gui(self: *Self) !void {
 }
 
 pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
-    try self.map.before_render(g.queue);
-
     const dims = g.window.get_size() catch @panic("g.window.get_size()");
     g.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&self.uniforms));
 
@@ -399,7 +387,7 @@ pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView)
         compute_pass.set_pipeline(self.compute_pipeline);
         compute_pass.set_bind_group(0, self.uniform_bg, null);
         compute_pass.set_bind_group(1, self.compute_textures_bg, null);
-        compute_pass.set_bind_group(2, self.map.map_bg, null);
+        compute_pass.set_bind_group(2, self.map_thing.map_bg, null);
 
         const wg_sz: [2]usize = .{ 8, 8 };
         const wg_count = wgm.div(

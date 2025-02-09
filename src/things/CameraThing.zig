@@ -10,8 +10,9 @@ const brick = @import("../brick.zig");
 const AnyThing = @import("../AnyThing.zig");
 
 const GPUThing = @import("GpuThing.zig");
+const MapThing = @import("MapThing.zig");
 
-const Brickmap = @import("../things/gpu/Map.zig").Brickmap;
+const Brickmap = MapThing.Brickmap;
 
 const PackedVoxel = brick.PackedVoxel;
 const Voxel = brick.Voxel;
@@ -75,15 +76,15 @@ input_state: InputState = std.mem.zeroes(InputState),
 mouse_delta: [2]f32 = .{ 0, 0 },
 fov: f64 = 45.0,
 
+centered_on: [3]isize = .{0} ** 3,
 global_coords: [3]f64 = .{0} ** 3,
 look: [3]f64 = .{0} ** 3,
 
-gpu_thing: *GPUThing,
+map_thing: *MapThing = undefined,
+gpu_thing: *GPUThing = undefined,
 
-pub fn init(gpu_thing: *GPUThing) !Self {
-    return .{
-        .gpu_thing = gpu_thing,
-    };
+pub fn init() !Self {
+    return .{};
 }
 
 pub fn deinit(self: *Self) void {
@@ -205,8 +206,8 @@ pub fn on_tick(self: *Self, delta_ns: u64) !void {
 
         ret.generate_tree();
 
-        try self.gpu_thing.map.queue_brickmap(bm_coords, &ret);
-        try self.gpu_thing.map.queue_brickmap(wgm.add(bm_coords, [_]isize{0, 0, 3}), &ret);
+        try self.map_thing.queue_brickmap(bm_coords, &ret);
+        try self.map_thing.queue_brickmap(wgm.add(bm_coords, [_]isize{ 0, 0, 3 }), &ret);
     }
 }
 

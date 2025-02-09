@@ -12,24 +12,39 @@ const Globals = @import("globals.zig");
 
 pub var g: Globals = undefined;
 
-fn add_thing(comptime Thing: type, args: anytype, alloc: std.mem.Allocator) *Thing {
+fn mkthing(comptime Thing: type, args: anytype, alloc: std.mem.Allocator) *Thing {
     const thing = alloc.create(Thing) catch @panic("");
     thing.* = @call(.auto, Thing.init, args) catch @panic("");
-    g.things.append(thing.to_any()) catch @panic("");
-
     return thing;
+}
+
+fn add_thing(thing: anytype) void {
+    g.things.append(thing.to_any()) catch @panic("");
 }
 
 fn initialize_things(alloc: std.mem.Allocator) void {
     g = Globals.init(Globals.default_resolution, alloc) catch @panic("Globals.init");
 
-    const gui = add_thing(@import("things/GuiThing.zig"), .{}, alloc);
+    const camera = mkthing(@import("things/CameraThing.zig"), .{}, alloc);
+    const map = mkthing(@import("things/MapThing.zig"), .{alloc}, alloc);
+    const gui = mkthing(@import("things/GuiThing.zig"), .{}, alloc);
+    const gpu = mkthing(@import("things/GpuThing.zig"), .{ map, alloc }, alloc);
+
+    camera.gpu_thing = gpu;
+    camera.map_thing = map;
+    gpu.map_thing = map;
+
     g.gui = gui;
 
-    const gpu = add_thing(@import("things/GpuThing.zig"), .{alloc}, alloc);
+    add_thing(camera);
+    add_thing(map);
+    add_thing(gui);
+    add_thing(gpu);
 
-    const camera = add_thing(@import("things/CameraThing.zig"), .{gpu}, alloc);
-    _ = camera;
+    map.reconfigure(.{
+        .grid_dimensions = .{ 16, 16, 16 },
+        .no_brickmaps = 128,
+    }) catch @panic("map.reconfigure");
 
     g.resize(Globals.default_resolution) catch @panic("g.resize");
 }

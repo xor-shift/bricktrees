@@ -23,14 +23,15 @@ pub const BindingLayout = union(enum) {
 
         type: BufferBindingType,
         has_dynamic_offset: bool = false,
-        min_binding_size: u64 = 0,
+        // https://github.com/gfx-rs/wgpu-native/blob/a522b7a3403a3977d4ef4607a588f54a3cac03b6/src/conv.rs#L1483
+        min_binding_size: ?u64 = null,
 
         pub fn get(self: @This()) @This().NativeType {
             return .{
                 .nextInChain = null,
                 .type = @intFromEnum(self.type),
                 .hasDynamicOffset = @intFromBool(self.has_dynamic_offset),
-                .minBindingSize = self.min_binding_size,
+                .minBindingSize = self.min_binding_size orelse 0,
             };
         }
     },
