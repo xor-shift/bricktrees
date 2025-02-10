@@ -42,8 +42,8 @@ fn initialize_things(alloc: std.mem.Allocator) void {
     add_thing(gpu);
 
     map.reconfigure(.{
-        .grid_dimensions = .{ 16, 16, 16 },
-        .no_brickmaps = 128,
+        .grid_dimensions = .{ 31, 31, 31 },
+        .no_brickmaps = 2048,
     }) catch @panic("map.reconfigure");
 
     g.resize(Globals.default_resolution) catch @panic("g.resize");

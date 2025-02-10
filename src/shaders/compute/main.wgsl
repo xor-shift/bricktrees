@@ -6,7 +6,7 @@
 @group(2) @binding(1) var<storage, read> bricktrees: array<u32>;
 @group(2) @binding(2) var<storage, read> brickmaps: array<u32>;
 
-const nudge_factor = 1.001;
+const nudge_factor = 1.00001;
 
 // X_dims can index into an array X
 // X_size is a real quantity representing X_dims * X_element_size
@@ -17,7 +17,7 @@ const nudge_factor = 1.001;
 // When X is a brickmap, then `X_element` is a voxel, which is by
 // definition 1x1x1 in *size* so `X_size` == `X_dims` == `brickmap_size`
 
-const brickmap_depth: u32 = 5u;
+const brickmap_depth: u32 = 4u;
 
 // voxel_dims = vec3<u32>(1)
 const brickmap_dims = vec3<u32>(1u << brickmap_depth);
@@ -70,6 +70,7 @@ struct BoxIteration {
     t: f32,
 
     box_local_pt: vec3<f32>,
+    new_origin: vec3<f32>,
 };
 
 /// `box_size` kind of goes against the convention of `_size` values being
@@ -109,24 +110,16 @@ fn iterate_box(
         tv.x < tv.y,
     );
 
+    let t = tv[shortest_axis];
+
     var shortest_axis_vector: vec3<i32>;
-    var t: f32;
     switch (shortest_axis) {
-        case 0u: {
-            shortest_axis_vector = vec3<i32>(1, 0, 0) * ray.iter_direction;
-            t = tv.x;
-        }
-        case 1u: {
-            shortest_axis_vector = vec3<i32>(0, 1, 0) * ray.iter_direction;
-            t = tv.y;
-        }
-        case 2u: {
-            shortest_axis_vector = vec3<i32>(0, 0, 1) * ray.iter_direction;
-            t = tv.z;
-        }
+        case 0u: { shortest_axis_vector = vec3<i32>(1, 0, 0); }
+        case 1u: { shortest_axis_vector = vec3<i32>(0, 1, 0); }
+        case 2u: { shortest_axis_vector = vec3<i32>(0, 0, 1); }
         default: {}
     }
-
+    shortest_axis_vector *= ray.iter_direction;
 
     debug_vec(
         debug_offset + 6u,
@@ -138,7 +131,14 @@ fn iterate_box(
         )) / 2, // -1 0 1 -> 1 0 2
     );
 
-    return BoxIteration(shortest_axis_vector, t * nudge_factor, box_local_pt);
+
+    return BoxIteration(
+        shortest_axis_vector,
+        t,
+        box_local_pt,
+        ray.origin + ray.direction * t * nudge_factor,
+        // clamp(ray.origin + ray.direction * t * 1.00001, box_origin * 0.9999, (box_origin + vec3<f32>(box_size)) * 1.0001),
+    );
 }
 
 fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
@@ -169,7 +169,7 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
             return false;
         }
 
-        ray.origin += distance_to_the_brickgrid * (ray.direction * nudge_factor);
+        ray.origin += distance_to_the_brickgrid * ray.direction * nudge_factor;
     }
 
     let sentinel = 0xFFFFFFFFu;
@@ -207,32 +207,36 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
                 any(current_box_coords < vec3<i32>(0u)) ||
                 any(current_box_coords >= brickgrid_dims)
             ) {
+                debug_vec(3u, i, vec3<f32>(1, 0.5, 1));
                 return false;
             }
 
-            debug_vec(3u, i, vec3<f32>(current_box_coords) / vec3<f32>(brickgrid_dims));
+            debug_vec(4u, i, vec3<f32>(current_box_coords) / vec3<f32>(brickgrid_dims));
 
             current_brickmap = textureLoad(brickgrid, current_box_coords, 0).r;
             have_hit = current_brickmap != sentinel;
 
-            debug_bool(4u, i, have_hit);
+            debug_bool(3u, i, have_hit);
 
             let iteration = iterate_box(
                 ray,
                 current_box_coords,
                 vec3<i32>(brickmap_dims),
-                i, 5u,
+                i, 6u,
             );
 
             lagged_stack[level] = current_box_coords;
             stack[level] = vec3<i32>(current_box_coords) + iteration.next_box_offset;
 
             if (!have_hit) {
-                ray.origin += ray.direction * iteration.t;
+                ray.origin = iteration.new_origin;
+                //ray.origin += ray.direction * iteration.t;
             } else {
-                let next_inner =
-                    current_box_coords * vec3<i32>(brickmap_dims) +
-                    vec3<i32>(iteration.box_local_pt);
+                let next_inner = current_box_coords * vec3<i32>(brickmap_dims) + clamp(
+                    vec3<i32>(trunc(iteration.box_local_pt)),
+                    vec3<i32>(0),
+                    vec3<i32>(brickmap_dims) - vec3<i32>(1),
+                );
                 stack[level + 1] = next_inner;
                 level += 1u;
             }
@@ -249,31 +253,40 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
             let brickmap_coords = current_box_coords / vec3<i32>(brickmap_dims);
             let bml_voxel_coords = current_box_coords - brickmap_coords * vec3<i32>(brickmap_dims);
 
-            debug_vec(3u, i, vec3<f32>(brickmap_coords) / vec3<f32>(brickgrid_dims));
-            debug_vec(4u, i, vec3<f32>(bml_voxel_coords) / vec3<f32>(brickmap_dims));
+            debug_vec(4u, i, vec3<f32>(brickmap_coords) / vec3<f32>(brickgrid_dims));
+            debug_vec(5u, i, vec3<f32>(bml_voxel_coords) / vec3<f32>(brickmap_dims));
 
-            let material = get_material(0u, vec3<u32>(bml_voxel_coords));
+            let material = get_material(current_brickmap, vec3<u32>(bml_voxel_coords));
             let have_hit = material != 0u;
+
+            debug_bool(3u, i, have_hit);
+
+            if (have_hit) {
+                *out_isection = Intersection(
+                    current_box_coords,
+                    ray.origin - vec3<f32>(current_box_coords),
+                    length(ray_arg.origin - ray.origin),
+                    material,
+                    Statistics(),
+                );
+                return true;
+            }
 
             let iteration = iterate_box(
                 ray,
                 current_box_coords, vec3<i32>(1u),
-                i, 5u,
+                i, 6u,
             );
 
             let next = current_box_coords + iteration.next_box_offset;
 
             stack[level] = next;
-            ray.origin += ray.direction * iteration.t;
-
-            if (have_hit) {
-                return true;
-            }
+            ray.origin = iteration.new_origin;
+            // ray.origin += iteration.box_local_pt;
+            // ray.origin += ray.direction * iteration.t * nudge_factor;
         } else {
             // unreachable
         }
-
-        debug_bool(3u, i, have_hit);
     }
 
     return false;
@@ -297,7 +310,8 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
     var intersection: Intersection;
     let intersected = trace(ray, &intersection);
 
-    debug_bool(0u, 0u, intersected);
+    debug_vec(0u, 0u, intersection.local_coords);
+    // debug_bool(0u, 0u, intersected);
     debug_vec(1u, 0u, vec3<f32>(intersection.distance / 5, 0, 0));
 
     debug_jet(2u, 0u, f32(pixel.x) / uniforms.dims[0]);

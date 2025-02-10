@@ -39,20 +39,18 @@ pub const Any = struct {
     }
 };
 
-pub const Brickmap = brick.U8Map(5);
+pub const Brickmap = brick.U8Map(4);
 
 pub const BrickmapInfo = struct {
-    /// This is true in ~~two~~ one situation~~s~~:
-    /// - The data on the GPU is junk for this brickmap
-    /// ~~- Another brickmap was uploaded to anoter slot at the same location.~~
-    ///
-    /// Both `valid` and `committed` can be `true` at the same time.
+    /// Whether the data on the GPU for this brickmap is junk
     valid: bool = false,
 
-    /// Value is undefined if `!valid`.
+    /// I still am not sure what to do with this but i'm sure that we need
+    /// something like this for when the brickgrid is shifted.
+    /// Undefined if `!valid`.
     last_accessed: usize = undefined,
 
-    /// Value is undefined if `!valid`.
+    /// Undefined if `!valid`.
     brickmap_coords: [3]isize = undefined,
 };
 
@@ -74,6 +72,9 @@ const QueuedBrickmap = struct {
 };
 
 alloc: std.mem.Allocator,
+
+// TODO: accesses to this are a little racy
+origin_brickmap: [3]isize = .{ 0, 0, 0 },
 
 map_bgl: wgpu.BindGroupLayout,
 
@@ -292,30 +293,36 @@ pub fn queue_brickmap(self: *Self, at_coords: [3]isize, brickmap: *const Brickma
     });
 }
 
-fn generate_brickgrid(self: *Self, brickgrid_origin: [3]isize) void {
+fn bgl_coords_of(self: Self, brickmap_coords: [3]isize) ?[3]usize {
+    const bgl_brickmap_coords = wgm.sub(brickmap_coords, self.origin_brickmap);
+
+    const below_bounds = wgm.compare(
+        .some,
+        bgl_brickmap_coords,
+        .less_than,
+        [_]isize{0} ** 3,
+    );
+    const no_greater_than_bounds = wgm.compare(
+        .all,
+        bgl_brickmap_coords,
+        .less_than,
+        wgm.cast(isize, self.config.?.grid_dimensions).?,
+    );
+
+    if (below_bounds or !no_greater_than_bounds) return null;
+
+    return wgm.cast(usize, bgl_brickmap_coords).?;
+}
+
+fn generate_brickgrid(self: *Self) void {
     @memset(self.local_brickgrid, std.math.maxInt(u32));
 
     for (self.brickmap_tracker, 0..) |v, i| if (v.valid) {
-        const g_brickmap_coords = wgm.cast(isize, v.brickmap_coords).?;
-        const g_origin_coords = wgm.cast(isize, brickgrid_origin).?;
+        const bgl_brickmap_coords = self.bgl_coords_of(v.brickmap_coords) orelse continue;
 
-        const bl_brickmap_coords = wgm.sub(g_brickmap_coords, g_origin_coords);
-        const below_bounds = wgm.compare(
-            .some,
-            bl_brickmap_coords,
-            .less_than,
-            [_]isize{0} ** 3,
-        );
-        const no_greater_than_bounds = wgm.compare(
-            .all,
-            bl_brickmap_coords,
-            .less_than,
-            wgm.cast(isize, self.config.?.grid_dimensions).?,
-        );
+        // std.log.debug("{any} = {d}", .{bgl_brickmap_coords, i});
 
-        if (below_bounds or !no_greater_than_bounds) continue;
-
-        const blc = wgm.cast(usize, bl_brickmap_coords).?;
+        const blc = wgm.cast(usize, bgl_brickmap_coords).?;
         const idx = blc[0] +
             blc[1] * self.config.?.grid_dimensions[0] +
             blc[2] * (self.config.?.grid_dimensions[0] * self.config.?.grid_dimensions[1]);
@@ -337,6 +344,10 @@ fn find_slot(self: *Self, coord_hint: ?[3]isize) usize {
         if (!v.valid) return i;
     }
 
+    for (0.., self.brickmap_tracker) |i, v| {
+        if (self.bgl_coords_of(v.brickmap_coords) == null) return i;
+    }
+
     @panic("there's no eviction strategy rn");
 }
 
@@ -351,8 +362,6 @@ fn upload_brickmap(self: *Self, slot: usize, brickmap: *const Brickmap, queue: w
     } else {
         @compileError("NYI: u64 trees");
     }
-
-    // TODO: upload the actual thing
 }
 
 /// Call this before doing anything in render().
@@ -369,8 +378,6 @@ pub fn render(self: *Self, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
     };
 
     for (previous_queue.items) |brickmap| {
-        std.log.debug("brickmap!", .{});
-
         const slot = self.find_slot(brickmap.coords);
 
         self.upload_brickmap(slot, brickmap.brickmap, g.queue);
@@ -385,7 +392,7 @@ pub fn render(self: *Self, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
 
     previous_queue.deinit();
 
-    self.generate_brickgrid(.{ 0, 0, 0 });
+    self.generate_brickgrid();
 
     g.queue.write_texture(
         wgpu.ImageCopyTexture{

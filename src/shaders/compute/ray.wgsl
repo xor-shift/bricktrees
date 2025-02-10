@@ -13,7 +13,7 @@ struct Statistics {
 
 struct Intersection {
     /// Coordinate of the voxel relative to the brickgrid origin
-    voxel_coords: vec3<u32>,
+    voxel_coords: vec3<i32>,
 
     /// Coordinate of the intersection relative to the voxel intersected.
     /// No axis should ever exceed 1 or go below 0.
@@ -26,23 +26,26 @@ struct Intersection {
     stats: Statistics,
 };
 
-fn generate_ray(pixel: vec2<u32>) -> Ray {
+fn generate_ray_transform(pixel: vec2<u32>) -> Ray {
     let inv = uniforms.inverse_transform;
 
     // TODO: send these 8 vectors through the uniforms
 
+    let near_z = 0.;
+    let far_z = 1.;
+
     let near_arr_h = array<vec4<f32>, 4>(
-        inv * vec4<f32>(-1, 1, 0, 1),
-        inv * vec4<f32>(1, 1, 0, 1),
-        inv * vec4<f32>(-1, -1, 0, 1),
-        inv * vec4<f32>(1, -1, 0, 1),
+        inv * vec4<f32>(-1, 1, near_z, 1),
+        inv * vec4<f32>(1, 1, near_z, 1),
+        inv * vec4<f32>(-1, -1, near_z, 1),
+        inv * vec4<f32>(1, -1, near_z, 1),
     );
 
     let far_arr_h = array<vec4<f32>, 4>(
-        inv * vec4<f32>(-1, 1, 1, 1),
-        inv * vec4<f32>(1, 1, 1, 1),
-        inv * vec4<f32>(-1, -1, 1, 1),
-        inv * vec4<f32>(1, -1, 1, 1),
+        inv * vec4<f32>(-1, 1, far_z, 1),
+        inv * vec4<f32>(1, 1, far_z, 1),
+        inv * vec4<f32>(-1, -1, far_z, 1),
+        inv * vec4<f32>(1, -1, far_z, 1),
     );
 
     let uv = vec2<f32>(pixel) / uniforms.dims;
@@ -53,18 +56,36 @@ fn generate_ray(pixel: vec2<u32>) -> Ray {
     var far_h: vec4<f32>;
 
     if (use_bilinear) {
-        let near_h_t = near_arr_h[0] * (1 - uv.x) + near_arr_h[1] * uv.x;
-        let near_h_b = near_arr_h[2] * (1 - uv.x) + near_arr_h[3] * uv.x;
-        near_h = near_h_t * (1 - uv.y) + near_h_b * uv.y;
+        let classic = false;
 
-        let far_h_t = far_arr_h[0] * (1 - uv.x) + far_arr_h[1] * uv.x;
-        let far_h_b = far_arr_h[2] * (1 - uv.x) + far_arr_h[3] * uv.x;
-        far_h = far_h_t * (1 - uv.y) + far_h_b * uv.y;
+        if (!classic) {
+            let uvx = vec2<f32>(1 - uv.x, uv.x);
+            let uvy = vec2<f32>(1 - uv.y, uv.y);
+
+            let near_t_mat = mat2x4<f32>(near_arr_h[0], near_arr_h[1]);
+            let near_b_mat = mat2x4<f32>(near_arr_h[2], near_arr_h[3]);
+            let near_h_mat = mat2x4<f32>(near_t_mat * uvx, near_b_mat * uvx);
+            near_h = near_h_mat * uvy;
+
+            let far_t_mat = mat2x4<f32>(far_arr_h[0], far_arr_h[1]);
+            let far_b_mat = mat2x4<f32>(far_arr_h[2], far_arr_h[3]);
+            let far_h_mat = mat2x4<f32>(far_t_mat * uvx, far_b_mat * uvx);
+            far_h = far_h_mat * uvy;
+
+        } else {
+            let near_h_t = near_arr_h[0] * (1 - uv.x) + near_arr_h[1] * uv.x;
+            let near_h_b = near_arr_h[2] * (1 - uv.x) + near_arr_h[3] * uv.x;
+            near_h = near_h_t * (1 - uv.y) + near_h_b * uv.y;
+
+            let far_h_t = far_arr_h[0] * (1 - uv.x) + far_arr_h[1] * uv.x;
+            let far_h_b = far_arr_h[2] * (1 - uv.x) + far_arr_h[3] * uv.x;
+            far_h = far_h_t * (1 - uv.y) + far_h_b * uv.y;
+        }
     } else {
         let pos = vec2<f32>(uv.x * 2 - 1, 1 - uv.y * 2);
 
-        near_h = inv * vec4<f32>(pos, 0, 1);
-        far_h = inv * vec4<f32>(pos, 1, 1);
+        near_h = inv * vec4<f32>(pos, near_z, 1);
+        far_h = inv * vec4<f32>(pos, far_z, 1);
     }
 
     let near = near_h.xyz / near_h.w;
@@ -73,17 +94,20 @@ fn generate_ray(pixel: vec2<u32>) -> Ray {
     let origin = near;
     let direction = normalize(far - near);
 
-    let iteration_direction = vec3<i32>(select(
+    return Ray(origin, direction, vec3<f32>(), vec3<i32>());
+}
+
+fn generate_ray(pixel: vec2<u32>) -> Ray {
+    var ray = generate_ray_transform(pixel);
+
+    ray.iter_direction = vec3<i32>(select(
         vec3<i32>(-1), vec3<i32>(1),
-        direction >= vec3<f32>(0),
+        ray.direction >= vec3<f32>(0),
     ));
 
-    return Ray(
-        origin,
-        direction,
-        1 / direction,
-        iteration_direction,
-    );
+    ray.direction_reciprocals = 1 /  ray.direction;
+
+    return ray;
 }
 
 /// *out_t is always clobbered

@@ -160,10 +160,10 @@ pub fn button(label: [:0]const u8, size: ?[2]f32) bool {
     );
 }
 
-pub fn input_scalar(comptime T: type, label: [:0]const u8, v: *T, step: T, step_fast: T) bool {
+fn ig_scalar_info(comptime T: type) struct { c.ImGuiDataType, [:0]const u8 } {
     const is_ilp32 = @bitSizeOf(c_long) != @bitSizeOf(c_longlong);
 
-    const args = switch (T) {
+    return switch (T) {
         i8 => .{ c.ImGuiDataType_S8, "%hhd" },
         u8 => .{ c.ImGuiDataType_U8, "%hhu" },
         i16 => .{ c.ImGuiDataType_S16, "%hd" },
@@ -176,14 +176,32 @@ pub fn input_scalar(comptime T: type, label: [:0]const u8, v: *T, step: T, step_
         f64 => .{ c.ImGuiDataType_Double, "%f" },
         else => @compileError("unsupported type passed into input_scalar"),
     };
+}
+
+pub fn input_scalar(comptime T: type, label: [:0]const u8, v: *T, step: T, step_fast: T) bool {
+    const info = ig_scalar_info(T);
 
     return c.igInputScalar(
         label.ptr,
-        args.@"0",
+        info.@"0",
         @ptrCast(v),
         &step,
         &step_fast,
-        args.@"1",
+        info.@"1",
+        0,
+    );
+}
+
+pub fn input_slider(comptime T: type, label: [:0]const u8, v: *T, min: T, max: T) bool {
+    const info = ig_scalar_info(T);
+
+    return c.igSliderScalar(
+        label,
+        info.@"0",
+        @ptrCast(v),
+        &min,
+        &max,
+        info.@"1",
         0,
     );
 }
