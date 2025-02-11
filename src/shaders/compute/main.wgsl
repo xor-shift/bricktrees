@@ -97,12 +97,12 @@ fn iterate_box(
     let delta = vec3<f32>(box_size) - ray_relative_box_local_pt;
     let tv = delta / abs(ray.direction);
 
-    debug_vec(debug_offset + 0u, iteration, abs(delta) / vec3<f32>(box_size));
-    debug_vec(debug_offset + 1u, iteration, abs(delta) * vec3<f32>(1, 1, 0) / vec3<f32>(box_size));
-    debug_vec(debug_offset + 2u, iteration, tv / 64);
-    debug_jet(debug_offset + 3u, iteration, tv.x / 64);
-    debug_jet(debug_offset + 4u, iteration, tv.y / 64);
-    debug_jet(debug_offset + 5u, iteration, tv.z / 64);
+    // debug_vec(debug_offset + 0u, iteration, abs(delta) / vec3<f32>(box_size));
+    // debug_vec(debug_offset + 1u, iteration, abs(delta) * vec3<f32>(1, 1, 0) / vec3<f32>(box_size));
+    // debug_vec(debug_offset + 2u, iteration, tv / 64);
+    // debug_jet(debug_offset + 3u, iteration, tv.x / 64);
+    // debug_jet(debug_offset + 4u, iteration, tv.y / 64);
+    // debug_jet(debug_offset + 5u, iteration, tv.z / 64);
 
     let shortest_axis = select(
         select(2u, 1u, tv.y < tv.z),
@@ -121,16 +121,15 @@ fn iterate_box(
     }
     shortest_axis_vector *= ray.iter_direction;
 
-    debug_vec(
-        debug_offset + 6u,
-        iteration,
-        vec3<f32>(select(
-            shortest_axis_vector * 2,
-            shortest_axis_vector + vec3<i32>(2),
-            shortest_axis_vector == vec3<i32>(-1)
-        )) / 2, // -1 0 1 -> 1 0 2
-    );
-
+    // debug_vec(
+    //     debug_offset + 6u,
+    //     iteration,
+    //     vec3<f32>(select(
+    //         shortest_axis_vector * 2,
+    //         shortest_axis_vector + vec3<i32>(2),
+    //         shortest_axis_vector == vec3<i32>(-1)
+    //     )) / 2, // -1 0 1 -> 1 0 2
+    // );
 
     return BoxIteration(
         shortest_axis_vector,
@@ -162,8 +161,8 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
             &distance_to_the_brickgrid,
         );
 
-        debug_bool(0u, 1u, is_intersecting_the_brickgrid);
-        debug_jet(1u, 1u, select(0., sqrt(distance_to_the_brickgrid) / 5, is_intersecting_the_brickgrid));
+        // debug_bool(0u, 1u, is_intersecting_the_brickgrid);
+        // debug_jet(1u, 1u, select(0., sqrt(distance_to_the_brickgrid) / 5, is_intersecting_the_brickgrid));
 
         if (!is_intersecting_the_brickgrid) {
             return false;
@@ -190,15 +189,15 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
 
     for (var i = 2u;; i++) {
         if (i >= 256u) {
-            debug_vec(0u, i, vec3<f32>(1, 0, 1));
+            // debug_vec(0u, i, vec3<f32>(1, 0, 1));
             break;
         }
 
         let current_box_coords = stack[level];
 
-        debug_u32(0u, i, level);
-        debug_u32(1u, i, current_brickmap);
-        debug_vec(2u, i, ray.origin / 128);
+        // debug_u32(0u, i, level);
+        // debug_u32(1u, i, current_brickmap);
+        // debug_vec(2u, i, ray.origin / 128);
 
         var have_hit = false;
 
@@ -207,16 +206,16 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
                 any(current_box_coords < vec3<i32>(0u)) ||
                 any(current_box_coords >= brickgrid_dims)
             ) {
-                debug_vec(3u, i, vec3<f32>(1, 0.5, 1));
+                // debug_vec(3u, i, vec3<f32>(1, 0.5, 1));
                 return false;
             }
 
-            debug_vec(4u, i, vec3<f32>(current_box_coords) / vec3<f32>(brickgrid_dims));
+            // debug_vec(4u, i, vec3<f32>(current_box_coords) / vec3<f32>(brickgrid_dims));
 
             current_brickmap = textureLoad(brickgrid, current_box_coords, 0).r;
             have_hit = current_brickmap != sentinel;
 
-            debug_bool(3u, i, have_hit);
+            // debug_bool(3u, i, have_hit);
 
             let iteration = iterate_box(
                 ray,
@@ -253,13 +252,13 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
             let brickmap_coords = current_box_coords / vec3<i32>(brickmap_dims);
             let bml_voxel_coords = current_box_coords - brickmap_coords * vec3<i32>(brickmap_dims);
 
-            debug_vec(4u, i, vec3<f32>(brickmap_coords) / vec3<f32>(brickgrid_dims));
-            debug_vec(5u, i, vec3<f32>(bml_voxel_coords) / vec3<f32>(brickmap_dims));
+            // debug_vec(4u, i, vec3<f32>(brickmap_coords) / vec3<f32>(brickgrid_dims));
+            // debug_vec(5u, i, vec3<f32>(bml_voxel_coords) / vec3<f32>(brickmap_dims));
 
             let material = get_material(current_brickmap, vec3<u32>(bml_voxel_coords));
             let have_hit = material != 0u;
 
-            debug_bool(3u, i, have_hit);
+            // debug_bool(3u, i, have_hit);
 
             if (have_hit) {
                 *out_isection = Intersection(
@@ -312,13 +311,13 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
 
     debug_vec(0u, 0u, intersection.local_coords);
     // debug_bool(0u, 0u, intersected);
-    debug_vec(1u, 0u, vec3<f32>(intersection.distance / 5, 0, 0));
+    // debug_vec(1u, 0u, vec3<f32>(intersection.distance / 5, 0, 0));
 
-    debug_jet(2u, 0u, f32(pixel.x) / uniforms.dims[0]);
+    // debug_jet(2u, 0u, f32(pixel.x) / uniforms.dims[0]);
 
-    debug_vec(3u, 0u, ray.origin / 32);
-    debug_vec(4u, 0u, ray.direction);
-    debug_vec(5u, 0u, vec3<f32>(ray.iter_direction + vec3<i32>(1)) / 2);
+    // debug_vec(3u, 0u, ray.origin / 32);
+    // debug_vec(4u, 0u, ray.direction);
+    // debug_vec(5u, 0u, vec3<f32>(ray.iter_direction + vec3<i32>(1)) / 2);
 
     textureStore(texture_radiance, pixel, vec4<f32>(debug_out, 1));
 }

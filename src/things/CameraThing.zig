@@ -175,8 +175,8 @@ pub const Any = struct {
         try @as(*Self, @ptrCast(@alignCast(self_arg))).on_tick(delta_ns);
     }
 
-    pub fn render(self_arg: *anyopaque, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).render(encoder, onto);
+    pub fn render(self_arg: *anyopaque, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
+        try @as(*Self, @ptrCast(@alignCast(self_arg))).render(delta_ns, encoder, onto);
     }
 
     pub fn do_gui(self_arg: *anyopaque) anyerror!void {
@@ -423,8 +423,8 @@ fn recenter(self: *Self) [3]f64 {
     return bgl_coords;
 }
 
-pub fn render(self: *Self, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
-    self.process_input(16_500_000);
+pub fn render(self: *Self, delta_ns: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
+    self.process_input(delta_ns);
     const real_coords = self.recenter();
 
     const dims = try g.window.get_size();
@@ -432,8 +432,8 @@ pub fn render(self: *Self, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
     const transform = wgm.mulmm(
         wgm.perspective_fov(
             f64,
-            1,
-            1000,
+            0.1,
+            10,
             self.fov / 90.0 * std.math.pi,
             @as(f64, @floatFromInt(dims[0])) / @as(f64, @floatFromInt(dims[1])),
         ),

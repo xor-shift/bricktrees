@@ -25,9 +25,9 @@ fn add_thing(thing: anytype) void {
 fn initialize_things(alloc: std.mem.Allocator) void {
     g = Globals.init(Globals.default_resolution, alloc) catch @panic("Globals.init");
 
+    const gui = mkthing(@import("things/GuiThing.zig"), .{}, alloc);
     const camera = mkthing(@import("things/CameraThing.zig"), .{}, alloc);
     const map = mkthing(@import("things/MapThing.zig"), .{alloc}, alloc);
-    const gui = mkthing(@import("things/GuiThing.zig"), .{}, alloc);
     const gpu = mkthing(@import("things/GpuThing.zig"), .{ map, alloc }, alloc);
 
     camera.gpu_thing = gpu;
@@ -38,8 +38,8 @@ fn initialize_things(alloc: std.mem.Allocator) void {
 
     add_thing(camera);
     add_thing(map);
-    add_thing(gui);
     add_thing(gpu);
+    add_thing(gui);
 
     map.reconfigure(.{
         .grid_dimensions = .{ 31, 31, 31 },
@@ -104,26 +104,24 @@ pub fn main() !void {
     );
     defer ticker.stop();
 
-    var frame_timer = try std.time.Timer.start();
-    var ms_spent_last_frame: f64 = 1000.0;
+    var last_frame_start = g.time() - 16_500_000;
     outer: while (true) {
-        std.log.debug("new frame after {d} ms", .{ms_spent_last_frame});
-        g.new_frame();
+        const frame_start = g.time();
+        const frametime_ns = frame_start - last_frame_start;
+        defer last_frame_start = frame_start;
 
-        const inter_frame_time = @as(f64, @floatFromInt(frame_timer.lap())) / @as(f64, @floatFromInt(std.time.ns_per_ms));
+        const frametime_ms = @as(f64, @floatFromInt(frametime_ns)) / std.time.ns_per_ms;
+
+        std.log.debug("new frame after {d} ms", .{frametime_ms});
+        g.new_frame();
 
         while (try sdl.poll_event()) |ev| {
             g.new_raw_event(ev) catch |e| {
-                std.log.err("erorr while handling event: {any}", .{e});
+                std.log.err("error while handling event: {any}", .{e});
             };
 
             switch (ev.common.type) {
                 sdl.c.SDL_EVENT_QUIT => break :outer,
-                sdl.c.SDL_EVENT_KEY_DOWN => {
-                    switch (ev.key.key) {
-                        else => {},
-                    }
-                },
                 else => {},
             }
         }
@@ -141,16 +139,13 @@ pub fn main() !void {
             .label = "current render texture view",
         });
 
-        imgui.c.igNewFrame();
-        defer imgui.c.igEndFrame();
+        g.gui.new_frame(frametime_ns);
 
         const command_encoder = try g.device.create_command_encoder(null);
 
         g.gui_step();
 
-        g.render_step(command_encoder, current_texture_view);
-
-        try g.gui.render(command_encoder, current_texture_view);
+        g.render_step(frametime_ns, command_encoder, current_texture_view);
 
         current_texture_view.deinit();
 
@@ -163,11 +158,6 @@ pub fn main() !void {
         g.surface.present();
 
         current_texture.texture.deinit();
-
-        const frame_time = @as(f64, @floatFromInt(frame_timer.lap())) / @as(f64, @floatFromInt(std.time.ns_per_ms));
-
-        ms_spent_last_frame = frame_time + inter_frame_time;
-        // std.log.debug("{d}ms between frames, {d}ms during frame", .{ inter_frame_time, frame_time });
     }
 }
 

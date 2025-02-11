@@ -60,8 +60,8 @@ pub const Any = struct {
         try @as(*Self, @ptrCast(@alignCast(self_arg))).do_gui();
     }
 
-    pub fn render(self_arg: *anyopaque, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).render(encoder, onto);
+    pub fn render(self_arg: *anyopaque, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
+        try @as(*Self, @ptrCast(@alignCast(self_arg))).render(delta_ns, encoder, onto);
     }
 };
 
@@ -375,7 +375,7 @@ pub fn do_gui(self: *Self) !void {
     imgui.end();
 }
 
-pub fn render(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
     const dims = g.window.get_size() catch @panic("g.window.get_size()");
     g.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&self.uniforms));
 

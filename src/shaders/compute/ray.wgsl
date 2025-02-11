@@ -56,9 +56,32 @@ fn generate_ray_transform(pixel: vec2<u32>) -> Ray {
     var far_h: vec4<f32>;
 
     if (use_bilinear) {
-        let classic = false;
+        let interp_type = 0u;
 
-        if (!classic) {
+        switch (interp_type) {
+        case 0u: {
+            near_h = mix(
+                mix(near_arr_h[0], near_arr_h[1], uv.x),
+                mix(near_arr_h[2], near_arr_h[3], uv.x),
+                uv.y,
+            );
+
+            far_h = mix(
+                mix(far_arr_h[0], far_arr_h[1], uv.x),
+                mix(far_arr_h[2], far_arr_h[3], uv.x),
+                uv.y,
+            );
+        }
+        case 1u: {
+            let near_h_t = near_arr_h[0] * (1 - uv.x) + near_arr_h[1] * uv.x;
+            let near_h_b = near_arr_h[2] * (1 - uv.x) + near_arr_h[3] * uv.x;
+            near_h = near_h_t * (1 - uv.y) + near_h_b * uv.y;
+
+            let far_h_t = far_arr_h[0] * (1 - uv.x) + far_arr_h[1] * uv.x;
+            let far_h_b = far_arr_h[2] * (1 - uv.x) + far_arr_h[3] * uv.x;
+            far_h = far_h_t * (1 - uv.y) + far_h_b * uv.y;
+        }
+        case 2u: {
             let uvx = vec2<f32>(1 - uv.x, uv.x);
             let uvy = vec2<f32>(1 - uv.y, uv.y);
 
@@ -71,15 +94,8 @@ fn generate_ray_transform(pixel: vec2<u32>) -> Ray {
             let far_b_mat = mat2x4<f32>(far_arr_h[2], far_arr_h[3]);
             let far_h_mat = mat2x4<f32>(far_t_mat * uvx, far_b_mat * uvx);
             far_h = far_h_mat * uvy;
-
-        } else {
-            let near_h_t = near_arr_h[0] * (1 - uv.x) + near_arr_h[1] * uv.x;
-            let near_h_b = near_arr_h[2] * (1 - uv.x) + near_arr_h[3] * uv.x;
-            near_h = near_h_t * (1 - uv.y) + near_h_b * uv.y;
-
-            let far_h_t = far_arr_h[0] * (1 - uv.x) + far_arr_h[1] * uv.x;
-            let far_h_b = far_arr_h[2] * (1 - uv.x) + far_arr_h[3] * uv.x;
-            far_h = far_h_t * (1 - uv.y) + far_h_b * uv.y;
+        }
+        default: {}
         }
     } else {
         let pos = vec2<f32>(uv.x * 2 - 1, 1 - uv.y * 2);

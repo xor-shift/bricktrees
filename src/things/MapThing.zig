@@ -34,8 +34,8 @@ pub const Any = struct {
         on_alloc.destroy(@as(*Self, @ptrCast(@alignCast(self_arg))));
     }
 
-    pub fn render(self_arg: *anyopaque, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).render(encoder, onto);
+    pub fn render(self_arg: *anyopaque, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
+        try @as(*Self, @ptrCast(@alignCast(self_arg))).render(delta_ns, encoder, onto);
     }
 };
 
@@ -365,7 +365,7 @@ fn upload_brickmap(self: *Self, slot: usize, brickmap: *const Brickmap, queue: w
 }
 
 /// Call this before doing anything in render().
-pub fn render(self: *Self, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
+pub fn render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
     const previous_queue = blk: {
         self.queue_mutex.lock();
         defer self.queue_mutex.unlock();

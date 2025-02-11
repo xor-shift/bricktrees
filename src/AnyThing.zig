@@ -42,6 +42,6 @@ do_gui: *const fn (self_arg: *anyopaque) anyerror!void = struct {
     pub fn aufruf(_: *anyopaque) anyerror!void {}
 }.aufruf,
 
-render: *const fn (self: *anyopaque, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void = struct {
-    pub fn aufruf(_: *anyopaque, _: wgpu.CommandEncoder, _: wgpu.TextureView) anyerror!void {}
+render: *const fn (self: *anyopaque, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void = struct {
+    pub fn aufruf(_: *anyopaque, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) anyerror!void {}
 }.aufruf,

@@ -72,7 +72,6 @@ const Any = struct {
             .on_raw_event = Self.Any.on_raw_event,
 
             .do_gui = Self.Any.do_gui,
-            .render = Self.Any.render,
         };
     }
 
@@ -90,12 +89,6 @@ const Any = struct {
 
     pub fn do_gui(_: *anyopaque) anyerror!void {
         try g.do_gui();
-    }
-
-    pub fn render(_: *anyopaque, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
-        _ = encoder;
-        _ = onto;
-        // try g.render(encoder, onto);
     }
 };
 
@@ -265,7 +258,8 @@ fn resize_impl(self: *Self, dims: [2]usize) !void {
         .view_formats = &.{.BGRA8UnormSrgb},
         .width = @intCast(dims[0]),
         .height = @intCast(dims[1]),
-        .present_mode = .Fifo,
+        .present_mode = .Mailbox,
+        // .present_mode = .Fifo,
     });
 }
 
@@ -316,6 +310,6 @@ pub fn gui_step(self: *Self) void {
     self.call_on_every_thing("do_gui", .{});
 }
 
-pub fn render_step(self: *Self, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) void {
-    self.call_on_every_thing("render", .{ encoder, onto });
+pub fn render_step(self: *Self, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) void {
+    self.call_on_every_thing("render", .{ delta_ns, encoder, onto });
 }
