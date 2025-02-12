@@ -75,10 +75,10 @@ const Uniforms = extern struct {
     debug_level: u32 = 0,
 
     pos: [3]f32 = .{ 0, 0, 0 }, // redundant
-    _padding_0: u32 = undefined,
+    debug_variable_0: u32 = 0,
 
     brickgrid_origin: [3]i32 = .{0} ** 3,
-    _padding_1: u32 = undefined,
+    debug_variable_1: u32 = 0,
 };
 
 compute_shader: wgpu.ShaderModule,
@@ -366,11 +366,9 @@ pub fn do_gui(self: *Self) !void {
         _ = imgui.button("asdf", null);
 
         _ = imgui.input_scalar(u32, "debug mode", &self.uniforms.debug_mode, 1, 1);
-
-        var debug_level: c_int = @intCast(self.uniforms.debug_level);
-        if (imgui.c.igInputInt("debug level", &debug_level, 1, 1, 0)) {
-            self.uniforms.debug_level = @intCast(debug_level);
-        }
+        _ = imgui.input_scalar(u32, "debug level", &self.uniforms.debug_level, 1, 1);
+        _ = imgui.input_scalar(u32, "debug variable 0", &self.uniforms.debug_variable_0, 1, 1);
+        _ = imgui.input_scalar(u32, "debug variable 1", &self.uniforms.debug_variable_1, 1, 1);
     }
     imgui.end();
 }

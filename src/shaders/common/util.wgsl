@@ -41,3 +41,11 @@ fn power_sum(upto: u32, base_log_2: u32) -> u32 {
 
     return a / b;
 }
+
+fn swap_endian(v: u32) -> u32 {
+    var w = v;
+    w = ((w & 0xFFFF0000u) >> 16u) | ((w & 0x0000FFFFu) << 16u);
+    w = ((w & 0xFF00FF00u) >> 8u ) | ((w & 0x00FF00FFu) << 8u );
+
+    return w;
+}
