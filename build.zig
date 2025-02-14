@@ -21,6 +21,111 @@ fn add_include_paths_for_zls(b: *std.Build, to: anytype) void {
     to.addIncludePath(b.path("thirdparty/cimgui/imgui"));
 }
 
+pub fn cimgui_make_fn(step: *std.Build.Step, prog_node: std.Progress.Node) anyerror!void {
+    const cwd: std.fs.Dir = step.owner.build_root.handle;
+
+    const files_to_back_up = .{
+        "cimgui.cpp",
+        "cimgui.h",
+        "generator/output/definitions.json",
+        "generator/output/definitions.lua",
+        "generator/output/structs_and_enums.json",
+        "generator/output/structs_and_enums.lua",
+        "generator/output/typedefs_dict.json",
+        "generator/output/typedefs_dict.lua",
+    };
+
+    {
+        const node = prog_node.start("backup original files", files_to_back_up.len);
+        defer node.end();
+
+        inline for (files_to_back_up) |filename| {
+            try cwd.rename(
+                "thirdparty/cimgui/" ++ filename,
+                "thirdparty/cimgui/" ++ filename ++ ".bak",
+            );
+            node.completeOne();
+        }
+    }
+
+    defer {
+        const node = prog_node.start("restore original files", files_to_back_up.len);
+        defer node.end();
+
+        inline for (files_to_back_up) |filename| {
+            cwd.rename(
+                "thirdparty/cimgui/" ++ filename ++ ".bak",
+                "thirdparty/cimgui/" ++ filename,
+            ) catch |e| {
+                std.log.err("failed restoring {s}: {s}", .{
+                    filename,
+                    @errorName(e),
+                });
+            };
+
+            node.completeOne();
+        }
+
+        // "preprocesed", lol
+        cwd.deleteFile("thirdparty/cimgui/generator/preprocesed.h") catch |e| {
+            std.log.err("failed removing a temporary file: {s}", .{
+                @errorName(e),
+            });
+        };
+    }
+
+    {
+        const node = prog_node.start("generate cimgui bindings", 1);
+        defer node.end();
+
+        const generator_dir = try cwd.openDir("thirdparty/cimgui/generator/", .{
+            .iterate = false,
+            .no_follow = true,
+            .access_sub_paths = true,
+        });
+
+        const result = std.process.Child.run(.{
+            .allocator = step.owner.allocator,
+            .argv = &.{
+                "luajit",
+                "generator.lua",
+                "gcc",
+                "internal noimstrv",
+                "-DIMGUI_USER_CONFIG=\"../../../lib/imgui/imconfig.h\"",
+            },
+            .cwd_dir = generator_dir,
+        }) catch |e| {
+            return step.fail("failed to spawn luajit: {any}", .{e});
+        };
+
+        switch (result.term) {
+            .Exited => |exit_code| if (exit_code != 0) {
+                return step.fail("luajit returned with non-zero exit code {d}", .{exit_code});
+            },
+            .Signal, .Stopped, .Unknown => {
+                return step.fail("luajit exited unexpectedly", .{});
+            },
+        }
+    }
+
+    {
+        const node = prog_node.start("copy files over", 2);
+        defer node.end();
+
+        try cwd.rename(
+            "thirdparty/cimgui/cimgui.h",
+            "lib/imgui/generated/cimgui.h",
+        );
+        node.completeOne();
+
+        try cwd.rename(
+            "thirdparty/cimgui/cimgui.cpp",
+            "lib/imgui/generated/cimgui.cpp",
+        );
+        node.completeOne();
+    }
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{
         .default_target = .{
@@ -34,6 +139,14 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the app");
     const test_step = b.step("test", "Run unit tests");
+
+    const cimgui_step = b.addSystemCommand(&.{
+        "nu",
+    });
+    cimgui_step.addFileArg(b.path("scripts/generate_cimgui.nu"));
+    cimgui_step.addDirectoryArg(b.path("thirdparty/cimgui/"));
+    cimgui_step.addFileArg(b.path("lib/imgui/imconfig.h"));
+    const cimgui_dir = cimgui_step.addOutputDirectoryArg("cimgui");
 
     const core = b.addModule("core", .{
         .root_source_file = b.path("lib/core/root.zig"),
@@ -80,10 +193,14 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
             .link_libcpp = true,
         });
+
+        const c_flags = &.{
+            "-DIMGUI_USER_CONFIG=\"../imconfig.h\"",
+        };
+
         imgui.addCSourceFiles(.{
             .root = b.path("thirdparty/cimgui/"),
             .files = &.{
-                "cimgui.cpp",
                 "imgui/imgui.cpp",
                 "imgui/imgui_draw.cpp",
                 "imgui/imgui_demo.cpp",
@@ -93,10 +210,16 @@ pub fn build(b: *std.Build) void {
 
                 "imgui/misc/freetype/imgui_freetype.cpp",
             },
-            .flags = &.{"-DIMGUI_USER_CONFIG=\"../../../lib/imgui/imconfig.h\""},
+            .flags = c_flags,
         });
-        imgui.addIncludePath(b.path("thirdparty/cimgui"));
-        imgui.addIncludePath(b.path("thirdparty/cimgui/imgui"));
+
+        imgui.addCSourceFile(.{
+            .file = cimgui_dir.path(b, "cimgui.cpp"),
+            .flags = c_flags,
+        });
+
+        imgui.addIncludePath(cimgui_dir);
+        imgui.addIncludePath(cimgui_dir.path(b, "imgui"));
 
         imgui.linkSystemLibrary("freetype", .{ .needed = true });
 
