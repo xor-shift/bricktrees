@@ -1,18 +1,15 @@
 const std = @import("std");
 
+const bit_utils = @import("../bit_utils.zig");
+
 const defns = @import("defns.zig");
-const util = @import("util.zig");
 
 const Voxel = defns.Voxel;
 const PackedVoxel = defns.PackedVoxel;
 
-const power_sum = util.power_sum;
-const stuff_zeroes = util.stuff_zeroes;
-const funny_merge_64 = util.funny_merge_64;
-
-test {
-    std.testing.refAllDecls(util);
-}
+const power_sum = bit_utils.power_sum;
+const stuff_zeroes = bit_utils.stuff_zeroes;
+const funny_merge_64 = bit_utils.funny_merge_64;
 
 pub fn MkTraits(comptime NodeTypeArg: type, comptime depth_arg: u6) type {
     std.debug.assert(NodeTypeArg == u8 or NodeTypeArg == u64);
@@ -126,22 +123,29 @@ pub fn U8Map(comptime depth: u6) type {
         pub fn generate_tree(self: *Self) void {
             @memset(self.tree[0..], 0);
 
-            generate_tree_scalar_u8(
-                Self.Traits,
-                depth - 1,
-                @ptrCast(self.tree_at_level(depth - 1)),
-                self.voxels[0..],
-            );
+            const foo = @import("./brickmap.zig");
+            const bar = @import("./bricktree/u8.zig");
 
-            inline for (1..depth - 1) |i| {
-                const level = depth - i - 1;
-                generate_tree_scalar_u8(
-                    Self.Traits,
-                    level,
-                    @ptrCast(self.tree_at_level(level)),
-                    @ptrCast(self.tree_at_level(level + 1)),
-                );
-            }
+            const as_bm: *foo.Brickmap(depth) = @ptrCast(&self.voxels);
+
+            bar.make_tree_inplace(depth, as_bm, &self.tree);
+
+            // generate_tree_scalar_u8(
+            //     Self.Traits,
+            //     depth - 1,
+            //     @ptrCast(self.tree_at_level(depth - 1)),
+            //     self.voxels[0..],
+            // );
+
+            // inline for (1..depth - 1) |i| {
+            //     const level = depth - i - 1;
+            //     generate_tree_scalar_u8(
+            //         Self.Traits,
+            //         level,
+            //         @ptrCast(self.tree_at_level(level)),
+            //         @ptrCast(self.tree_at_level(level + 1)),
+            //     );
+            // }
         }
 
         pub fn set(self: *Self, coord: [3]usize, voxel: PackedVoxel) void {

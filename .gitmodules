@@ -7,3 +7,6 @@
 [submodule "thirdparty/cimgui"]
 	path = thirdparty/cimgui
 	url = https://github.com/cimgui/cimgui
+[submodule "thirdparty/mustache-zig"]
+	path = thirdparty/mustache-zig
+	url = https://github.com/batiati/mustache-zig

@@ -1,5 +1,9 @@
 const std = @import("std");
 
+const mustache = @import("thirdparty/mustache-zig/src/mustache.zig");
+
+const scene_config = @import("config.zig");
+
 fn link_to_wgpu_and_sdl(b: *std.Build, c: *std.Build.Step.Compile) void {
     c.addIncludePath(b.path("thirdparty/wgpu-native/ffi/webgpu-headers"));
     c.addIncludePath(b.path("thirdparty/wgpu-native/ffi/"));

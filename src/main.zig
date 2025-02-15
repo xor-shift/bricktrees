@@ -163,8 +163,13 @@ pub fn main() !void {
 
 test {
     // std.debug.assert(false);
+
+    std.testing.refAllDecls(@import("bit_utils.zig"));
     std.testing.refAllDecls(@import("brick/map.zig"));
     // std.testing.refAllDecls(@import("sgr.zig"));
+
+    std.testing.refAllDecls(@import("brick/brickmap.zig"));
+    std.testing.refAllDecls(@import("brick/bricktree/u8.zig"));
 }
 
 // test "will leak" {
