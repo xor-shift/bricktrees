@@ -1,12 +1,16 @@
 const std = @import("std");
 
-const SGR = @import("sgr.zig");
+const root = @import("root");
+
+const SGR = @import("core").SGR;
 
 fn printf(comptime fmt: []const u8, args: anytype) void {
     std.fmt.format(std.io.getStdOut().writer(), fmt, args) catch {};
 }
 
 pub fn main() !void {
+    // @compileLog(@hasDecl(root, "core"));
+
     const builtin = @import("builtin");
 
     // LARP just to make the output look like that of googletest's

@@ -5,8 +5,6 @@ const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
-const brick = @import("../brick.zig");
-
 const AnyThing = @import("../AnyThing.zig");
 
 const MapThing = @import("MapThing.zig");
@@ -15,11 +13,8 @@ const TextureAndView = @import("gpu/TextureAndView.zig");
 
 const Brickmap = MapThing.Brickmap;
 
-const PackedVoxel = brick.PackedVoxel;
-const Voxel = brick.Voxel;
-
-const BrickmapCoordinates = brick.BrickmapCoordinates;
-const VoxelCoordinates = brick.VoxelCoordinates;
+const PackedVoxel = @import("../voxel.zig").PackedVoxel;
+const Voxel = @import("../voxel.zig").Voxel;
 
 const g = &@import("../main.zig").g;
 

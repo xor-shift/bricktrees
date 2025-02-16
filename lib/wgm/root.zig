@@ -61,38 +61,38 @@ pub fn Helper(comptime Mat: type) type {
 
         /// Turns `mat` (a pointer to type `Mat`) into `*[cols][rows]T`
         /// regardless of whether `mat.*` is canonical.
-        pub fn p(mat: anytype) *Verbose(Mat) {
+        pub inline fn p(mat: anytype) *Verbose(Mat) {
             return @constCast(cp(mat));
         }
 
         /// Turns `mat` (a pointer to type `Mat`) into `*const [cols][rows]T`
         /// regardless of whether `mat.*` is canonical.
-        pub fn cp(mat: anytype) *const Verbose(Mat) {
+        pub inline fn cp(mat: anytype) *const Verbose(Mat) {
             const self: *const Verbose(Mat) = @ptrCast(mat);
             return self;
         }
 
         /// Turns `mat` (a pointer to type `Mat`) into `*[cols * rows]T`
         /// regardless of whether `mat.*` is canonical.
-        pub fn fp(mat: anytype) *[rows * cols]T {
+        pub inline fn fp(mat: anytype) *[rows * cols]T {
             return @constCast(cfp(mat));
         }
 
         /// Turns `mat` (a pointer to type `Mat`) into `*const [cols * rows]T`
         /// regardless of whether `mat.*` is canonical.
-        pub fn cfp(mat: anytype) *const [rows * cols]T {
+        pub inline fn cfp(mat: anytype) *const [rows * cols]T {
             const self: *const [rows * cols]T = @ptrCast(mat);
             return self;
         }
 
-        pub fn get(mat: anytype, row: usize, col: usize) T {
+        pub inline fn get(mat: anytype, row: usize, col: usize) T {
             std.debug.assert(col < cols);
             std.debug.assert(row < rows);
 
             return cp(mat)[col][row];
         }
 
-        pub fn set(mat: anytype, row: usize, col: usize, v: T) void {
+        pub inline fn set(mat: anytype, row: usize, col: usize, v: T) void {
             std.debug.assert(col < cols);
             std.debug.assert(row < rows);
 
@@ -100,10 +100,10 @@ pub fn Helper(comptime Mat: type) type {
         }
 
         // zig fmt: off
-        pub fn x(mat: anytype) T { return get(&mat, 0, 0); }
-        pub fn y(mat: anytype) T { return get(&mat, 1, 0); }
-        pub fn z(mat: anytype) T { return get(&mat, 2, 0); }
-        pub fn w(mat: anytype) T { return get(&mat, 3, 0); }
+        pub inline fn x(mat: anytype) T { return get(&mat, 0, 0); }
+        pub inline fn y(mat: anytype) T { return get(&mat, 1, 0); }
+        pub inline fn z(mat: anytype) T { return get(&mat, 2, 0); }
+        pub inline fn w(mat: anytype) T { return get(&mat, 3, 0); }
         // zig fmt: on
     };
 }
@@ -123,7 +123,7 @@ pub fn transpose(mat: anytype) He(@TypeOf(mat)).Transposed {
     return ret;
 }
 
-pub fn vec(comptime T: type, values: anytype) Vector(T, values.len) {
+pub inline fn vec(comptime T: type, values: anytype) Vector(T, values.len) {
     const H = Helper(Vector(T, values.len));
 
     var ret: Vector(T, values.len) = undefined;
@@ -175,42 +175,42 @@ fn ArithmeticResult(comptime Lhs: type, comptime Rhs: type) type {
 // glorified macros
 const binary_ops = struct {
     const add = struct {
-        fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs + rhs) {
+        inline fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs + rhs) {
             return lhs + rhs;
         }
 
-        fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
+        inline fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
             return lhs + rhs;
         }
     };
 
     const sub = struct {
-        fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs - rhs) {
+        inline fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs - rhs) {
             return lhs - rhs;
         }
 
-        fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
+        inline fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
             return lhs - rhs;
         }
     };
 
     const mul = struct {
-        fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs * rhs) {
+        inline fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs * rhs) {
             return lhs * rhs;
         }
 
-        fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
+        inline fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
             return lhs * rhs;
         }
     };
 
     const div = struct {
-        fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs + rhs) {
+        inline fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs + rhs) {
             if (@typeInfo(@TypeOf(lhs)) == .Int) return @divTrunc(lhs, rhs) //
             else return lhs / rhs;
         }
 
-        fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
+        inline fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
             return lhs / rhs;
         }
     };

@@ -2,8 +2,6 @@ const std = @import("std");
 
 const mustache = @import("thirdparty/mustache-zig/src/mustache.zig");
 
-const scene_config = @import("config.zig");
-
 fn link_to_wgpu_and_sdl(b: *std.Build, c: *std.Build.Step.Compile) void {
     c.addIncludePath(b.path("thirdparty/wgpu-native/ffi/webgpu-headers"));
     c.addIncludePath(b.path("thirdparty/wgpu-native/ffi/"));
@@ -25,110 +23,31 @@ fn add_include_paths_for_zls(b: *std.Build, to: anytype) void {
     to.addIncludePath(b.path("thirdparty/cimgui/imgui"));
 }
 
-pub fn cimgui_make_fn(step: *std.Build.Step, prog_node: std.Progress.Node) anyerror!void {
-    const cwd: std.fs.Dir = step.owner.build_root.handle;
+const ShaderBuildStep = struct {
+    step: std.Build.Step,
 
-    const files_to_back_up = .{
-        "cimgui.cpp",
-        "cimgui.h",
-        "generator/output/definitions.json",
-        "generator/output/definitions.lua",
-        "generator/output/structs_and_enums.json",
-        "generator/output/structs_and_enums.lua",
-        "generator/output/typedefs_dict.json",
-        "generator/output/typedefs_dict.lua",
-    };
-
-    {
-        const node = prog_node.start("backup original files", files_to_back_up.len);
-        defer node.end();
-
-        inline for (files_to_back_up) |filename| {
-            try cwd.rename(
-                "thirdparty/cimgui/" ++ filename,
-                "thirdparty/cimgui/" ++ filename ++ ".bak",
-            );
-            node.completeOne();
-        }
-    }
-
-    defer {
-        const node = prog_node.start("restore original files", files_to_back_up.len);
-        defer node.end();
-
-        inline for (files_to_back_up) |filename| {
-            cwd.rename(
-                "thirdparty/cimgui/" ++ filename ++ ".bak",
-                "thirdparty/cimgui/" ++ filename,
-            ) catch |e| {
-                std.log.err("failed restoring {s}: {s}", .{
-                    filename,
-                    @errorName(e),
-                });
-            };
-
-            node.completeOne();
-        }
-
-        // "preprocesed", lol
-        cwd.deleteFile("thirdparty/cimgui/generator/preprocesed.h") catch |e| {
-            std.log.err("failed removing a temporary file: {s}", .{
-                @errorName(e),
-            });
-        };
-    }
-
-    {
-        const node = prog_node.start("generate cimgui bindings", 1);
-        defer node.end();
-
-        const generator_dir = try cwd.openDir("thirdparty/cimgui/generator/", .{
-            .iterate = false,
-            .no_follow = true,
-            .access_sub_paths = true,
-        });
-
-        const result = std.process.Child.run(.{
-            .allocator = step.owner.allocator,
-            .argv = &.{
-                "luajit",
-                "generator.lua",
-                "gcc",
-                "internal noimstrv",
-                "-DIMGUI_USER_CONFIG=\"../../../lib/imgui/imconfig.h\"",
-            },
-            .cwd_dir = generator_dir,
-        }) catch |e| {
-            return step.fail("failed to spawn luajit: {any}", .{e});
+    pub fn init(b: *std.Build, comptime out_filename: []const u8) *ShaderBuildStep {
+        const ret = b.allocator.create(ShaderBuildStep) catch @panic("OOM");
+        ret.* = .{
+            .step = std.Build.Step.init(.{
+                .name = "shader build step for " ++ out_filename,
+                .owner = b,
+                .id = .custom,
+                .makeFn = ShaderBuildStep.make_fn,
+            }),
         };
 
-        switch (result.term) {
-            .Exited => |exit_code| if (exit_code != 0) {
-                return step.fail("luajit returned with non-zero exit code {d}", .{exit_code});
-            },
-            .Signal, .Stopped, .Unknown => {
-                return step.fail("luajit exited unexpectedly", .{});
-            },
-        }
+        return ret;
     }
 
-    {
-        const node = prog_node.start("copy files over", 2);
-        defer node.end();
+    pub fn make_fn(step: *std.Build.Step, prog_node: std.Progress.Node) anyerror!void {
+        const self: *ShaderBuildStep = @fieldParentPtr("step", step);
+        defer prog_node.end();
 
-        try cwd.rename(
-            "thirdparty/cimgui/cimgui.h",
-            "lib/imgui/generated/cimgui.h",
-        );
-        node.completeOne();
-
-        try cwd.rename(
-            "thirdparty/cimgui/cimgui.cpp",
-            "lib/imgui/generated/cimgui.cpp",
-        );
-        node.completeOne();
+        _ = self;
+        // TODO
     }
-}
+};
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{
@@ -151,6 +70,18 @@ pub fn build(b: *std.Build) void {
     cimgui_step.addDirectoryArg(b.path("thirdparty/cimgui/"));
     cimgui_step.addFileArg(b.path("lib/imgui/imconfig.h"));
     const cimgui_dir = cimgui_step.addOutputDirectoryArg("cimgui");
+
+    const mustache_module = b.addModule("mustache", .{
+        .root_source_file = b.path("thirdparty/mustache-zig/src/mustache.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const scene_config_module = b.addModule("scene_config", .{
+        .root_source_file = b.path("config.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     const core = b.addModule("core", .{
         .root_source_file = b.path("lib/core/root.zig"),
@@ -247,6 +178,10 @@ pub fn build(b: *std.Build) void {
         exe.root_module.addImport("gfx", gfx);
         // link_to_wgpu_and_sdl(b, exe);
 
+        exe.root_module.addImport("mustache", mustache_module);
+
+        exe.root_module.addImport("scene_config", scene_config_module);
+
         add_include_paths_for_zls(b, exe);
 
         b.installArtifact(exe);
@@ -267,7 +202,7 @@ pub fn build(b: *std.Build) void {
     {
         const exe_tests = b.addTest(.{
             .root_source_file = b.path("src/main.zig"),
-            .test_runner = b.path("src/test_runner.zig"),
+            .test_runner = b.path("test_runner.zig"),
             .target = target,
             .optimize = optimize,
         });
@@ -277,6 +212,8 @@ pub fn build(b: *std.Build) void {
         exe_tests.root_module.addImport("imgui", imgui);
         // link_to_wgpu_and_sdl(b, exe_tests);
 
+        exe_tests.root_module.addImport("scene_config", scene_config_module);
+
         var run_exe_tests = b.addRunArtifact(exe_tests);
         run_exe_tests.has_side_effects = true;
 
@@ -284,13 +221,17 @@ pub fn build(b: *std.Build) void {
     }
 
     // basic tests
-    inline for (.{ "wgm", "qoi", "imgui" }) |lib_name| {
+    inline for (.{ "core", "wgm", "qoi", "imgui" }) |lib_name| {
         const tests = b.addTest(.{
             .root_source_file = b.path(std.fmt.comptimePrint("lib/{s}/root.zig", .{lib_name})),
-            .test_runner = b.path("src/test_runner.zig"),
+            .test_runner = if (!std.mem.eql(u8, lib_name, "core")) b.path("test_runner.zig") else null,
             .target = target,
             .optimize = optimize,
         });
+
+        if (!std.mem.eql(u8, lib_name, "core")) {
+            tests.root_module.addImport("core", core);
+        }
 
         var run_tests = b.addRunArtifact(tests);
         run_tests.has_side_effects = true;

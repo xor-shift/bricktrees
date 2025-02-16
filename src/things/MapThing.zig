@@ -3,10 +3,8 @@ const std = @import("std");
 const wgm = @import("wgm");
 const wgpu = @import("gfx").wgpu;
 
-const brick = @import("../brick.zig");
-
-const PackedVoxel = brick.PackedVoxel;
-const Voxel = brick.Voxel;
+const PackedVoxel = @import("../voxel.zig").PackedVoxel;
+const Voxel = @import("../voxel.zig").Voxel;
 
 const AnyThing = @import("../AnyThing.zig");
 
@@ -39,7 +37,26 @@ pub const Any = struct {
     }
 };
 
-pub const Brickmap = brick.U8Map(4);
+pub const Brickmap = switch (@import("scene_config").scene_config) {
+    .brickmap => |config| @import("../brickmap.zig").Brickmap(config.bml_coordinate_bits),
+    .brickmap_u8_bricktree => |config| @import("../brickmap.zig").Brickmap(config.base_config.bml_coordinate_bits),
+    .brickmap_u64_bricktree => |config| @import("../brickmap.zig").Brickmap(config.base_config.bml_coordinate_bits),
+    // else => @compileError("scene type not supported"),
+};
+
+pub const bricktree = switch (@import("scene_config").scene_config) {
+    .brickmap => void,
+    .brickmap_u8_bricktree => @import("../bricktree/u8.zig"),
+    .brickmap_u64_bricktree => @compileError("u64 bricktrees are not supported"),
+    // else => @compileError("scene type not supported"),
+};
+
+pub const BricktreeStorage = switch (@import("scene_config").scene_config) {
+    .brickmap => void,
+    .brickmap_u8_bricktree => [bricktree.tree_bits(Brickmap.depth) / 8]u8,
+    .brickmap_u64_bricktree => [bricktree.tree_bits(Brickmap.depth) / 64]u64,
+    // else => @compileError("scene type not supported"),
+};
 
 pub const BrickmapInfo = struct {
     /// Whether the data on the GPU for this brickmap is junk
@@ -67,7 +84,8 @@ pub const MapConfig = struct {
 };
 
 const QueuedBrickmap = struct {
-    brickmap: *Brickmap,
+    map: *Brickmap,
+    tree: *BricktreeStorage,
     coords: [3]isize,
 };
 
@@ -190,7 +208,7 @@ pub fn reconfigure(self: *Self, config: ?MapConfig) !void {
     errdefer self.alloc.free(local_brickgrid);
     @memset(local_brickgrid, std.math.maxInt(u32));
 
-    const bricktree_buffer_size = (Brickmap.Traits.no_tree_bits / 8 - 1) * cfg.no_brickmaps;
+    const bricktree_buffer_size = (bricktree.tree_bits(Brickmap.depth) / 8 - 1) * cfg.no_brickmaps;
     const bricktree_buffer = try g.device.create_buffer(wgpu.Buffer.Descriptor{
         .label = "master bricktree buffer",
         .size = bricktree_buffer_size,
@@ -201,7 +219,7 @@ pub fn reconfigure(self: *Self, config: ?MapConfig) !void {
         .mapped_at_creation = false,
     });
 
-    const brickmap_buffer_size = Brickmap.Traits.volume * 4 * cfg.no_brickmaps;
+    const brickmap_buffer_size = Brickmap.volume * 4 * cfg.no_brickmaps;
     const brickmap_buffer = try g.device.create_buffer(wgpu.Buffer.Descriptor{
         .label = "master brickmap buffer",
         .size = brickmap_buffer_size,
@@ -272,25 +290,33 @@ pub fn reconfigure(self: *Self, config: ?MapConfig) !void {
     self.map_bg = map_bg;
 }
 
-/// Queues a brickmap for upload.
-///
-/// This function will make a copy of the brickmap given.
+/// Tries queueing a brickmap to be uploaded to the GPU. If the given brickmap
+/// is empty, no queueing will take place and a `false` will be returned. The
+/// return value is `true` otherwise.
 ///
 /// This function is thread-safe.
-pub fn queue_brickmap(self: *Self, at_coords: [3]isize, brickmap: *const Brickmap) !void {
+pub fn queue_brickmap(self: *Self, at_coords: [3]isize, map: *const Brickmap) !bool {
     self.queue_mutex.lock();
     defer self.queue_mutex.unlock();
 
     const alloc = self.brickmap_queue.allocator;
 
+    const tree = try alloc.create(BricktreeStorage);
+    @memset(tree.*[0..], 0);
+    bricktree.make_tree_inplace(Brickmap.depth, map, tree);
+
+    if (tree[0] == 0) return false;
+
     const copy = try alloc.create(Brickmap);
-    copy.* = brickmap.*;
-    errdefer alloc.destroy(copy);
+    copy.* = map.*;
 
     try self.brickmap_queue.append(.{
+        .map = copy,
+        .tree = tree,
         .coords = at_coords,
-        .brickmap = copy,
     });
+
+    return true;
 }
 
 fn bgl_coords_of(self: Self, brickmap_coords: [3]isize) ?[3]usize {
@@ -351,14 +377,14 @@ fn find_slot(self: *Self, coord_hint: ?[3]isize) usize {
     @panic("there's no eviction strategy rn");
 }
 
-fn upload_brickmap(self: *Self, slot: usize, brickmap: *const Brickmap, queue: wgpu.Queue) void {
-    if (Brickmap.Traits.NodeType == u8) {
+fn upload_brickmap(self: *Self, slot: usize, map: *const Brickmap, tree: *const BricktreeStorage, queue: wgpu.Queue) void {
+    if (bricktree.NodeType == u8) {
         // uploading layer 1 is too much trouble for too little gain
-        const tree_offset = (Brickmap.Traits.no_tree_bits / 8 - 1) * slot;
-        queue.write_buffer(self.bricktree_buffer, tree_offset, brickmap.tree[1..]);
+        const tree_offset = (bricktree.tree_bits(Brickmap.depth) / 8 - 1) * slot;
+        queue.write_buffer(self.bricktree_buffer, tree_offset, tree[1..]);
 
-        const brickmap_offset = (Brickmap.Traits.volume * 4) * slot;
-        queue.write_buffer(self.brickmap_buffer, brickmap_offset, std.mem.asBytes(brickmap.voxels[0..]));
+        const brickmap_offset = (Brickmap.volume * 4) * slot;
+        queue.write_buffer(self.brickmap_buffer, brickmap_offset, std.mem.asBytes(map.c_flat()[0..]));
     } else {
         @compileError("NYI: u64 trees");
     }
@@ -377,17 +403,14 @@ pub fn render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) 
         break :blk ret;
     };
 
-    for (previous_queue.items) |brickmap| {
-        const slot = self.find_slot(brickmap.coords);
+    for (previous_queue.items) |item| {
+        const slot = self.find_slot(item.coords);
 
-        self.upload_brickmap(slot, brickmap.brickmap, g.queue);
+        self.upload_brickmap(slot, item.map, item.tree, g.queue);
         self.brickmap_tracker[slot] = .{
             .valid = true,
-            .brickmap_coords = brickmap.coords,
+            .brickmap_coords = item.coords,
         };
-
-        const alloc = previous_queue.allocator;
-        alloc.destroy(brickmap.brickmap);
     }
 
     previous_queue.deinit();

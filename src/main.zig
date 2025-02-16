@@ -1,11 +1,12 @@
 const std = @import("std");
 
+const core = @import("core");
 const imgui = @import("imgui");
 const qoi = @import("qoi");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
-const Ticker = @import("Ticker.zig");
+const Ticker = core.Ticker;
 
 const AnyThing = @import("AnyThing.zig");
 const Globals = @import("globals.zig");
@@ -13,13 +14,13 @@ const Globals = @import("globals.zig");
 pub var g: Globals = undefined;
 
 fn mkthing(comptime Thing: type, args: anytype, alloc: std.mem.Allocator) *Thing {
-    const thing = alloc.create(Thing) catch @panic("");
-    thing.* = @call(.auto, Thing.init, args) catch @panic("");
+    const thing = alloc.create(Thing) catch @panic("OOM");
+    thing.* = @call(.auto, Thing.init, args) catch @panic("init fail");
     return thing;
 }
 
 fn add_thing(thing: anytype) void {
-    g.things.append(thing.to_any()) catch @panic("");
+    g.things.append(thing.to_any()) catch @panic("OOM");
 }
 
 fn initialize_things(alloc: std.mem.Allocator) void {
@@ -61,10 +62,18 @@ pub fn main() !void {
     initialize_things(alloc);
     defer deinitialize_things();
 
-    var ticker: Ticker = .{ .config = .{
-        .ns_per_tick = 50 * std.time.ns_per_ms,
-        .mode = .aligned,
-    } };
+    var ticker: Ticker = .{
+        .config = .{
+            .ns_per_tick = 50 * std.time.ns_per_ms,
+            .mode = .aligned,
+        },
+        .time_ctx = undefined,
+        .time_provider = struct {
+            pub fn aufruf(_: *anyopaque) u64 {
+                return g.time();
+            }
+        }.aufruf,
+    };
 
     const TickFn = struct {
         const Self = @This();
@@ -164,12 +173,10 @@ pub fn main() !void {
 test {
     // std.debug.assert(false);
 
-    std.testing.refAllDecls(@import("bit_utils.zig"));
-    std.testing.refAllDecls(@import("brick/map.zig"));
-    // std.testing.refAllDecls(@import("sgr.zig"));
+    std.testing.refAllDecls(@import("brickmap.zig"));
+    std.testing.refAllDecls(@import("bricktree/u8.zig"));
 
-    std.testing.refAllDecls(@import("brick/brickmap.zig"));
-    std.testing.refAllDecls(@import("brick/bricktree/u8.zig"));
+    std.testing.refAllDecls(@import("DependencyGraph.zig"));
 }
 
 // test "will leak" {

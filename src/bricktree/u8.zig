@@ -1,8 +1,10 @@
 const std = @import("std");
 
-const bit_utils = @import("../../bit_utils.zig");
+const bit_utils = @import("core").bit_utils;
 
 const Brickmap = @import("../brickmap.zig").Brickmap;
+
+pub const NodeType = u8;
 
 inline fn bits_before_level(comptime level: u6) usize {
     return bit_utils.power_sum(usize, level, 3);

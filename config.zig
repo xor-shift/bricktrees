@@ -9,7 +9,7 @@ pub const BrickmapWithBricktreeConfig = struct {
 
     // Must be between 1 and `bml_coordinate_bits - 1` inclusive.
     // Must also be ordered.
-    levels_to_process: []usize,
+    levels_to_process: []const usize,
 };
 
 pub const SceneConfig = union(enum) {
@@ -20,6 +20,6 @@ pub const SceneConfig = union(enum) {
 
 pub const scene_config: SceneConfig = .{ .brickmap_u8_bricktree = .{
     .base_config = .{ .bml_coordinate_bits = 4 },
-    .levels_to_process = &.{ 1, 2, 3 },
+    .levels_to_process = &.{ 1, 2 },
 } };
 

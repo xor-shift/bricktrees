@@ -26,6 +26,16 @@ struct Intersection {
     stats: Statistics,
 };
 
+fn intersection_normal(intersection: Intersection) -> vec3<f32> {
+    let lp = intersection.local_coords * 2.001 - 1.0005;
+    let alp = abs(lp);
+
+    let m = max(max(alp.x, alp.y), alp.z);
+    let an = step(vec3<f32>(m - 0.0001), alp);
+
+    return an * sign(lp);
+}
+
 fn generate_ray_transform(pixel: vec2<u32>) -> Ray {
     let inv = uniforms.inverse_transform;
 
@@ -121,19 +131,19 @@ fn generate_ray(pixel: vec2<u32>) -> Ray {
         ray.direction >= vec3<f32>(0),
     ));
 
-    ray.direction_reciprocals = 1 /  ray.direction;
+    ray.direction_reciprocals = 1 / ray.direction;
 
     return ray;
 }
 
 /// *out_t is always clobbered
-fn slab(origin: vec3<f32>, direction: vec3<f32>, min: vec3<f32>, max: vec3<f32>, out_t: ptr<function, f32>) -> bool {
+fn slab(origin: vec3<f32>, direction_reciprocals: vec3<f32>, min: vec3<f32>, max: vec3<f32>, out_t: ptr<function, f32>) -> bool {
     var t_min = 0.0;
     var t_max = 99999.0;
 
     for (var d = 0u; d < 3u; d++) {
-        let t_1 = (min[d] - origin[d]) / direction[d];
-        let t_2 = (max[d] - origin[d]) / direction[d];
+        let t_1 = (min[d] - origin[d]) * direction_reciprocals[d];
+        let t_2 = (max[d] - origin[d]) * direction_reciprocals[d];
 
         t_min = min(max(t_1, t_min), max(t_2, t_min));
         t_max = max(min(t_1, t_max), min(t_2, t_max));

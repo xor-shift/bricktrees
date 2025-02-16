@@ -5,8 +5,6 @@ const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
-const brick = @import("../brick.zig");
-
 const AnyThing = @import("../AnyThing.zig");
 
 const GPUThing = @import("GpuThing.zig");
@@ -14,8 +12,8 @@ const MapThing = @import("MapThing.zig");
 
 const Brickmap = MapThing.Brickmap;
 
-const PackedVoxel = brick.PackedVoxel;
-const Voxel = brick.Voxel;
+const PackedVoxel = @import("../voxel.zig").PackedVoxel;
+const Voxel = @import("../voxel.zig").Voxel;
 
 const g = &@import("../main.zig").g;
 
@@ -279,10 +277,10 @@ fn generate_chunk(bm_coords: [3]isize) !?Brickmap {
 
     const base_coords: [3]isize = wgm.mulew(
         bm_coords,
-        Brickmap.Traits.side_length_i,
+        Brickmap.side_length_i,
     );
 
-    const sl = Brickmap.Traits.side_length;
+    const sl = Brickmap.side_length;
 
     for (0..sl) |bml_z| for (0..sl) |bml_x| {
         const bml_xz = [2]usize{ bml_x, bml_z };
@@ -297,18 +295,15 @@ fn generate_chunk(bm_coords: [3]isize) !?Brickmap {
         if (remaining_height < 0) continue;
 
         for (0..@min(sl, @as(usize, @intCast(remaining_height)))) |bml_y| {
-            ret.set([3]usize{ bml_x, bml_y, bml_z }, PackedVoxel{
+            ret.voxels[bml_z][bml_y][bml_x] = PackedVoxel{
                 .r = 0xFF,
                 .g = 0,
                 .b = 0xFF,
                 .i = 0x40,
-            });
+            };
         }
     };
 
-    ret.generate_tree();
-
-    if (ret.tree[0] == 0) return null;
     return ret;
 }
 
@@ -333,9 +328,10 @@ pub fn on_tick(self: *Self, delta_ns: u64) !void {
         if (generated_chunks >= 1024) break;
 
         const chunk = (try generate_chunk(g_coords)) orelse continue;
-        generated_chunks += 1;
 
-        try self.map_thing.queue_brickmap(g_coords, &chunk);
+        if (try self.map_thing.queue_brickmap(g_coords, &chunk)) {
+            generated_chunks += 1;
+        }
         // std.log.debug("{any}", .{g_coords});
     }
 }
@@ -392,7 +388,7 @@ fn recenter(self: *Self) [3]f64 {
 
     const current_brickmap = wgm.lossy_cast(isize, wgm.trunc(wgm.div(
         self.global_coords,
-        wgm.lossy_cast(f64, MapThing.Brickmap.Traits.side_length),
+        wgm.lossy_cast(f64, MapThing.Brickmap.side_length),
     )));
 
     const delta_v = wgm.sub(current_brickmap, currently_centered_on);
@@ -415,7 +411,7 @@ fn recenter(self: *Self) [3]f64 {
 
     const origin_coords = wgm.mulew(
         self.map_thing.origin_brickmap,
-        MapThing.Brickmap.Traits.side_length_i,
+        MapThing.Brickmap.side_length_i,
     );
 
     const bgl_coords = wgm.sub(self.global_coords, wgm.lossy_cast(f64, origin_coords));

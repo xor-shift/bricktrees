@@ -18,9 +18,10 @@ pub const Config = struct {
     mode: TickMode,
 };
 
-const g = &@import("main.zig").g;
-
 config: Config,
+
+time_ctx: *anyopaque,
+time_provider: *const fn (*anyopaque) u64,
 
 exit_mutex: std.Thread.Mutex = .{},
 exit: bool = false,
@@ -46,19 +47,23 @@ pub fn run(
     );
 }
 
+fn get_time(self: *Self) u64 {
+    return self.time_provider(self.time_ctx);
+}
+
 const WaitResult = enum {
     quitting,
     do_tick,
 };
 
-fn wait(self: *Self) WaitResult {
+pub fn wait(self: *Self) WaitResult {
     self.exit_mutex.lock();
     defer self.exit_mutex.unlock();
 
     while (true) {
         if (@atomicLoad(bool, &self.exit, .acquire)) return .quitting;
 
-        const time = g.time();
+        const time = self.get_time();
 
         if (time >= self.next_tick_at) break;
 
@@ -70,17 +75,17 @@ fn wait(self: *Self) WaitResult {
     return .do_tick;
 }
 
-fn worker(
+pub fn worker(
     self: *Self,
     comptime function: anytype,
     args: anytype,
 ) void {
-    self.next_tick_at = g.time() + self.config.ns_per_tick;
+    self.next_tick_at = self.get_time() + self.config.ns_per_tick;
 
     while (true) {
         if (self.wait() == .quitting) break;
 
-        const start_time = g.time();
+        const start_time = self.get_time();
 
         if (start_time >= self.next_tick_at + std.time.ns_per_ms) {
             const lag_ns = start_time - self.next_tick_at;
@@ -91,7 +96,7 @@ fn worker(
 
         @call(.auto, function, args);
 
-        const end_time = g.time();
+        const end_time = self.get_time();
 
         const tick_duration = end_time - start_time;
 

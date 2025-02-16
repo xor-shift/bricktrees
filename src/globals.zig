@@ -1,20 +1,22 @@
 const std = @import("std");
 
-const wgm = @import("wgm");
+const core = @import("core");
 const imgui = @import("imgui");
 const qoi = @import("qoi");
 const sdl = @import("gfx").sdl;
+const wgm = @import("wgm");
 const wgpu = @import("gfx").wgpu;
 
-const rotating_arena = @import("rotating_arena.zig");
-
 const g = &@import("main.zig").g;
+
+const DependencyGraph = @import("DependencyGraph.zig");
+
+const Things = @import("Things.zig");
 
 const AnyThing = @import("AnyThing.zig");
 const GuiThing = @import("things/GuiThing.zig");
 
-const RotatingArenaConfig = rotating_arena.Config;
-const RotatingArena = rotating_arena.RotatingArena;
+const RotatingArena = core.RotatingArena;
 
 pub const default_resolution: [2]usize = .{ 1280, 720 };
 
@@ -54,6 +56,8 @@ tick_alloc: std.mem.Allocator = undefined,
 
 /// `AnyThing`s must be allocated on `alloc`.
 things: std.ArrayList(AnyThing),
+
+thing_store: Things,
 
 // Normally, you should store pointers to other `Thing`s you want inside your
 // own `Thing` but this is the one exception as every`Thing` needs it.
@@ -181,6 +185,8 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
         .tick_ra = tick_ra,
 
         .things = std.ArrayList(AnyThing).init(alloc),
+
+        .thing_store = Things.init(alloc) catch @panic("OOM"),
     };
 
     try ret.things.append(ret.to_any());
