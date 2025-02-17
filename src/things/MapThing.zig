@@ -264,13 +264,13 @@ pub fn reconfigure(self: *Self, config: ?MapConfig) !void {
             wgpu.BindGroup.Entry{
                 .binding = 1,
                 .resource = .{ .Buffer = .{
-                    .buffer = bricktree_buffer,
+                    .buffer = brickmap_buffer,
                 } },
             },
             wgpu.BindGroup.Entry{
                 .binding = 2,
                 .resource = .{ .Buffer = .{
-                    .buffer = brickmap_buffer,
+                    .buffer = bricktree_buffer,
                 } },
             },
         },

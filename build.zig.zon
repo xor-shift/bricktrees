@@ -1,7 +1,12 @@
 .{
     .name = "vktest",
     .version = "0.0.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .zmpl = .{
+            .url = "https://github.com/jetzig-framework/zmpl/archive/refs/tags/zig-0.13.tar.gz",
+            .hash = "1220bf01968a822771a33bb51e37ff8ee13d21437f95ec55150ffa7c6a9fb1dfcbc5",
+        },
+    },
 
     .paths = .{
         "build.zig",

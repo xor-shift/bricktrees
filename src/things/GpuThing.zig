@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const mustache = @import("mustache");
+
 const wgm = @import("wgm");
 const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
@@ -8,6 +10,7 @@ const wgpu = @import("gfx").wgpu;
 const AnyThing = @import("../AnyThing.zig");
 
 const MapThing = @import("MapThing.zig");
+const VisualiserThing = @import("VisualiserThing.zig");
 
 const TextureAndView = @import("gpu/TextureAndView.zig");
 
@@ -77,7 +80,6 @@ const Uniforms = extern struct {
 };
 
 compute_shader: wgpu.ShaderModule,
-visualisation_shader: wgpu.ShaderModule,
 
 uniforms: Uniforms = .{
     .dims = .{
@@ -89,14 +91,6 @@ uniform_buffer: wgpu.Buffer,
 uniform_bgl: wgpu.BindGroupLayout,
 uniform_bg: wgpu.BindGroup,
 
-visualisation_texture_bgl: wgpu.BindGroupLayout,
-visualisation_texture_bg: wgpu.BindGroup,
-visualisation_texture_sampler: wgpu.Sampler,
-visualisation_texture: TextureAndView,
-
-visualisation_pipeline_layout: wgpu.PipelineLayout,
-visualisation_pipeline: wgpu.RenderPipeline,
-
 compute_textures_bgl: wgpu.BindGroupLayout,
 compute_textures_bg: wgpu.BindGroup,
 
@@ -104,13 +98,51 @@ compute_pipeline_layout: wgpu.PipelineLayout,
 compute_pipeline: wgpu.ComputePipeline,
 
 map_thing: *MapThing = undefined,
+visualiser: *VisualiserThing = undefined,
+
+fn make_shader(alloc: std.mem.Allocator) !wgpu.ShaderModule {
+    const templated_code = val: {
+        const cwd = std.fs.cwd();
+
+        const file = try cwd.openFile("shaders/compute.wgsl", .{});
+        defer file.close();
+
+        const contents = try file.readToEndAllocOptions(alloc, 64 * 1024 * 1024, null, @alignOf(u8), 0);
+
+        break :val contents;
+    };
+    defer alloc.free(templated_code);
+
+    const maybe_res = try mustache.parseText(alloc, templated_code, .{}, .{
+        .copy_strings = false,
+    });
+
+    const res = switch (maybe_res) {
+        .parse_error => return error.ParseError,
+        .success => |v| v,
+    };
+
+    std.log.debug("{any}", .{res});
+    defer res.deinit(alloc);
+
+    var out = std.ArrayList(u8).init(alloc);
+    const scene_config = @import("scene_config");
+    try mustache.render(res, scene_config.MustacheSettings.from_config(scene_config.scene_config), out.writer());
+    defer out.deinit();
+
+    const shader_code = try out.toOwnedSliceSentinel(0);
+    defer alloc.free(shader_code);
+
+    const shader = try g.device.create_shader_module_wgsl("compute shader", shader_code);
+
+    return shader;
+}
 
 pub fn init(map: *MapThing, alloc: std.mem.Allocator) !Self {
-    const compute_shader = try g.device.create_shader_module_wgsl_from_file("compute shader", "shaders/compute.wgsl", alloc);
-    errdefer compute_shader.deinit();
+    const compute_shader = try make_shader(alloc);
 
-    const visualisation_shader = try g.device.create_shader_module_wgsl_from_file("visualisation shader", "shaders/visualiser.wgsl", alloc);
-    errdefer visualisation_shader.deinit();
+    //const compute_shader = try g.device.create_shader_module_wgsl_from_file("compute shader", "shaders/compute.wgsl", alloc);
+    errdefer compute_shader.deinit();
 
     const uniform_buffer = try g.device.create_buffer(wgpu.Buffer.Descriptor{
         .label = "uniform buffer",
@@ -121,11 +153,6 @@ pub fn init(map: *MapThing, alloc: std.mem.Allocator) !Self {
         .size = @sizeOf(Uniforms),
     });
     errdefer uniform_buffer.deinit();
-
-    const visualisation_texture_sampler = try g.device.create_sampler(.{
-        .label = "visualisation texture sampler",
-    });
-    errdefer visualisation_texture_sampler.deinit();
 
     const uniform_bgl = try g.device.create_bind_group_layout(wgpu.BindGroupLayout.Descriptor{
         .label = "uniform bgl",
@@ -192,76 +219,12 @@ pub fn init(map: *MapThing, alloc: std.mem.Allocator) !Self {
     });
     errdefer compute_pipeline.deinit();
 
-    const visualisation_texture_bgl = try g.device.create_bind_group_layout(wgpu.BindGroupLayout.Descriptor{
-        .label = "visualisation texture('s|s') fragment BGL",
-        .entries = &.{
-            wgpu.BindGroupLayout.Entry{
-                .binding = 0,
-                .visibility = .{ .fragment = true },
-                .layout = .{ .Sampler = .{ .type = .Filtering } },
-            },
-            wgpu.BindGroupLayout.Entry{
-                .binding = 1,
-                .visibility = .{ .fragment = true },
-                .layout = .{ .Texture = .{
-                    .view_dimension = .D2,
-                    .sample_type = .Float,
-                } },
-            },
-        },
-    });
-    errdefer visualisation_texture_bgl.deinit();
-
-    const visualisation_pipeline_layout = try g.device.create_pipeline_layout(wgpu.PipelineLayout.Descriptor{
-        .label = "visualisation pipeline layout",
-        .bind_group_layouts = &.{ uniform_bgl, visualisation_texture_bgl },
-    });
-    errdefer visualisation_pipeline_layout.deinit();
-
-    const visualisation_pipeline = try g.device.create_render_pipeline(wgpu.RenderPipeline.Descriptor{
-        .label = "visualisation pipeline",
-        .layout = visualisation_pipeline_layout,
-        .vertex = .{
-            .module = visualisation_shader,
-            .entry_point = "vs_main",
-            .buffers = &.{},
-        },
-        .fragment = .{
-            .module = visualisation_shader,
-            .entry_point = "fs_main",
-            .targets = &.{
-                .{
-                    .format = .BGRA8Unorm,
-                    .write_mask = .{
-                        .red = true,
-                        .green = true,
-                        .blue = true,
-                        .alpha = true,
-                    },
-                },
-            },
-        },
-        .primitive = .{
-            .topology = .TriangleList,
-        },
-    });
-    errdefer visualisation_pipeline.deinit();
-
     var ret: Self = .{
         .compute_shader = compute_shader,
-        .visualisation_shader = visualisation_shader,
 
         .uniform_bgl = uniform_bgl,
         .uniform_bg = uniform_bg,
         .uniform_buffer = uniform_buffer,
-
-        .visualisation_texture_bgl = visualisation_texture_bgl,
-        .visualisation_texture_bg = .{},
-        .visualisation_texture_sampler = visualisation_texture_sampler,
-        .visualisation_texture = .{},
-
-        .visualisation_pipeline_layout = visualisation_pipeline_layout,
-        .visualisation_pipeline = visualisation_pipeline,
 
         .compute_textures_bgl = compute_textures_bgl,
         .compute_textures_bg = .{},
@@ -270,8 +233,6 @@ pub fn init(map: *MapThing, alloc: std.mem.Allocator) !Self {
         .compute_pipeline = compute_pipeline,
     };
     errdefer ret.deinit();
-
-    try ret.on_resize(@TypeOf(g.*).default_resolution);
 
     return ret;
 }
@@ -282,9 +243,6 @@ pub fn deinit(self: *Self) void {
 
     self.compute_textures_bg.deinit();
     self.compute_textures_bgl.deinit();
-
-    self.visualisation_pipeline.deinit();
-    self.visualisation_pipeline_layout.deinit();
 }
 
 pub fn to_any(self: *Self) AnyThing {
@@ -297,55 +255,17 @@ pub fn on_resize(self: *Self, dims: [2]usize) !void {
         @floatFromInt(dims[1]),
     };
 
-    const visualisation_texture = try TextureAndView.init(g.device, .{
-        .label = "visualisation texture",
-        .usage = .{ .texture_binding = true, .storage_binding = true },
-        .dimension = .D2,
-        .size = .{
-            .width = @intCast(dims[0]),
-            .height = @intCast(dims[1]),
-            .depth_or_array_layers = 1,
-        },
-        .format = .BGRA8Unorm,
-        .mipLevelCount = 1,
-        .sampleCount = 1,
-        .view_formats = &.{ .BGRA8Unorm, .BGRA8UnormSrgb },
-    }, null);
-    errdefer visualisation_texture.deinit();
-
-    const visualisation_texture_bg = try g.device.create_bind_group(wgpu.BindGroup.Descriptor{
-        .label = "visualisation texture('s|s') fragment BGL",
-        .layout = self.visualisation_texture_bgl,
-        .entries = &.{
-            wgpu.BindGroup.Entry{
-                .binding = 0,
-                .resource = .{ .Sampler = self.visualisation_texture_sampler },
-            },
-            wgpu.BindGroup.Entry{
-                .binding = 1,
-                .resource = .{ .TextureView = visualisation_texture.view },
-            },
-        },
-    });
-    errdefer visualisation_texture_bg.deinit();
-
     const compute_textures_bg = try g.device.create_bind_group(wgpu.BindGroup.Descriptor{
         .label = "compute textures' BG",
         .layout = self.compute_textures_bgl,
         .entries = &.{
             wgpu.BindGroup.Entry{
                 .binding = 0,
-                .resource = .{ .TextureView = visualisation_texture.view },
+                .resource = .{ .TextureView = self.visualiser.visualisation_texture.view },
             },
         },
     });
     errdefer compute_textures_bg.deinit();
-
-    self.visualisation_texture.deinit();
-    self.visualisation_texture = visualisation_texture;
-
-    self.visualisation_texture_bg.deinit();
-    self.visualisation_texture_bg = visualisation_texture_bg;
 
     self.compute_textures_bg.deinit();
     self.compute_textures_bg = compute_textures_bg;
@@ -369,6 +289,8 @@ pub fn do_gui(self: *Self) !void {
 }
 
 pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+    _ = onto;
+
     const dims = g.window.get_size() catch @panic("g.window.get_size()");
     g.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&self.uniforms));
 
@@ -398,30 +320,5 @@ pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.Text
 
         compute_pass.end();
         compute_pass.deinit();
-    }
-
-    {
-        const render_pass = try encoder.begin_render_pass(wgpu.RenderPass.Descriptor{
-            .label = "render pass",
-            .color_attachments = &.{
-                wgpu.RenderPass.ColorAttachment{
-                    .view = onto,
-                    .load_op = .Load,
-                    .store_op = .Store,
-                },
-            },
-        });
-
-        render_pass.set_pipeline(self.visualisation_pipeline);
-        render_pass.set_bind_group(0, self.uniform_bg, null);
-        render_pass.set_bind_group(1, self.visualisation_texture_bg, null);
-        render_pass.draw(.{
-            .first_vertex = 0,
-            .vertex_count = 6,
-            .first_instance = 0,
-            .instance_count = 1,
-        });
-        render_pass.end();
-        render_pass.deinit();
     }
 }

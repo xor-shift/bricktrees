@@ -6,10 +6,6 @@ pub const BaseBrickmapConfig = struct {
 
 pub const BrickmapWithBricktreeConfig = struct {
     base_config: BaseBrickmapConfig,
-
-    // Must be between 1 and `bml_coordinate_bits - 1` inclusive.
-    // Must also be ordered.
-    levels_to_process: []const usize,
 };
 
 pub const SceneConfig = union(enum) {
@@ -19,7 +15,40 @@ pub const SceneConfig = union(enum) {
 };
 
 pub const scene_config: SceneConfig = .{ .brickmap_u8_bricktree = .{
-    .base_config = .{ .bml_coordinate_bits = 4 },
-    .levels_to_process = &.{ 1, 2 },
+    .base_config = .{ .bml_coordinate_bits = 3 },
 } };
 
+pub const MustacheSettings = struct {
+    use_brickmaps: bool,
+    use_bricktrees: bool,
+    brickmap_depth: usize,
+    bricktree_width_log2: usize,
+
+    no_levels: usize,
+
+    pub fn from_config(config: SceneConfig) MustacheSettings {
+        return switch (config) {
+            .brickmap => |v| .{
+                .use_brickmaps = true,
+                .use_bricktrees = false,
+                .brickmap_depth = v.bml_coordinate_bits,
+                .bricktree_width_log2 = 0,
+                .no_levels = 2,
+            },
+            .brickmap_u8_bricktree => |v| .{
+                .use_brickmaps = true,
+                .use_bricktrees = false,
+                .brickmap_depth = v.base_config.bml_coordinate_bits,
+                .bricktree_width_log2 = 3,
+                .no_levels = v.base_config.bml_coordinate_bits + 1,
+            },
+            .brickmap_u64_bricktree => |v| .{
+                .use_brickmaps = true,
+                .use_bricktrees = true,
+                .brickmap_depth = v.base_config.bml_coordinate_bits,
+                .bricktree_width_log2 = 6,
+                .no_levels = v.base_config.bml_coordinate_bits + 1,
+            },
+        };
+    }
+};

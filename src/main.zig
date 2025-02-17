@@ -11,36 +11,105 @@ const Ticker = core.Ticker;
 const AnyThing = @import("AnyThing.zig");
 const Globals = @import("globals.zig");
 
+const Things = @import("Things.zig");
+
 pub var g: Globals = undefined;
-
-fn mkthing(comptime Thing: type, args: anytype, alloc: std.mem.Allocator) *Thing {
-    const thing = alloc.create(Thing) catch @panic("OOM");
-    thing.* = @call(.auto, Thing.init, args) catch @panic("init fail");
-    return thing;
-}
-
-fn add_thing(thing: anytype) void {
-    g.things.append(thing.to_any()) catch @panic("OOM");
-}
 
 fn initialize_things(alloc: std.mem.Allocator) void {
     g = Globals.init(Globals.default_resolution, alloc) catch @panic("Globals.init");
 
-    const gui = mkthing(@import("things/GuiThing.zig"), .{}, alloc);
-    const camera = mkthing(@import("things/CameraThing.zig"), .{}, alloc);
-    const map = mkthing(@import("things/MapThing.zig"), .{alloc}, alloc);
-    const gpu = mkthing(@import("things/GpuThing.zig"), .{ map, alloc }, alloc);
+    const make_defaults = struct {
+        fn aufruf(graph: Things.Dependency.Graph) [2]Things.Dependency {
+            return .{
+                Things.Dependency{
+                    .graph = graph,
+                    .kind = .run_before,
+                    .target = "right before end",
+                },
+                Things.Dependency{
+                    .graph = graph,
+                    .kind = .run_after,
+                    .target = "right after start",
+                },
+            };
+        }
+    }.aufruf;
+
+    const defaults = make_defaults(.render) ++ make_defaults(.tick) ++ make_defaults(.event);
+
+    g.thing_store.add_thing(g.to_any(), "globals", &defaults);
+
+    const GuiThing = @import("things/GuiThing.zig");
+    const gui = g.thing_store.add_new_thing(GuiThing, "gui", &(.{
+        Things.Dependency{
+            .graph = .render,
+            .kind = .run_after,
+            .target = "right before end",
+        },
+        Things.Dependency{
+            .graph = .event,
+            .kind = .run_before,
+            .target = "right after start",
+        },
+    } ++ make_defaults(.tick)));
+    gui.* = GuiThing.init() catch @panic("");
+
+    const CameraThing = @import("things/CameraThing.zig");
+    const camera = g.thing_store.add_new_thing(CameraThing, "camera", &(.{
+        Things.Dependency{
+            .graph = .event,
+            .kind = .run_before,
+            .target = "map",
+        },
+        Things.Dependency{
+            .graph = .render,
+            .kind = .run_before,
+            .target = "gpu",
+        },
+        Things.Dependency{
+            .graph = .render,
+            .kind = .run_before,
+            .target = "map",
+        },
+    } ++ defaults));
+    camera.* = CameraThing.init() catch @panic("");
+
+    const VisualiserThing = @import("things/VisualiserThing.zig");
+    const visualiser = g.thing_store.add_new_thing(VisualiserThing, "visualiser", &(.{
+        Things.Dependency{
+            .graph = .event,
+            .kind = .run_before,
+            .target = "gpu",
+        },
+    } ++ defaults));
+    visualiser.* = VisualiserThing.init() catch @panic("");
+
+    const MapThing = @import("things/MapThing.zig");
+    const map = g.thing_store.add_new_thing(MapThing, "map", &(.{
+        Things.Dependency{ // to push
+            .graph = .render,
+            .kind = .run_before,
+            .target = "gpu",
+        },
+    } ++ defaults));
+    map.* = MapThing.init(g.alloc) catch @panic("");
+
+    const GpuThing = @import("things/GpuThing.zig");
+    const gpu = g.thing_store.add_new_thing(GpuThing, "gpu", &(.{
+        Things.Dependency{
+            .graph = .render,
+            .kind = .run_before,
+            .target = "visualiser",
+        },
+    } ++ defaults));
+    gpu.* = GpuThing.init(map, g.alloc) catch @panic("");
 
     camera.gpu_thing = gpu;
     camera.map_thing = map;
     gpu.map_thing = map;
+    gpu.visualiser = visualiser;
 
     g.gui = gui;
-
-    add_thing(camera);
-    add_thing(map);
-    add_thing(gpu);
-    add_thing(gui);
 
     map.reconfigure(.{
         .grid_dimensions = .{ 31, 31, 31 },
@@ -89,7 +158,7 @@ pub fn main() !void {
             // });
             defer self.last = time;
 
-            g.new_tick(time - self.last);
+            g.thing_store.tick(time - self.last);
 
             std.log.debug("tick took {d} ms", .{
                 @as(f64, @floatFromInt(g.time() - time)) / std.time.ns_per_ms,
@@ -125,9 +194,7 @@ pub fn main() !void {
         g.new_frame();
 
         while (try sdl.poll_event()) |ev| {
-            g.new_raw_event(ev) catch |e| {
-                std.log.err("error while handling event: {any}", .{e});
-            };
+            g.event(ev);
 
             switch (ev.common.type) {
                 sdl.c.SDL_EVENT_QUIT => break :outer,
@@ -152,9 +219,14 @@ pub fn main() !void {
 
         const command_encoder = try g.device.create_command_encoder(null);
 
-        g.gui_step();
+        {
+            const _context_guard = imgui.ContextGuard.init(g.gui.c());
+            defer _context_guard.deinit();
 
-        g.render_step(frametime_ns, command_encoder, current_texture_view);
+            g.thing_store.call_on_every_thing("do_gui", .{});
+        }
+
+        g.thing_store.render(frametime_ns, command_encoder, current_texture_view);
 
         current_texture_view.deinit();
 

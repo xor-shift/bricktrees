@@ -115,19 +115,25 @@ fn add_one(self: *Self, v: []const u8) !GraphType.GetOrPutResult {
 
 /// `before` is the dependency and `after` is the dependant.
 pub fn add_dependency(self: *Self, before: []const u8, after: []const u8) !void {
-    const b_res = try self.add_one(before);
-    errdefer if (!b_res.found_existing) self.alloc.free(b_res.key_ptr.*);
-    errdefer if (!b_res.found_existing) {
-        _ = self.graph.remove(before);
-    };
-
     const a_res = try self.add_one(after);
-    errdefer if (!a_res.found_existing) self.alloc.free(a_res.key_ptr.*);
+    const after_on_heap = a_res.key_ptr.*;
+
     errdefer if (!a_res.found_existing) {
+        self.alloc.free(after_on_heap);
         _ = self.graph.remove(after);
     };
 
-    try a_res.value_ptr.put(self.alloc, b_res.key_ptr.*, {});
+    const b_res = try self.add_one(before);
+    const before_on_heap = b_res.key_ptr.*;
+
+    errdefer if (!b_res.found_existing) {
+        self.alloc.free(before_on_heap);
+        _ = self.graph.remove(before);
+    };
+
+    // a_res could be invalidated
+    // try a_res.value_ptr.put(self.alloc, b_res.key_ptr.*, {});
+    try self.graph.getEntry(after).?.value_ptr.put(self.alloc, b_res.key_ptr.*, {});
 }
 
 pub fn start(self: *Self) !Iterator {
