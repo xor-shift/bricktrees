@@ -236,7 +236,7 @@ const voxel_level = brickmap_depth;
 const voxel_level = 1u;
 {{/use_bricktrees}}
 
-fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32) -> bool {
+fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level: bool) -> bool {
     let brickgrid_dims = vec3<i32>(textureDimensions(brickgrid));
     let frame = iterator_cur_frame(it);
 
@@ -268,11 +268,12 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32) -> bool {
     let level_relative_brickmap_origin =
       (*it).stack[0].coords * vec3<i32>(brickmap_dims) / props.sidelength;
 
-    return tree_check(
+    return tree_check_llm(
         (*it).current_brickmap,
         (*it).level,
         props.sidelength,
         vec3<u32>(frame.coords - level_relative_brickmap_origin),
+        first_time_on_level,
     );
 {{/use_bricktrees}}
 
@@ -283,8 +284,6 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32) -> bool {
 
 /// Returns whether to continue iterating
 fn iterator_iterate(it: ptr<function, Iterator>, i: u32) -> bool {
-    let frame = (*it).stack[(*it).level];
-
     debug_u32(0u, i + 1, i);
 
     if (i >= 256) {
@@ -294,7 +293,10 @@ fn iterator_iterate(it: ptr<function, Iterator>, i: u32) -> bool {
 
     let props = get_level_props((*it).level);
 
-    if ((*it).stack[(*it).level].iterate_first) {
+    var first_time_on_level = !(*it).stack[(*it).level].iterate_first;
+    if (!first_time_on_level) {
+        let frame = (*it).stack[(*it).level];
+
         let bit = iterate_box(
             (*it).ray,
             frame.coords,
@@ -307,9 +309,9 @@ fn iterator_iterate(it: ptr<function, Iterator>, i: u32) -> bool {
         (*it).stack[(*it).level].iterate_first = false;
 
         debug_vec(1u, i, vec3<f32>(0, 1, 0));
-
-        return true;
     }
+
+    let frame = (*it).stack[(*it).level];
 
     let bound_check_res = iterator_check_oob(it);
 
@@ -324,7 +326,7 @@ fn iterator_iterate(it: ptr<function, Iterator>, i: u32) -> bool {
         return true;
     }
 
-    let have_hit = iterator_detect_hit(it, i);
+    let have_hit = iterator_detect_hit(it, i, first_time_on_level);
     debug_bool(1u, i, have_hit);
 
     debug_u32(2u, i, (*it).level);

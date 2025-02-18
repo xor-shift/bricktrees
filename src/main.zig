@@ -113,7 +113,7 @@ fn initialize_things(alloc: std.mem.Allocator) void {
 
     map.reconfigure(.{
         .grid_dimensions = .{ 31, 31, 31 },
-        .no_brickmaps = 2048,
+        .no_brickmaps = 1024,
     }) catch @panic("map.reconfigure");
 
     g.resize(Globals.default_resolution) catch @panic("g.resize");
@@ -247,6 +247,7 @@ test {
 
     std.testing.refAllDecls(@import("brickmap.zig"));
     std.testing.refAllDecls(@import("bricktree/u8.zig"));
+    std.testing.refAllDecls(@import("bricktree/u64.zig"));
 
     std.testing.refAllDecls(@import("DependencyGraph.zig"));
 }

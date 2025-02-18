@@ -15,7 +15,7 @@ pub const SceneConfig = union(enum) {
 };
 
 pub const scene_config: SceneConfig = .{ .brickmap_u8_bricktree = .{
-    .base_config = .{ .bml_coordinate_bits = 3 },
+    .base_config = .{ .bml_coordinate_bits = 5 },
 } };
 
 pub const MustacheSettings = struct {
@@ -37,7 +37,7 @@ pub const MustacheSettings = struct {
             },
             .brickmap_u8_bricktree => |v| .{
                 .use_brickmaps = true,
-                .use_bricktrees = false,
+                .use_bricktrees = true,
                 .brickmap_depth = v.base_config.bml_coordinate_bits,
                 .bricktree_width_log2 = 3,
                 .no_levels = v.base_config.bml_coordinate_bits + 1,
