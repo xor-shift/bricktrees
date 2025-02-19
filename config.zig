@@ -21,14 +21,14 @@ pub const SceneConfig = union(enum) {
     brickmap_u64_bricktree: BrickmapWithBricktreeConfig,
 };
 
-pub const scene_config: SceneConfig = .{ .brickmap_u8_bricktree = .{
+pub const scene_config: SceneConfig = .{ .brickmap_u64_bricktree = .{
     .base_config = .{ .bml_coordinate_bits = 4 },
     .curve_kind = .raster,
     .cache_if_possible = false,
 } };
 
 // pub const scene_config: SceneConfig = .{ .brickmap = .{
-//     .bml_coordinate_bits = 5,
+//     .bml_coordinate_bits = 4,
 // } };
 
 pub const MustacheSettings = struct {
@@ -36,6 +36,8 @@ pub const MustacheSettings = struct {
     brickmap_depth: usize,
 
     use_bricktrees: bool,
+    use_u8_bricktrees: bool,
+    use_u64_bricktrees: bool,
     bricktree_width_log2: usize,
     bricktree_use_raster: bool,
     bricktree_use_llm: bool,
@@ -50,6 +52,8 @@ pub const MustacheSettings = struct {
                 .brickmap_depth = v.bml_coordinate_bits,
 
                 .use_bricktrees = false,
+                .use_u8_bricktrees = false,
+                .use_u64_bricktrees = false,
                 .bricktree_width_log2 = 0,
                 .bricktree_use_raster = false,
                 .bricktree_use_llm = false,
@@ -62,6 +66,8 @@ pub const MustacheSettings = struct {
                 .brickmap_depth = v.base_config.bml_coordinate_bits,
 
                 .use_bricktrees = true,
+                .use_u8_bricktrees = true,
+                .use_u64_bricktrees = false,
                 .bricktree_width_log2 = 3,
                 .bricktree_use_raster = v.curve_kind == .raster,
                 .bricktree_use_llm = v.curve_kind == .last_layer_morton,
@@ -73,13 +79,15 @@ pub const MustacheSettings = struct {
                 .use_brickmaps = true,
                 .brickmap_depth = v.base_config.bml_coordinate_bits,
 
-                .use_bricktrees = false,
+                .use_bricktrees = true,
+                .use_u8_bricktrees = false,
+                .use_u64_bricktrees = true,
                 .bricktree_width_log2 = 6,
                 .bricktree_use_raster = v.curve_kind == .raster,
                 .bricktree_use_llm = v.curve_kind == .last_layer_morton,
                 .bricktree_cache = v.cache_if_possible,
 
-                .no_levels = v.base_config.bml_coordinate_bits + 1,
+                .no_levels = (v.base_config.bml_coordinate_bits / 2) + 1,
             },
         };
     }

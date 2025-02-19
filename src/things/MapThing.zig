@@ -3,6 +3,8 @@ const std = @import("std");
 const wgm = @import("wgm");
 const wgpu = @import("gfx").wgpu;
 
+const curves = @import("../bricktree/curves.zig");
+
 const PackedVoxel = @import("../voxel.zig").PackedVoxel;
 const Voxel = @import("../voxel.zig").Voxel;
 
@@ -47,7 +49,7 @@ pub const Brickmap = switch (@import("scene_config").scene_config) {
 pub const bricktree = switch (@import("scene_config").scene_config) {
     .brickmap => void,
     .brickmap_u8_bricktree => @import("../bricktree/u8.zig"),
-    .brickmap_u64_bricktree => @compileError("u64 bricktrees are not supported"),
+    .brickmap_u64_bricktree => @import("../bricktree/u64.zig"),
     // else => @compileError("scene type not supported"),
 };
 
@@ -55,6 +57,13 @@ pub const BricktreeStorage = switch (@import("scene_config").scene_config) {
     .brickmap => void,
     .brickmap_u8_bricktree => [bricktree.tree_bits(Brickmap.depth) / 8]u8,
     .brickmap_u64_bricktree => [bricktree.tree_bits(Brickmap.depth) / 64]u64,
+    // else => @compileError("scene type not supported"),
+};
+
+pub const bytes_per_bricktree_buffer: usize = switch (@import("scene_config").scene_config) {
+    .brickmap => undefined,
+    .brickmap_u8_bricktree => bricktree.tree_bits(Brickmap.depth) / 8 + 3,
+    .brickmap_u64_bricktree => bricktree.tree_bits(Brickmap.depth) / 8,
     // else => @compileError("scene type not supported"),
 };
 
@@ -208,7 +217,7 @@ pub fn reconfigure(self: *Self, config: ?MapConfig) !void {
     errdefer self.alloc.free(local_brickgrid);
     @memset(local_brickgrid, std.math.maxInt(u32));
 
-    const bricktree_buffer_size: ?usize = if (bricktree == void) null else (bricktree.tree_bits(Brickmap.depth) / 8 + 3) * cfg.no_brickmaps;
+    const bricktree_buffer_size: ?usize = if (bricktree == void) null else bytes_per_bricktree_buffer * cfg.no_brickmaps;
 
     const bricktree_buffer: wgpu.Buffer = if (bricktree_buffer_size) |v| try g.device.create_buffer(wgpu.Buffer.Descriptor{
         .label = "master bricktree buffer",
@@ -304,19 +313,24 @@ pub fn queue_brickmap(self: *Self, at_coords: [3]isize, map: *const Brickmap) !b
 
     const tree = try alloc.create(BricktreeStorage);
 
+    // const tree_gen_start = g.time();
     const is_empty = switch (@import("scene_config").scene_config) {
         .brickmap => std.mem.allEqual(u32, map.c_flat_u32()[0..], 0),
-        .brickmap_u8_bricktree => |v| blk: {
+        .brickmap_u64_bricktree, .brickmap_u8_bricktree => |v| blk: {
             @memset(tree.*[0..], 0);
             bricktree.make_tree_inplace(Brickmap.depth, map, tree, switch (v.curve_kind) {
-                .raster => bricktree.curves.raster,
-                .last_layer_morton => bricktree.curves.llm,
+                .raster => curves.raster,
+                .last_layer_morton => curves.llm,
             });
 
             break :blk tree[0] == 0;
         },
-        .brickmap_u64_bricktree => @compileError("NYI: u64 trees"),
     };
+    // const tree_gen_end = g.time();
+    // std.log.debug("treegen took {d}ms", .{
+    //     @as(f64, @floatFromInt(tree_gen_end - tree_gen_start)) / std.time.ns_per_ms
+    // });
+    // if (true) @panic("asd");
 
     if (is_empty) {
         return false;
@@ -399,14 +413,16 @@ fn upload_brickmap(self: *Self, slot: usize, map: *const Brickmap, tree: *const 
     switch (@import("scene_config").scene_config) {
         .brickmap => {},
         .brickmap_u8_bricktree => {
-            // uploading layer 1 is too much trouble for too little gain
-            const tree_offset = (bricktree.tree_bits(Brickmap.depth) / 8 + 3) * slot;
+            const tree_offset = bytes_per_bricktree_buffer * slot;
             queue.write_buffer(self.bricktree_buffer, tree_offset + 4, tree[1..]);
 
-            const tmp: [4]u8 = .{tree[0], undefined, undefined, tree[0]};
+            const tmp: [4]u8 = .{ tree[0], undefined, undefined, tree[0] };
             queue.write_buffer(self.bricktree_buffer, tree_offset, tmp[0..]);
         },
-        .brickmap_u64_bricktree => @compileError("NYI: u64 trees"),
+        .brickmap_u64_bricktree => {
+            const tree_offset = bytes_per_bricktree_buffer * slot;
+            queue.write_buffer(self.bricktree_buffer, tree_offset, std.mem.sliceAsBytes(tree[0..]));
+        },
     }
 }
 

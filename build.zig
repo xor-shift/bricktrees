@@ -8,7 +8,7 @@ fn link_to_wgpu_and_sdl(b: *std.Build, c: *std.Build.Step.Compile) void {
     c.addIncludePath(b.path("thirdparty/SDL/include/"));
     c.addLibraryPath(b.path("thirdparty/SDL/build/"));
     c.linkSystemLibrary("SDL3");
-    c.addLibraryPath(b.path("thirdparty/wgpu-native/target/debug/"));
+    c.addLibraryPath(b.path("thirdparty/wgpu-native/target/release/"));
     c.linkSystemLibrary("wgpu_native");
     c.linkLibC();
 }
@@ -114,7 +114,7 @@ pub fn build(b: *std.Build) void {
         gfx.addIncludePath(b.path("thirdparty/SDL/include/"));
         gfx.addLibraryPath(b.path("thirdparty/SDL/build/"));
         gfx.linkSystemLibrary("SDL3", .{ .needed = true });
-        gfx.addLibraryPath(b.path("thirdparty/wgpu-native/target/debug/"));
+        gfx.addLibraryPath(b.path("thirdparty/wgpu-native/target/release/"));
         gfx.linkSystemLibrary("wgpu_native", .{ .needed = true });
 
         break :blk gfx;

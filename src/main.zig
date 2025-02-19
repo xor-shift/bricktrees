@@ -4,6 +4,7 @@ const core = @import("core");
 const imgui = @import("imgui");
 const qoi = @import("qoi");
 const sdl = @import("gfx").sdl;
+const wgm = @import("wgm");
 const wgpu = @import("gfx").wgpu;
 
 const Ticker = core.Ticker;
@@ -112,8 +113,8 @@ fn initialize_things(alloc: std.mem.Allocator) void {
     g.gui = gui;
 
     map.reconfigure(.{
-        .grid_dimensions = .{ 31, 31, 31 },
-        .no_brickmaps = 1024,
+        .grid_dimensions = wgm.sub(wgm.div([_]usize{ 32, 32, 32 }, 1), 1),
+        .no_brickmaps = 8192,
     }) catch @panic("map.reconfigure");
 
     g.resize(Globals.default_resolution) catch @panic("g.resize");
@@ -248,6 +249,7 @@ test {
     std.testing.refAllDecls(@import("brickmap.zig"));
     std.testing.refAllDecls(@import("bricktree/u8.zig"));
     std.testing.refAllDecls(@import("bricktree/u64.zig"));
+    std.testing.refAllDecls(@import("bricktree/curves.zig"));
 
     std.testing.refAllDecls(@import("DependencyGraph.zig"));
 }

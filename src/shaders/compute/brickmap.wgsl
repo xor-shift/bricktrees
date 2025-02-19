@@ -129,9 +129,14 @@ fn get_level_props(level: u32) -> LevelProps {
     let brickgrid_dims = vec3<i32>(textureDimensions(brickgrid));
 
 {{#use_bricktrees}}
+    // for 6:
+    // 0: 64, brickgrid_dims * 1 ,  // brickgrid
+    // 1: 16, brickgrid_dims * 4 , // tree level 0
+    // 2: 4 , brickgrid_dims * 16, // tree level 1
+    // 3: 1 , brickgrid_dims * 64  // voxel
     return LevelProps(
-        i32(1) << (brickmap_depth - level),
-        brickgrid_dims * (i32(1) << level),
+        i32(1) << (brickmap_depth - level * bricktree_level_depth),
+        brickgrid_dims * (i32(1) << (level * bricktree_level_depth)),
     );
 {{/use_bricktrees}}
 
@@ -227,13 +232,7 @@ fn iterator_check_oob(it: ptr<function, Iterator>) -> u32 {
     return 0u;
 }
 
-{{#use_bricktrees}}
-const voxel_level = brickmap_depth;
-{{/use_bricktrees}}
-
-{{^use_bricktrees}}
-const voxel_level = 1u;
-{{/use_bricktrees}}
+const voxel_level = {{no_levels}}u - 1u;
 
 fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level: bool) -> bool {
     let brickgrid_dims = vec3<i32>(textureDimensions(brickgrid));
@@ -270,7 +269,6 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level:
     return tree_check(
         (*it).current_brickmap,
         (*it).level,
-        props.sidelength,
         vec3<u32>(frame.coords - level_relative_brickmap_origin),
         first_time_on_level,
     );
