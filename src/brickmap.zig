@@ -22,5 +22,13 @@ pub fn Brickmap(comptime depth_arg: usize) type {
         pub inline fn c_flat(self: *const Self) *const [volume]PackedVoxel {
             return @ptrCast(&self.voxels);
         }
+
+        pub inline fn flat_u32(self: *Self) *[volume]u32 {
+            return @ptrCast(self.flat());
+        }
+
+        pub inline fn c_flat_u32(self: *const Self) *const [volume]u32 {
+            return @ptrCast(self.c_flat());
+        }
     };
 }

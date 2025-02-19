@@ -52,5 +52,5 @@ pub fn deinit(self: Buffer) void {
 }
 
 pub fn destroy(self: Buffer) void {
-    c.wgpuBufferDestroy(self.handle);
+    if (self.handle != null) c.wgpuBufferDestroy(self.handle);
 }

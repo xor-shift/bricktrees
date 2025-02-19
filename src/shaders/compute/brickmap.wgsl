@@ -21,7 +21,6 @@ const brickmap_dims = vec3<u32>(1u << brickmap_depth);
 // let voxel_size = vec3<f32>(voxel_dims) * nothing
 const brickmap_size = vec3<f32>(brickmap_dims); // * voxel_size
 
-fn bricktree_words() -> u32 { return power_sum(brickmap_depth, {{bricktree_width_log2}}u) / 8 / 4; }
 const brickmap_words: u32 = 1u << (3u * brickmap_depth);
 
 const nudge_factor = 1.00001;
@@ -268,7 +267,7 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level:
     let level_relative_brickmap_origin =
       (*it).stack[0].coords * vec3<i32>(brickmap_dims) / props.sidelength;
 
-    return tree_check_llm(
+    return tree_check(
         (*it).current_brickmap,
         (*it).level,
         props.sidelength,

@@ -31,8 +31,8 @@ pub fn Bricktree(comptime depth: usize) type {
 /// If, for any `n`, the bit depth of `coords[n]` exceeds `depth`, the behaviour
 /// is undefined. Likewise, if the bit depth of `index` exceeds `depth * 3`,
 /// the behaviour is undefined.
-const curves = struct {
-    const raster = struct {
+pub const curves = struct {
+    pub const raster = struct {
         inline fn forward(comptime depth: usize, coords: [3]usize) usize {
             return 0 //
             | (coords[0] << (0 * depth)) //
@@ -58,7 +58,7 @@ const curves = struct {
         try std.testing.expectEqual(0x3F, raster.forward(2, .{ 3, 3, 3 }));
     }
 
-    const morton = struct {
+    pub const morton = struct {
         inline fn forward(comptime depth: usize, coords: [3]usize) usize {
             const T = @Type(std.builtin.Type{ .Int = .{
                 .bits = @intCast(depth),
@@ -95,7 +95,7 @@ const curves = struct {
         try std.testing.expectEqual([_]usize{ 1, 2, 3 }, morton.backward(2, 0b110101));
     }
 
-    const llm = struct {
+    pub const llm = struct {
         inline fn forward(comptime depth: usize, coords: [3]usize) usize {
             // z4 z3 z2 z1 z0  y4 y3 y2 y1 y0  x5 x4 x3 x2 x1 x0
             // z4 z3 z2 z1     y4 y3 y2 y1     x5 x4 x3 x2 x1    z0 y0 x0
@@ -253,10 +253,11 @@ pub fn make_tree_inplace(
     comptime depth: u6,
     brickmap: *const Brickmap(depth),
     output: *Bricktree(depth),
+    comptime curve: type
 ) void {
     inline for (1..depth) |i| {
         const level = depth - i;
-        make_level(depth, level, brickmap, output, curves.llm);
+        make_level(depth, level, brickmap, output, curve);
     }
 }
 
@@ -264,11 +265,12 @@ pub fn make_tree(
     comptime depth: u6,
     brickmap: *const Brickmap(depth),
     alloc: std.mem.Allocator,
+    comptime curve: type
 ) !*Bricktree(depth) {
     const ret = try alloc.create(Bricktree(depth));
     @memset(ret[0..], 0);
 
-    make_tree_inplace(depth, brickmap, ret);
+    make_tree_inplace(depth, brickmap, ret, curve);
 
     return ret;
 }

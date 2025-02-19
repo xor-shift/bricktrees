@@ -201,7 +201,7 @@ input_state: InputState = std.mem.zeroes(InputState),
 mouse_delta: [2]f32 = .{ 0, 0 },
 fov: f64 = 45.0,
 
-global_coords: [3]f64 = .{0} ** 3,
+global_coords: [3]f64 = .{0, 40, 0},
 look: [3]f64 = .{0} ** 3,
 
 map_thing: *MapThing = undefined,
