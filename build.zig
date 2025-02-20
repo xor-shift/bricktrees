@@ -6,7 +6,7 @@ fn link_to_wgpu_and_sdl(b: *std.Build, c: *std.Build.Step.Compile) void {
     c.addIncludePath(b.path("thirdparty/wgpu-native/ffi/webgpu-headers"));
     c.addIncludePath(b.path("thirdparty/wgpu-native/ffi/"));
     c.addIncludePath(b.path("thirdparty/SDL/include/"));
-    c.addLibraryPath(b.path("thirdparty/SDL/build/"));
+    c.addLibraryPath(b.path("thirdparty/SDL/build-debug/"));
     c.linkSystemLibrary("SDL3");
     c.addLibraryPath(b.path("thirdparty/wgpu-native/target/release/"));
     c.linkSystemLibrary("wgpu_native");
@@ -18,7 +18,7 @@ fn add_include_paths_for_zls(b: *std.Build, to: anytype) void {
     to.addIncludePath(b.path("thirdparty/wgpu-native/ffi/webgpu-headers"));
     to.addIncludePath(b.path("thirdparty/wgpu-native/ffi/"));
     to.addIncludePath(b.path("thirdparty/SDL/include/"));
-    to.addLibraryPath(b.path("thirdparty/SDL/build/"));
+    to.addLibraryPath(b.path("thirdparty/SDL/build-debug/"));
     to.addIncludePath(b.path("thirdparty/cimgui"));
     to.addIncludePath(b.path("thirdparty/cimgui/imgui"));
 }
@@ -112,7 +112,7 @@ pub fn build(b: *std.Build) void {
         gfx.addIncludePath(b.path("thirdparty/wgpu-native/ffi/webgpu-headers"));
         gfx.addIncludePath(b.path("thirdparty/wgpu-native/ffi/"));
         gfx.addIncludePath(b.path("thirdparty/SDL/include/"));
-        gfx.addLibraryPath(b.path("thirdparty/SDL/build/"));
+        gfx.addLibraryPath(b.path("thirdparty/SDL/build-debug/"));
         gfx.linkSystemLibrary("SDL3", .{ .needed = true });
         gfx.addLibraryPath(b.path("thirdparty/wgpu-native/target/release/"));
         gfx.linkSystemLibrary("wgpu_native", .{ .needed = true });

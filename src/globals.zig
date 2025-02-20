@@ -231,7 +231,8 @@ fn resize_impl(self: *Self, dims: [2]usize) !void {
         .view_formats = &.{.BGRA8UnormSrgb},
         .width = @intCast(dims[0]),
         .height = @intCast(dims[1]),
-        .present_mode = .Mailbox,
+        .present_mode = .Immediate,
+        // .present_mode = .Mailbox,
         // .present_mode = .Fifo,
     });
 }

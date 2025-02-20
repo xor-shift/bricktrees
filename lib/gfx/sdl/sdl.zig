@@ -108,11 +108,7 @@ pub const Window = struct {
         return [2]usize{ @intCast(out[0]), @intCast(out[1]) };
     }
 
-    pub fn get_surface(self: @This(), instance: wgpu.Instance) !wgpu.Surface {
-        if (c.SDL_strcmp(c.SDL_GetCurrentVideoDriver(), "wayland") != 0) {
-            @panic("expected to be running under wayland, bailing");
-        }
-
+    fn get_wl_surface(self: @This(), instance: wgpu.Instance) !wgpu.Surface {
         const properties = c.SDL_GetWindowProperties(self.handle);
 
         const wl_display = c.SDL_GetPointerProperty(properties, c.SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, null) orelse {
@@ -145,6 +141,64 @@ pub const Window = struct {
         };
 
         return .{ .handle = wgpu_surface };
+    }
+
+    fn get_x11_surface(self: @This(), instance: wgpu.Instance) !wgpu.Surface {
+        const properties = c.SDL_GetWindowProperties(self.handle);
+
+        const xlib_display = c.SDL_GetPointerProperty(properties, c.SDL_PROP_WINDOW_X11_DISPLAY_POINTER, null) orelse {
+            std.log.err("SDL_GetPointerProperty for {s} failed: {s}", .{
+                c.SDL_PROP_WINDOW_X11_DISPLAY_POINTER,
+                c.SDL_GetError(),
+            });
+            return Error.Failed;
+        };
+        std.log.debug("xlib_display: {p}", .{xlib_display});
+
+        const xlib_window = c.SDL_GetNumberProperty(properties, c.SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
+        if (xlib_window == 0) {
+            std.log.err("SDL_GetNumberProperty for {s} failed: {s}", .{
+                c.SDL_PROP_WINDOW_X11_WINDOW_NUMBER,
+                c.SDL_GetError(),
+            });
+            return Error.Failed;
+        }
+        std.log.debug("xlib_window: {d}", .{xlib_window});
+
+        const wgpu_surface_from_xlib_window: wgpu_c.WGPUSurfaceDescriptorFromXlibWindow = .{
+            .chain = .{
+                .sType = wgpu_c.WGPUSType_SurfaceDescriptorFromXlibWindow,
+                .next = null,
+            },
+            .display = xlib_display,
+            .window = @intCast(xlib_window),
+        };
+
+        const surface_descriptor: wgpu_c.WGPUSurfaceDescriptor = .{
+            .nextInChain = &wgpu_surface_from_xlib_window.chain,
+            .label = "surface",
+        };
+
+        const wgpu_surface = wgpu_c.wgpuInstanceCreateSurface(instance.handle, &surface_descriptor) orelse {
+            @panic("failed to create a wgpu surface");
+        };
+
+        return .{ .handle = wgpu_surface };
+    }
+
+    pub fn get_surface(self: @This(), instance: wgpu.Instance) !wgpu.Surface {
+        const driver = c.SDL_GetCurrentVideoDriver();
+
+        if (c.SDL_strcmp(driver, "wayland") == 0) {
+            return try self.get_wl_surface(instance);
+        }
+
+        if (c.SDL_strcmp(driver, "x11") == 0) {
+            return try self.get_x11_surface(instance);
+        }
+
+        std.log.err("Unknown video driver {s}. Couldn't get a surface.", .{driver});
+        return error.NoCompatibleSurface;
     }
 
     /// Sets the cursor position relative to the window
