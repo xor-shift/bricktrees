@@ -94,17 +94,9 @@ pub fn configure(self: Surface, config: Configuration) Error!void {
     c.wgpuSurfaceConfigure(self.handle, &c_config);
 }
 
-pub fn present(self: Surface) !void {
+pub fn present(self: Surface) void {
     const res = c.wgpuSurfacePresent(self.handle);
     _ = res;
-    // TODO: this function returns bullshit values for some reason.
-    // This has started happening after the wgpu 22 -> 24 update. I probably
-    // missed some struct and have UB lying around.
-    // Double TODO: automate the generation of some structs to avoid this.
-
-    return switch (c.WGPUStatus_Success) {
-        c.WGPUStatus_Success => {},
-        c.WGPUStatus_Error => error.WGPUError,
-        else => unreachable,
-    };
+    // wgpuSurfacePresent currently returns garbo:
+    // https://github.com/gfx-rs/wgpu-native/issues/458
 }
