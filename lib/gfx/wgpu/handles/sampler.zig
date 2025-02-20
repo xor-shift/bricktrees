@@ -16,7 +16,7 @@ const Sampler = @This();
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUSamplerDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
     addressModeU: wgpu.AddressMode = .Repeat,
     addressModeV: wgpu.AddressMode = .Repeat,
     addressModeW: wgpu.AddressMode = .Repeat,

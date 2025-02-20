@@ -125,15 +125,15 @@ pub const Window = struct {
 
         std.log.debug("wl_surface: {p}", .{wl_surface});
 
-        const wgpu_surface_from_wl_surface: wgpu_c.WGPUSurfaceDescriptorFromWaylandSurface = .{
-            .chain = .{ .sType = wgpu_c.WGPUSType_SurfaceDescriptorFromWaylandSurface, .next = null },
+        const wgpu_surface_from_wl_surface: wgpu_c.WGPUSurfaceSourceWaylandSurface = .{
+            .chain = .{ .sType = wgpu_c.WGPUSType_SurfaceSourceWaylandSurface, .next = null },
             .display = wl_display,
             .surface = wl_surface,
         };
 
         const surface_descriptor: wgpu_c.WGPUSurfaceDescriptor = .{
             .nextInChain = &wgpu_surface_from_wl_surface.chain,
-            .label = "surface",
+            .label = wgpu.make_string("surface"),
         };
 
         const wgpu_surface = wgpu_c.wgpuInstanceCreateSurface(instance.handle, &surface_descriptor) orelse {
@@ -165,9 +165,9 @@ pub const Window = struct {
         }
         std.log.debug("xlib_window: {d}", .{xlib_window});
 
-        const wgpu_surface_from_xlib_window: wgpu_c.WGPUSurfaceDescriptorFromXlibWindow = .{
+        const wgpu_surface_from_xlib_window: wgpu_c.WGPUSurfaceSourceXlibWindow = .{
             .chain = .{
-                .sType = wgpu_c.WGPUSType_SurfaceDescriptorFromXlibWindow,
+                .sType = wgpu_c.WGPUSType_SurfaceSourceXlibWindow,
                 .next = null,
             },
             .display = xlib_display,
@@ -176,7 +176,7 @@ pub const Window = struct {
 
         const surface_descriptor: wgpu_c.WGPUSurfaceDescriptor = .{
             .nextInChain = &wgpu_surface_from_xlib_window.chain,
-            .label = "surface",
+            .label = wgpu.make_string("surface"),
         };
 
         const wgpu_surface = wgpu_c.wgpuInstanceCreateSurface(instance.handle, &surface_descriptor) orelse {

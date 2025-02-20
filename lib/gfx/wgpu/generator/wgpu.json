@@ -10,10 +10,10 @@
       "doc": "TODO\n",
       "entries": [
           { "name": "DeviceExtras", "doc": "TODO\n" },
-          { "name": "RequiredLimitsExtras", "doc": "TODO\n" },
+          { "name": "NativeLimits", "doc": "TODO\n" },
           { "name": "PipelineLayoutExtras", "doc": "TODO\n" },
           { "name": "ShaderModuleGLSLDescriptor", "doc": "TODO\n" },
-          { "name": "SupportedLimitsExtras", "doc": "TODO\n" },
+          { "name": "Reserved30006", "doc": "TODO\n" },
           { "name": "InstanceExtras", "doc": "TODO\n" },
           { "name": "BindGroupEntryExtras", "doc": "TODO\n" },
           { "name": "BindGroupLayoutEntryExtras", "doc": "TODO\n" },

@@ -31,16 +31,18 @@ fn write_enum(enumeration: IDL.Enumeration, writer: std.io.AnyWriter, alloc: std
     try std.fmt.format(writer, "pub const {s} = enum(c_uint) {{\n", .{enum_name});
 
     for (0.., enumeration.field_groups) |group_no, group| {
-        for (0.., group.fields) |i, field| {
+        for (0.., group.fields) |i, maybe_field| if (maybe_field) |field| {
             const field_name = try util.snake_to_pascal(field.name, alloc);
             defer alloc.free(field_name);
 
             util.swap_first_two_chars_if_leading_is_digit(&field_name);
 
-            const index = (if (group_no == 0) i else i + 1) + (group.prefix << 16);
+            _ = group_no;
+            const index = i + (group.prefix << 16);
+            //const index = (if (group_no == 0) i else i + 1) + (group.prefix << 16);
 
             try std.fmt.format(writer, "    {s} = 0x{X:0>8},\n", .{ field_name, index });
-        }
+        };
     }
 
     try std.fmt.format(writer, "}}; // {s}\n", .{enum_name});

@@ -21,7 +21,7 @@ const RenderPipeline = @This();
 pub const Descriptor = struct {
     pub const NativeType = c.WGPURenderPipelineDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
     layout: ?PipelineLayout = null,
     vertex: VertexState,
     primitive: PrimitiveState,
@@ -32,7 +32,7 @@ pub const Descriptor = struct {
     pub fn get(self: Descriptor, helper: *ConversionHelper) Descriptor.NativeType {
         return .{
             .nextInChain = null,
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
             .layout = if (self.layout) |v| v.handle else null,
             .vertex = self.vertex.get(helper),
             .primitive = self.primitive.get(),

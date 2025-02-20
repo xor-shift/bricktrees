@@ -64,7 +64,7 @@ pub fn init(device: wgpu.Device, queue: wgpu.Queue) !Self {
         },
     });
     errdefer font_texture.deinit();
-    const font_texture_view = try font_texture.create_view(.{});
+    const font_texture_view = try font_texture.create_view(null);
 
     queue.write_texture(wgpu.ImageCopyTexture{
         .texture = font_texture,

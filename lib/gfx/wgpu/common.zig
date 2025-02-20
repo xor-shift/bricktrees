@@ -11,6 +11,8 @@ pub const sdl_c = @cImport({
     @cInclude("SDL3/SDL_system.h");
 });
 
+const auto = @import("auto.zig");
+
 pub const Error = error{
     UnexpectedNull,
 
@@ -83,7 +85,7 @@ pub fn sync_request_impl(
     requester(self, zig_descriptor, struct {
         out_res: *Error!Requested,
 
-        fn aufruf(ctx: @This(), res_arg: Error!Requested, error_desc: [*c]const u8) void {
+        fn aufruf(ctx: @This(), res_arg: Error!Requested, error_desc: []const u8) void {
             const actual_res = res_arg catch |e| {
                 std.log.err("failed to request a/an " ++ requested_name ++ ". error: {any}, error_desc: {?s}", .{ e, error_desc });
                 ctx.out_res.* = e;
@@ -105,26 +107,28 @@ pub fn async_request_impl(
     comptime success_code: c_uint,
     comptime result_codes: anytype,
     comptime WGPUType: type,
+    comptime InfoType: type,
     comptime Type: type,
 ) void {
     const Callback = @TypeOf(callback_arg);
 
     const actual_callback = struct {
-        fn aufruf(status: c_uint, maybe_res: WGPUType, error_desc: [*c]const u8, userdata: ?*anyopaque) callconv(.C) void {
-            const callback: *Callback = @ptrCast(@alignCast(userdata));
+        fn aufruf(status: c_uint, maybe_res: WGPUType, error_desc: c.WGPUStringView, userdata1: ?*anyopaque, userdata2: ?*anyopaque) callconv(.C) void {
+            _ = userdata2;
+            const callback: *Callback = @ptrCast(@alignCast(userdata1));
 
             if (status == success_code) {
                 const res = maybe_res orelse {
-                    callback.aufruf(Error.UnexpectedNull, error_desc);
+                    callback.aufruf(Error.UnexpectedNull, auto.from_string(error_desc));
                     return;
                 };
-                callback.aufruf(Type{ .handle = res }, error_desc);
+                callback.aufruf(Type{ .handle = res }, auto.from_string(error_desc));
                 return;
             }
 
             inline for (result_codes) |code_err_pair| {
                 if (status == code_err_pair.@"0") {
-                    callback.aufruf(code_err_pair.@"1", error_desc);
+                    callback.aufruf(code_err_pair.@"1", auto.from_string(error_desc));
                     return;
                 }
             }
@@ -133,6 +137,15 @@ pub fn async_request_impl(
         }
     }.aufruf;
 
+    const info: InfoType = .{
+        .nextInChain = null,
+        .mode = c.WGPUCallbackMode_AllowProcessEvents,
+        .callback = actual_callback,
+        .userdata1 = @constCast(@ptrCast(&callback_arg)),
+        .userdata2 = null,
+    };
+
     //const converted_descriptor = options.get();
-    requester_fun(self.handle, &c_descriptor, actual_callback, @constCast(@ptrCast(&callback_arg)));
+    // TODO: ignored future
+    _ = requester_fun(self.handle, &c_descriptor, info);
 }

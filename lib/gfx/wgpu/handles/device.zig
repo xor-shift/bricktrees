@@ -16,10 +16,10 @@ const CommandEncoder = wgpu.CommandEncoder;
 const ComputePipeline = wgpu.ComputePipeline;
 const DeviceLostReason = wgpu.DeviceLostReason;
 const FeatureName = wgpu.FeatureName;
+const Limits = wgpu.Limits;
 const PipelineLayout = wgpu.PipelineLayout;
 const Queue = wgpu.Queue;
 const RenderPipeline = wgpu.RenderPipeline;
-const RequiredLimits = wgpu.RequiredLimits;
 const Sampler = wgpu.Sampler;
 const ShaderModule = wgpu.ShaderModule;
 const Texture = wgpu.Texture;
@@ -29,31 +29,37 @@ const Device = @This();
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUDeviceDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
     required_features: []const FeatureName = &.{},
-    required_limits: ?RequiredLimits = null,
+    required_limits: ?Limits = null,
     default_queue: Queue.Descriptor = .{},
 
     // TODO
 
-    // device_lost_callback: ?*const fn (ctx: ?*anyopaque, reason: DeviceLostReason, message: ?[:0]const u8) void = null,
+    // device_lost_callback: ?*const fn (ctx: ?*anyopaque, reason: DeviceLostReason, message: ?[]const u8) void = null,
     // device_lost_callback_userdata: ?*anyopaque = null,
 
     // uncapturedErrorCallbackInfo: WGPUUncapturedErrorCallbackInfo = @import("std").mem.zeroes(WGPUUncapturedErrorCallbackInfo),
 
     pub fn get(self: Descriptor, helper: *ConversionHelper) Descriptor.NativeType {
         return .{
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
             .requiredFeatureCount = self.required_features.len,
             .requiredFeatures = @ptrCast(self.required_features),
-            .requiredLimits = helper.optional_helper(true, RequiredLimits, self.required_limits),
+            .requiredLimits = helper.optional_helper(false, Limits, self.required_limits),
             .defaultQueue = self.default_queue.get(),
-            .deviceLostCallback = null,
-            .deviceLostUserdata = null,
+            .deviceLostCallbackInfo = .{
+                .nextInChain = null,
+                .mode = undefined,
+                .callback = null,
+                .userdata1 = null,
+                .userdata2 = null,
+            },
             .uncapturedErrorCallbackInfo = .{
                 .nextInChain = null,
                 .callback = null,
-                .userdata = null,
+                .userdata1 = null,
+                .userdata2 = null,
             },
         };
     }
@@ -85,7 +91,7 @@ pub fn create_command_encoder(self: Device, descriptor: ?CommandEncoder.Descript
     };
 }
 
-pub fn create_shader_module_wgsl_from_file(self: Device, label: ?[:0]const u8, filename: []const u8, alloc: std.mem.Allocator) !ShaderModule {
+pub fn create_shader_module_wgsl_from_file(self: Device, label: ?[]const u8, filename: []const u8, alloc: std.mem.Allocator) !ShaderModule {
     const shader_code = val: {
         const cwd = std.fs.cwd();
 
@@ -101,18 +107,18 @@ pub fn create_shader_module_wgsl_from_file(self: Device, label: ?[:0]const u8, f
     return try self.create_shader_module_wgsl(label, shader_code);
 }
 
-pub fn create_shader_module_wgsl(self: Device, label: ?[:0]const u8, source: [:0]const u8) Error!ShaderModule {
-    const wgsl_descriptor = c.WGPUShaderModuleWGSLDescriptor{
+pub fn create_shader_module_wgsl(self: Device, label: ?[]const u8, source: []const u8) Error!ShaderModule {
+    const wgsl_descriptor = c.WGPUShaderSourceWGSL{
         .chain = .{
             .next = null,
-            .sType = c.WGPUSType_ShaderModuleWGSLDescriptor,
+            .sType = c.WGPUSType_ShaderSourceWGSL,
         },
-        .code = source,
+        .code = auto.make_string(source),
     };
 
     const descriptor = c.WGPUShaderModuleDescriptor{
         .nextInChain = &wgsl_descriptor.chain,
-        .label = if (label) |v| v.ptr else null,
+        .label = auto.make_string(label),
     };
 
     return .{

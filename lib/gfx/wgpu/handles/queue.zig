@@ -20,12 +20,12 @@ const Queue = @This();
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUQueueDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
 
     pub fn get(self: Descriptor) NativeType {
         return .{
             .nextInChain = null,
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
         };
     }
 };

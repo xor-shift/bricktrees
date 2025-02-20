@@ -21,6 +21,8 @@ test {
 const c = common.c;
 const sdl_c = common.sdl_c;
 
+pub const make_string = auto.make_string;
+
 const ConversionHelper = common.ConversionHelper;
 
 pub const Error = common.Error;
@@ -162,14 +164,14 @@ pub const FragmentState = struct {
     pub const NativeType = c.WGPUFragmentState;
 
     module: ShaderModule,
-    entry_point: [:0]const u8,
+    entry_point: []const u8,
     targets: []const ColorTargetState = &.{},
 
     pub fn get(self: FragmentState, helper: *ConversionHelper) NativeType {
         return .{
             .nextInChain = null,
             .module = self.module.handle,
-            .entryPoint = self.entry_point.ptr,
+            .entryPoint = make_string(self.entry_point),
             .constantCount = 0,
             .constants = null,
             .targetCount = self.targets.len,
@@ -252,7 +254,7 @@ pub const VertexState = struct {
     pub const NativeType = c.WGPUVertexState;
 
     module: ShaderModule,
-    entry_point: [:0]const u8,
+    entry_point: []const u8,
     // TODO: constants
     buffers: []const VertexBufferLayout = &.{},
 
@@ -260,7 +262,7 @@ pub const VertexState = struct {
         return .{
             .nextInChain = null,
             .module = self.module.handle,
-            .entryPoint = self.entry_point.ptr,
+            .entryPoint = make_string(self.entry_point),
             .constantCount = 0,
             .constants = undefined,
             .bufferCount = self.buffers.len,
@@ -294,7 +296,6 @@ pub const Limits = struct {
     max_buffer_size: u64 = constants.limit_u64_undefined,
     max_vertex_attributes: u32 = constants.limit_u32_undefined,
     max_vertex_buffer_array_stride: u32 = constants.limit_u32_undefined,
-    max_inter_stage_shader_components: u32 = constants.limit_u32_undefined,
     max_inter_stage_shader_variables: u32 = constants.limit_u32_undefined,
     max_color_attachments: u32 = constants.limit_u32_undefined,
     max_color_attachment_bytes_per_sample: u32 = constants.limit_u32_undefined,
@@ -306,37 +307,40 @@ pub const Limits = struct {
     max_compute_workgroups_per_dimension: u32 = constants.limit_u32_undefined,
 
     pub fn get(self: Limits) NativeType {
-        return auto.wgpu_struct_get(null, NativeType, self);
-    }
-};
-
-pub const NativeLimits = struct {
-    pub const NativeType = c.WGPUNativeLimits;
-
-    max_push_constant_size: u32 = 0,
-    max_non_sampler_bindings: u32 = 0,
-
-    pub fn get(self: NativeLimits) NativeType {
         return .{
-            .maxPushConstantSize = self.max_push_constant_size,
-            .maxNonSamplerBindings = self.max_non_sampler_bindings,
-        };
-    }
-};
-
-pub const RequiredLimits = struct {
-    pub const NativeType = c.WGPURequiredLimits;
-
-    native_limits: ?NativeLimits = null,
-    limits: Limits = .{},
-
-    pub fn get(self: RequiredLimits, helper: *ConversionHelper) NativeType {
-        const chained = helper.optional_helper(false, NativeLimits, self.native_limits);
-        _ = chained;
-
-        return .{
+            // TODO: JESUS FUCKING CHRIST AUTOMATE THIS SHIT
             .nextInChain = null,
-            .limits = self.limits.get(),
+            .maxTextureDimension1D = self.max_texture_dimension_1d,
+            .maxTextureDimension2D = self.max_texture_dimension_2d,
+            .maxTextureDimension3D = self.max_texture_dimension_3d,
+            .maxTextureArrayLayers = self.max_texture_array_layers,
+            .maxBindGroups = self.max_bind_groups,
+            .maxBindGroupsPlusVertexBuffers = self.max_bind_groups_plus_vertex_buffers,
+            .maxBindingsPerBindGroup = self.max_bindings_per_bind_group,
+            .maxDynamicUniformBuffersPerPipelineLayout = self.max_dynamic_uniform_buffers_per_pipeline_layout,
+            .maxDynamicStorageBuffersPerPipelineLayout = self.max_dynamic_storage_buffers_per_pipeline_layout,
+            .maxSampledTexturesPerShaderStage = self.max_sampled_textures_per_shader_stage,
+            .maxSamplersPerShaderStage = self.max_samplers_per_shader_stage,
+            .maxStorageBuffersPerShaderStage = self.max_storage_buffers_per_shader_stage,
+            .maxStorageTexturesPerShaderStage = self.max_storage_textures_per_shader_stage,
+            .maxUniformBuffersPerShaderStage = self.max_uniform_buffers_per_shader_stage,
+            .maxUniformBufferBindingSize = self.max_uniform_buffer_binding_size,
+            .maxStorageBufferBindingSize = self.max_storage_buffer_binding_size,
+            .minUniformBufferOffsetAlignment = self.min_uniform_buffer_offset_alignment,
+            .minStorageBufferOffsetAlignment = self.min_storage_buffer_offset_alignment,
+            .maxVertexBuffers = self.max_vertex_buffers,
+            .maxBufferSize = self.max_buffer_size,
+            .maxVertexAttributes = self.max_vertex_attributes,
+            .maxVertexBufferArrayStride = self.max_vertex_buffer_array_stride,
+            .maxInterStageShaderVariables = self.max_inter_stage_shader_variables,
+            .maxColorAttachments = self.max_color_attachments,
+            .maxColorAttachmentBytesPerSample = self.max_color_attachment_bytes_per_sample,
+            .maxComputeWorkgroupStorageSize = self.max_compute_workgroup_storage_size,
+            .maxComputeInvocationsPerWorkgroup = self.max_compute_invocations_per_workgroup,
+            .maxComputeWorkgroupSizeX = self.max_compute_workgroup_size_x,
+            .maxComputeWorkgroupSizeY = self.max_compute_workgroup_size_y,
+            .maxComputeWorkgroupSizeZ = self.max_compute_workgroup_size_z,
+            .maxComputeWorkgroupsPerDimension = self.max_compute_workgroups_per_dimension,
         };
     }
 };
@@ -374,7 +378,7 @@ pub const Origin3D = struct {
 };
 
 pub const ImageCopyTexture = struct {
-    pub const NativeType = c.WGPUImageCopyTexture;
+    pub const NativeType = c.WGPUTexelCopyTextureInfo; // what a dumb name change
 
     texture: Texture,
     mip_level: u32 = 0,
@@ -383,7 +387,6 @@ pub const ImageCopyTexture = struct {
 
     pub fn get(self: ImageCopyTexture) NativeType {
         return .{
-            .nextInChain = null,
             .texture = self.texture.handle,
             .mipLevel = self.mip_level,
             .origin = self.origin.get(),
@@ -393,7 +396,7 @@ pub const ImageCopyTexture = struct {
 };
 
 pub const TextureDataLayout = struct {
-    pub const NativeType = c.WGPUTextureDataLayout;
+    pub const NativeType = c.WGPUTexelCopyBufferLayout;
 
     offset: u64,
     bytes_per_row: u32,
@@ -401,7 +404,6 @@ pub const TextureDataLayout = struct {
 
     pub fn get(self: TextureDataLayout) NativeType {
         return .{
-            .nextInChain = null,
             .offset = self.offset,
             .bytesPerRow = self.bytes_per_row,
             .rowsPerImage = self.rows_per_image,
@@ -412,13 +414,13 @@ pub const TextureDataLayout = struct {
 pub const ConstantEntry = struct {
     pub const NativeType = c.WGPUConstantEntry;
 
-    key: [:0]const u8,
+    key: []const u8,
     value: f64,
 
     pub fn get(self: ConstantEntry) NativeType {
         return .{
             .nextInChain = null,
-            .key = self.key.ptr,
+            .key = make_string(self.key),
             .value = self.value,
         };
     }

@@ -20,7 +20,7 @@ const Texture = @This();
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUTextureDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
     usage: TextureUsage = .{},
     dimension: TextureDimension,
     size: Extent3D,
@@ -32,7 +32,7 @@ pub const Descriptor = struct {
     pub fn get(self: Descriptor) Descriptor.NativeType {
         return .{
             .nextInChain = null,
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
             .usage = auto.get_flags(self.usage),
             .dimension = @intFromEnum(self.dimension),
             .size = self.size.get(),

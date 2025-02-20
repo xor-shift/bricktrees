@@ -18,11 +18,11 @@ const CommandEncoder = @This();
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUCommandEncoderDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
 
     pub fn get(self: Descriptor) Descriptor.NativeType {
         return .{
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
         };
     }
 };

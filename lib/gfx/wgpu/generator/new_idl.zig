@@ -8,10 +8,10 @@ const IDL = @This();
 pub const Enumeration = struct {
     pub const Inner = struct {
         prefix: u32,
-        fields: []RawIDL.EBEntry,
+        fields: []?RawIDL.EBEntry,
 
         pub fn deinit(self: Inner, alloc: std.mem.Allocator) void {
-            for (self.fields) |field| field.deinit(alloc);
+            for (self.fields) |field| if (field) |v| v.deinit(alloc);
             alloc.free(self.fields);
         }
     };
@@ -44,7 +44,7 @@ pub const Enumeration = struct {
         return null;
     }
 
-    pub fn add_group(self: *Enumeration, alloc: std.mem.Allocator, prefix: u32, fields: []const RawIDL.EBEntry) !void {
+    pub fn add_group(self: *Enumeration, alloc: std.mem.Allocator, prefix: u32, fields: []const ?RawIDL.EBEntry) !void {
         const new_groups = try alloc.alloc(Inner, self.field_groups.len + 1);
         errdefer alloc.free(new_groups);
 
@@ -54,14 +54,17 @@ pub const Enumeration = struct {
 
         new_group.* = .{
             .prefix = prefix,
-            .fields = try alloc.alloc(RawIDL.EBEntry, fields.len),
+            .fields = try alloc.alloc(?RawIDL.EBEntry, fields.len),
         };
         errdefer alloc.free(new_group.fields);
 
         var cloned_fields: usize = 0;
-        errdefer for (0..cloned_fields) |i| new_group.fields[i].deinit(alloc);
+        errdefer for (0..cloned_fields) |i| if (new_group.fields[i]) |v| v.deinit(alloc);
         while (cloned_fields < fields.len) : (cloned_fields += 1) {
-            new_group.fields[cloned_fields] = try fields[cloned_fields].clone(alloc);
+            new_group.fields[cloned_fields] = if (fields[cloned_fields]) |v|
+                try v.clone(alloc)
+            else
+                null;
         }
 
         alloc.free(self.field_groups);

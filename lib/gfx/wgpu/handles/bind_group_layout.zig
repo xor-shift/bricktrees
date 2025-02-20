@@ -127,7 +127,7 @@ pub const Entry = struct {
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUBindGroupLayoutDescriptor;
 
-    label: ?[:0]const u8,
+    label: ?[]const u8,
     entries: []const Entry,
 
     pub fn get(self: Descriptor, helper: *ConversionHelper) @This().NativeType {

@@ -53,7 +53,7 @@ pub const DepthStencilAttachment = struct {
 pub const Descriptor = struct {
     pub const NativeType = c.WGPURenderPassDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
     color_attachments: []const ColorAttachment = &.{},
     depth_stencil_attachment: ?DepthStencilAttachment = null,
     // TODO: occlusion_query_set
@@ -74,7 +74,7 @@ pub const Descriptor = struct {
         };
 
         return .{
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
             .colorAttachmentCount = color_attachments.len,
             .colorAttachments = color_attachments.ptr,
             .depthStencilAttachment = depth_stencil_attachment,

@@ -237,7 +237,7 @@ pub fn main() !void {
         g.queue.submit((&command_buffer)[0..1]);
         command_buffer.deinit();
 
-        g.surface.present();
+        g.surface.present() catch {};
 
         current_texture.texture.deinit();
     }

@@ -84,14 +84,14 @@ pub const Entry = struct {
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUBindGroupDescriptor;
 
-    label: ?[:0]const u8,
+    label: ?[]const u8,
     layout: BindGroupLayout,
     entries: []const Entry,
 
     pub fn get(self: Descriptor, helper: *ConversionHelper) NativeType {
         return .{
             .nextInChain = null,
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
             .layout = self.layout.handle,
             .entryCount = self.entries.len,
             .entries = helper.array_helper(true, Entry, self.entries),

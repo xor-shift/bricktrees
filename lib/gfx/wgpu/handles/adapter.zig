@@ -59,6 +59,7 @@ pub fn request_device(self: Adapter, descriptor: Device.Descriptor, callback_arg
             .{ c.WGPURequestAdapterStatus_Unknown, Error.Unknown },
         },
         c.WGPUDevice,
+        c.WGPURequestDeviceCallbackInfo,
         Device,
     );
 }

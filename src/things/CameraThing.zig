@@ -321,13 +321,11 @@ pub fn on_tick(self: *Self, delta_ns: u64) !void {
     const bg_origin = self.map_thing.origin_brickmap;
     const bg_size = self.map_thing.config.?.grid_dimensions;
 
-    if (g.frame_no >= 100) { return; }
-
     var asd = try LoadCycleStatus.init(bg_size, bg_origin);
     defer asd.deinit();
     var generated_chunks: usize = 0;
     while (try asd.iterate()) |g_coords| {
-        if (generated_chunks >= 8192) break;
+        if (generated_chunks >= 1024) break;
 
         const chunk = (try generate_chunk(g_coords)) orelse continue;
 

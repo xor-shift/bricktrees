@@ -54,6 +54,7 @@ pub fn request_adapter(self: Instance, options: Adapter.Options, callback_arg: a
             .{ c.WGPURequestAdapterStatus_Unknown, Error.Unknown },
         },
         c.WGPUAdapter,
+        c.WGPURequestAdapterCallbackInfo,
         Adapter,
     );
 }

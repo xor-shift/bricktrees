@@ -5,6 +5,19 @@ const c = common.c;
 
 const ConversionHelper = common.ConversionHelper;
 
+pub fn make_string(v: ?[]const u8) c.WGPUStringView {
+    return c.WGPUStringView{
+        .data = if (v) |w| w.ptr else null,
+        .length = if (v) |w| w.len else 0,
+    };
+}
+
+pub fn from_string(v: c.WGPUStringView) []const u8 {
+    if (v.length == 0) return "";
+
+    return v.data[0..v.length];
+}
+
 pub fn get_flags(f: anytype) c.WGPUFlags {
     const IntType = @Type(.{
         .Int = .{
@@ -74,8 +87,8 @@ inline fn wgpu_struct_get_recursive(helper: ?*ConversionHelper, comptime OutType
         },
 
         .Pointer => |v| val: {
-            if (InField == [:0]const u8) {
-                out_ptr.* = if (@as(?[:0]const u8, in_value)) |w| w.ptr else null;
+            if (InField == []const u8) {
+                out_ptr.* = make_string(in_value);
                 break :val 1;
             }
 
@@ -91,8 +104,8 @@ inline fn wgpu_struct_get_recursive(helper: ?*ConversionHelper, comptime OutType
         },
 
         .Optional => |v| val: {
-            if (InField == ?[:0]const u8) {
-                out_ptr.* = if (@as(?[:0]const u8, in_value)) |w| w.ptr else null;
+            if (InField == ?[]const u8) {
+                out_ptr.* = make_string(in_value);
                 break :val 1;
             }
 

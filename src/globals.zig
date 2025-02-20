@@ -130,14 +130,11 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
             wgpu.FeatureName.ShaderI16,
 
             wgpu.FeatureName.BGRA8UnormStorage,
-
         },
         .required_limits = .{
-            .limits = .{
-                // .max_sampled_textures_per_shader_stage = 32768 + 64,
-                // .max_storage_buffers_per_shader_stage = 32768 + 64,
-                .max_buffer_size = 1 * 1024 * 1024 * 1024,
-            },
+            // .max_sampled_textures_per_shader_stage = 32768 + 64,
+            // .max_storage_buffers_per_shader_stage = 32768 + 64,
+            .max_buffer_size = 1 * 1024 * 1024 * 1024,
         },
     });
     errdefer device.deinit();

@@ -11,6 +11,7 @@ const Error = common.Error;
 
 const TextureAspect = wgpu.TextureAspect;
 const TextureFormat = wgpu.TextureFormat;
+const TextureUsage = wgpu.TextureUsage;
 const TextureViewDimension = wgpu.TextureViewDimension;
 
 const TextureView = @This();
@@ -18,7 +19,7 @@ const TextureView = @This();
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUTextureViewDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
     format: TextureFormat = .Undefined,
     dimension: TextureViewDimension = .Undefined,
     base_mip_level: u32 = 0,
@@ -26,6 +27,7 @@ pub const Descriptor = struct {
     base_array_layer: u32 = 0,
     array_layer_count: u32 = 1,
     aspect: TextureAspect = .All,
+    usage: TextureUsage = .{},
 
     pub fn get(self: Descriptor) Descriptor.NativeType {
         return auto.wgpu_struct_get(null, Descriptor.NativeType, self);

@@ -19,7 +19,7 @@ pub const Descriptor = struct {
     pub fn get(self: Descriptor) Descriptor.NativeType {
         return .{
             .nextInChain = null,
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
         };
     }
 };

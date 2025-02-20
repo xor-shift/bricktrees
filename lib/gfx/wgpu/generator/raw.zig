@@ -32,7 +32,7 @@ pub const EBEntry = struct {
 pub const EBDecl = struct {
     name: []const u8,
     doc: []const u8,
-    entries: []const EBEntry,
+    entries: []const ?EBEntry,
 
     pub fn clone(self: EBDecl, alloc: std.mem.Allocator) !EBDecl {
         const cloned_name = try alloc.dupe(u8, self.name);
@@ -41,13 +41,17 @@ pub const EBDecl = struct {
         const cloned_doc = try alloc.dupe(u8, self.doc);
         errdefer alloc.free(cloned_doc);
 
-        const entries = try alloc.alloc(EBEntry, self.entries.len);
+        const entries = try alloc.alloc(?EBEntry, self.entries.len);
         errdefer alloc.free(entries);
 
         var copied_entries: usize = 0;
-        errdefer for (0..copied_entries) |i| entries[i].deinit(alloc);
+        errdefer for (0..copied_entries) |i| if (entries[i]) |v| v.deinit(alloc);
         for (self.entries) |entry| {
-            entries[copied_entries] = try entry.clone(alloc);
+            entries[copied_entries] = if (entry) |v|
+                try v.clone(alloc)
+            else
+                null;
+
             copied_entries += 1;
         }
 
@@ -62,7 +66,7 @@ pub const EBDecl = struct {
         alloc.free(self.name);
         alloc.free(self.doc);
 
-        for (self.entries) |entry| entry.deinit(alloc);
+        for (self.entries) |entry| if (entry) |v| v.deinit(alloc);
         alloc.free(self.entries);
     }
 };

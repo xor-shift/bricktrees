@@ -52,10 +52,31 @@
   "typedefs": [],
   "enums": [
     {
+      "name": "request_adapter_status",
+      "doc": "TODO\n",
+      "entries": [
+        {
+          "name": "success",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "unavailable",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "error",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "unknown",
+          "doc": "TODO\n"
+        }
+      ]
+    },
+    {
       "name": "adapter_type",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "discrete_GPU",
           "doc": "TODO\n"
@@ -79,19 +100,15 @@
       "doc": "TODO\n",
       "entries": [
         {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
-        {
-          "name": "clamp_to_edge",
-          "doc": "TODO\n"
-        },
-        {
           "name": "repeat",
           "doc": "TODO\n"
         },
         {
           "name": "mirror_repeat",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "clamp_to_edge",
           "doc": "TODO\n"
         }
       ]
@@ -102,7 +119,7 @@
       "entries": [
         {
           "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
+          "doc": "TODO\n"
         },
         {
           "name": "null",
@@ -139,13 +156,105 @@
       ]
     },
     {
-      "name": "blend_factor",
+      "name": "buffer_binding_type",
       "doc": "TODO\n",
       "entries": [
         {
           "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
+          "doc": "TODO\n"
         },
+        {
+          "name": "uniform",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "storage",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "read_only_storage",
+          "doc": "TODO\n"
+        }
+      ]
+    },
+    {
+      "name": "sampler_binding_type",
+      "doc": "TODO\n",
+      "entries": [
+        {
+          "name": "undefined",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "filtering",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "non_filtering",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "comparison",
+          "doc": "TODO\n"
+        }
+      ]
+    },
+    {
+      "name": "texture_sample_type",
+      "doc": "TODO\n",
+      "entries": [
+        {
+          "name": "undefined",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "float",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "unfilterable_float",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "depth",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "sint",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "uint",
+          "doc": "TODO\n"
+        }
+      ]
+    },
+    {
+      "name": "storage_texture_access",
+      "doc": "TODO\n",
+      "entries": [
+        {
+          "name": "undefined",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "write_only",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "read_only",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "read_write",
+          "doc": "TODO\n"
+        }
+      ]
+    },
+    {
+      "name": "blend_factor",
+      "doc": "TODO\n",
+      "entries": [
         {
           "name": "zero",
           "doc": "TODO\n"
@@ -197,22 +306,6 @@
         {
           "name": "one_minus_constant",
           "doc": "TODO\n"
-        },
-        {
-          "name": "src1",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "one_minus_src1",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "src1_alpha",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "one_minus_src1_alpha",
-          "doc": "TODO\n"
         }
       ]
     },
@@ -220,10 +313,6 @@
       "name": "blend_operation",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
         {
           "name": "add",
           "doc": "TODO\n"
@@ -247,27 +336,43 @@
       ]
     },
     {
-      "name": "buffer_binding_type",
+      "name": "buffer_map_async_status",
       "doc": "TODO\n",
       "entries": [
         {
-          "name": "binding_not_used",
-          "doc": "Indicates that this @ref WGPUBufferBindingLayout member of\nits parent @ref WGPUBindGroupLayoutEntry is not used.\n(See also @ref SentinelValues.)\n"
-        },
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
-        {
-          "name": "uniform",
+          "name": "success",
           "doc": "TODO\n"
         },
         {
-          "name": "storage",
+          "name": "validation_error",
           "doc": "TODO\n"
         },
         {
-          "name": "read_only_storage",
+          "name": "unknown",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "device_lost",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "destroyed_before_callback",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "unmapped_before_callback",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "mapping_already_pending",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "offset_out_of_range",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "size_out_of_range",
           "doc": "TODO\n"
         }
       ]
@@ -276,7 +381,6 @@
       "name": "buffer_map_state",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "unmapped",
           "doc": "TODO\n"
@@ -292,31 +396,12 @@
       ]
     },
     {
-      "name": "callback_mode",
-      "doc": "The callback mode controls how a callback for an asynchronous operation may be fired. See @ref Asynchronous-Operations for how these are used.",
-      "entries": [
-        null,
-        {
-          "name": "wait_any_only",
-          "doc": "Callbacks created with `WGPUCallbackMode_WaitAnyOnly`:\n- fire when the asynchronous operation's future is passed to a call to `::wgpuInstanceWaitAny`\n  AND the operation has already completed or it completes inside the call to `::wgpuInstanceWaitAny`.\n"
-        },
-        {
-          "name": "allow_process_events",
-          "doc": "Callbacks created with `WGPUCallbackMode_AllowProcessEvents`:\n- fire for the same reasons as callbacks created with `WGPUCallbackMode_WaitAnyOnly`\n- fire inside a call to `::wgpuInstanceProcessEvents` if the asynchronous operation is complete.\n"
-        },
-        {
-          "name": "allow_spontaneous",
-          "doc": "Callbacks created with `WGPUCallbackMode_AllowSpontaneous`:\n- fire for the same reasons as callbacks created with `WGPUCallbackMode_AllowProcessEvents`\n- **may** fire spontaneously on an arbitrary or application thread, when the WebGPU implementations discovers that the asynchronous operation is complete.\n\n  Implementations _should_ fire spontaneous callbacks as soon as possible.\n\n@note Because spontaneous callbacks may fire at an arbitrary time on an arbitrary thread, applications should take extra care when acquiring locks or mutating state inside the callback. It undefined behavior to re-entrantly call into the webgpu.h API if the callback fires while inside the callstack of another webgpu.h function that is not `wgpuInstanceWaitAny` or `wgpuInstanceProcessEvents`.\n"
-        }
-      ]
-    },
-    {
       "name": "compare_function",
       "doc": "TODO\n",
       "entries": [
         {
           "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
+          "doc": "TODO\n"
         },
         {
           "name": "never",
@@ -324,10 +409,6 @@
         },
         {
           "name": "less",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "equal",
           "doc": "TODO\n"
         },
         {
@@ -339,11 +420,15 @@
           "doc": "TODO\n"
         },
         {
-          "name": "not_equal",
+          "name": "greater_equal",
           "doc": "TODO\n"
         },
         {
-          "name": "greater_equal",
+          "name": "equal",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "not_equal",
           "doc": "TODO\n"
         },
         {
@@ -356,17 +441,16 @@
       "name": "compilation_info_request_status",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "success",
           "doc": "TODO\n"
         },
         {
-          "name": "instance_dropped",
+          "name": "error",
           "doc": "TODO\n"
         },
         {
-          "name": "error",
+          "name": "device_lost",
           "doc": "TODO\n"
         },
         {
@@ -379,7 +463,6 @@
       "name": "compilation_message_type",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "error",
           "doc": "TODO\n"
@@ -396,27 +479,27 @@
     },
     {
       "name": "composite_alpha_mode",
-      "doc": "Describes how frames are composited with other contents on the screen when `::wgpuSurfacePresent` is called.",
+      "doc": "TODO\n",
       "entries": [
         {
           "name": "auto",
-          "doc": "Lets the WebGPU implementation choose the best mode (supported, and with the best performance) between @ref WGPUCompositeAlphaMode_Opaque or @ref WGPUCompositeAlphaMode_Inherit."
+          "doc": "TODO\n"
         },
         {
           "name": "opaque",
-          "doc": "The alpha component of the image is ignored and teated as if it is always 1.0."
+          "doc": "TODO\n"
         },
         {
           "name": "premultiplied",
-          "doc": "The alpha component is respected and non-alpha components are assumed to be already multiplied with the alpha component. For example, (0.5, 0, 0, 0.5) is semi-transparent bright red."
+          "doc": "TODO\n"
         },
         {
           "name": "unpremultiplied",
-          "doc": "The alpha component is respected and non-alpha components are assumed to NOT be already multiplied with the alpha component. For example, (1.0, 0, 0, 0.5) is semi-transparent bright red."
+          "doc": "TODO\n"
         },
         {
           "name": "inherit",
-          "doc": "The handling of the alpha component is unknown to WebGPU and should be handled by the application using system-specific APIs. This mode may be unavailable (for example on Wasm)."
+          "doc": "TODO\n"
         }
       ]
     },
@@ -424,13 +507,8 @@
       "name": "create_pipeline_async_status",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "success",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "instance_dropped",
           "doc": "TODO\n"
         },
         {
@@ -439,6 +517,14 @@
         },
         {
           "name": "internal_error",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "device_lost",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "device_destroyed",
           "doc": "TODO\n"
         },
         {
@@ -451,10 +537,6 @@
       "name": "cull_mode",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
         {
           "name": "none",
           "doc": "TODO\n"
@@ -473,21 +555,14 @@
       "name": "device_lost_reason",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "unknown",
+          "value": 1,
           "doc": "TODO\n"
         },
         {
           "name": "destroyed",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "instance_dropped",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "failed_creation",
+          "value": 2,
           "doc": "TODO\n"
         }
       ]
@@ -496,7 +571,6 @@
       "name": "error_filter",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "validation",
           "doc": "TODO\n"
@@ -515,7 +589,6 @@
       "name": "error_type",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "no_error",
           "doc": "TODO\n"
@@ -535,21 +608,10 @@
         {
           "name": "unknown",
           "doc": "TODO\n"
-        }
-      ]
-    },
-    {
-      "name": "feature_level",
-      "doc": "See @ref WGPURequestAdapterOptions::featureLevel.\n",
-      "entries": [
-        null,
-        {
-          "name": "compatibility",
-          "doc": "\"Compatibility\" profile which can be supported on OpenGL ES 3.1.\n"
         },
         {
-          "name": "core",
-          "doc": "\"Core\" profile which can be supported on Vulkan/Metal/D3D12.\n"
+          "name": "device_lost",
+          "doc": "TODO\n"
         }
       ]
     },
@@ -578,19 +640,11 @@
           "doc": "TODO\n"
         },
         {
-          "name": "texture_compression_BC_sliced_3D",
-          "doc": "TODO\n"
-        },
-        {
           "name": "texture_compression_ETC2",
           "doc": "TODO\n"
         },
         {
           "name": "texture_compression_ASTC",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "texture_compression_ASTC_sliced_3D",
           "doc": "TODO\n"
         },
         {
@@ -612,18 +666,6 @@
         {
           "name": "float32_filterable",
           "doc": "TODO\n"
-        },
-        {
-          "name": "float32_blendable",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "clip_distances",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "dual_source_blending",
-          "doc": "TODO\n"
         }
       ]
     },
@@ -631,10 +673,6 @@
       "name": "filter_mode",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
         {
           "name": "nearest",
           "doc": "TODO\n"
@@ -649,10 +687,6 @@
       "name": "front_face",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
         {
           "name": "CCW",
           "doc": "TODO\n"
@@ -669,7 +703,7 @@
       "entries": [
         {
           "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
+          "doc": "TODO\n"
         },
         {
           "name": "uint16",
@@ -682,46 +716,37 @@
       ]
     },
     {
-      "name": "load_op",
+      "name": "vertex_step_mode",
       "doc": "TODO\n",
       "entries": [
         {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
-        {
-          "name": "load",
+          "name": "vertex",
           "doc": "TODO\n"
         },
         {
-          "name": "clear",
+          "name": "instance",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "vertex_buffer_not_used",
           "doc": "TODO\n"
         }
       ]
     },
     {
-      "name": "map_async_status",
+      "name": "load_op",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
-          "name": "success",
+          "name": "undefined",
           "doc": "TODO\n"
         },
         {
-          "name": "instance_dropped",
+          "name": "clear",
           "doc": "TODO\n"
         },
         {
-          "name": "error",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "aborted",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "unknown",
+          "name": "load",
           "doc": "TODO\n"
         }
       ]
@@ -730,10 +755,6 @@
       "name": "mipmap_filter_mode",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
         {
           "name": "nearest",
           "doc": "TODO\n"
@@ -745,39 +766,20 @@
       ]
     },
     {
-      "name": "optional_bool",
+      "name": "store_op",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "false",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "true",
-          "doc": "TODO\n"
-        },
         {
           "name": "undefined",
           "doc": "TODO\n"
-        }
-      ]
-    },
-    {
-      "name": "pop_error_scope_status",
-      "doc": "TODO\n",
-      "entries": [
-        null,
-        {
-          "name": "success",
-          "doc": "The error scope stack was successfully popped and a result was reported.\n"
         },
         {
-          "name": "instance_dropped",
+          "name": "store",
           "doc": "TODO\n"
         },
         {
-          "name": "empty_stack",
-          "doc": "The error scope stack could not be popped, because it was empty.\n"
+          "name": "discard",
+          "doc": "TODO\n"
         }
       ]
     },
@@ -787,7 +789,7 @@
       "entries": [
         {
           "name": "undefined",
-          "doc": "No preference. (See also @ref SentinelValues.)"
+          "doc": "TODO\n"
         },
         {
           "name": "low_power",
@@ -801,27 +803,23 @@
     },
     {
       "name": "present_mode",
-      "doc": "Describes when and in which order frames are presented on the screen when `::wgpuSurfacePresent` is called.",
+      "doc": "TODO\n",
       "entries": [
         {
-          "name": "undefined",
-          "doc": "Present mode is not specified. Use the default.\n"
-        },
-        {
           "name": "fifo",
-          "doc": "The presentation of the image to the user waits for the next vertical blanking period to update in a first-in, first-out manner.\nTearing cannot be observed and frame-loop will be limited to the display's refresh rate.\nThis is the only mode that's always available.\n"
+          "doc": "TODO\n"
         },
         {
           "name": "fifo_relaxed",
-          "doc": "The presentation of the image to the user tries to wait for the next vertical blanking period but may decide to not wait if a frame is presented late.\nTearing can sometimes be observed but late-frame don't produce a full-frame stutter in the presentation.\nThis is still a first-in, first-out mechanism so a frame-loop will be limited to the display's refresh rate.\n"
+          "doc": "TODO\n"
         },
         {
           "name": "immediate",
-          "doc": "The presentation of the image to the user is updated immediately without waiting for a vertical blank.\nTearing can be observed but latency is minimized.\n"
+          "doc": "TODO\n"
         },
         {
           "name": "mailbox",
-          "doc": "The presentation of the image to the user waits for the next vertical blanking period to update to the latest provided image.\nTearing cannot be observed and a frame-loop is not limited to the display's refresh rate.\n"
+          "doc": "TODO\n"
         }
       ]
     },
@@ -829,10 +827,6 @@
       "name": "primitive_topology",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
         {
           "name": "point_list",
           "doc": "TODO\n"
@@ -859,7 +853,6 @@
       "name": "query_type",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "occlusion",
           "doc": "TODO\n"
@@ -874,13 +867,8 @@
       "name": "queue_work_done_status",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "success",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "instance_dropped",
           "doc": "TODO\n"
         },
         {
@@ -890,32 +878,9 @@
         {
           "name": "unknown",
           "doc": "TODO\n"
-        }
-      ]
-    },
-    {
-      "name": "request_adapter_status",
-      "doc": "TODO\n",
-      "entries": [
-        null,
-        {
-          "name": "success",
-          "doc": "TODO\n"
         },
         {
-          "name": "instance_dropped",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "unavailable",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "error",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "unknown",
+          "name": "device_lost",
           "doc": "TODO\n"
         }
       ]
@@ -924,13 +889,8 @@
       "name": "request_device_status",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
           "name": "success",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "instance_dropped",
           "doc": "TODO\n"
         },
         {
@@ -944,97 +904,9 @@
       ]
     },
     {
-      "name": "s_type",
-      "doc": "TODO\n",
-      "entries": [
-        null,
-        {
-          "name": "shader_source_SPIRV",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "shader_source_WGSL",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "render_pass_max_draw_count",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "surface_source_metal_layer",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "surface_source_windows_HWND",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "surface_source_xlib_window",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "surface_source_wayland_surface",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "surface_source_android_native_window",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "surface_source_XCB_window",
-          "doc": "TODO\n"
-        }
-      ]
-    },
-    {
-      "name": "sampler_binding_type",
-      "doc": "TODO\n",
-      "entries": [
-        {
-          "name": "binding_not_used",
-          "doc": "Indicates that this @ref WGPUSamplerBindingLayout member of\nits parent @ref WGPUBindGroupLayoutEntry is not used.\n(See also @ref SentinelValues.)\n"
-        },
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
-        {
-          "name": "filtering",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "non_filtering",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "comparison",
-          "doc": "TODO\n"
-        }
-      ]
-    },
-    {
-      "name": "status",
-      "doc": "Status code returned (synchronously) from many operations. Generally\nindicates an invalid input like an unknown enum value or @ref OutStructChainError.\nRead the function's documentation for specific error conditions.\n",
-      "entries": [
-        null,
-        {
-          "name": "success",
-          "doc": ""
-        },
-        {
-          "name": "error",
-          "doc": ""
-        }
-      ]
-    },
-    {
       "name": "stencil_operation",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
         {
           "name": "keep",
           "doc": "TODO\n"
@@ -1070,85 +942,87 @@
       ]
     },
     {
-      "name": "storage_texture_access",
+      "name": "s_type",
       "doc": "TODO\n",
       "entries": [
         {
-          "name": "binding_not_used",
-          "doc": "Indicates that this @ref WGPUStorageTextureBindingLayout member of\nits parent @ref WGPUBindGroupLayoutEntry is not used.\n(See also @ref SentinelValues.)\n"
-        },
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
-        {
-          "name": "write_only",
+          "name": "invalid",
           "doc": "TODO\n"
         },
         {
-          "name": "read_only",
+          "name": "surface_descriptor_from_metal_layer",
           "doc": "TODO\n"
         },
         {
-          "name": "read_write",
-          "doc": "TODO\n"
-        }
-      ]
-    },
-    {
-      "name": "store_op",
-      "doc": "TODO\n",
-      "entries": [
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
-        {
-          "name": "store",
+          "name": "surface_descriptor_from_windows_HWND",
           "doc": "TODO\n"
         },
         {
-          "name": "discard",
+          "name": "surface_descriptor_from_xlib_window",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "surface_descriptor_from_canvas_HTML_selector",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "shader_module_SPIRV_descriptor",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "shader_module_WGSL_descriptor",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "primitive_depth_clip_control",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "surface_descriptor_from_wayland_surface",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "surface_descriptor_from_android_native_window",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "surface_descriptor_from_xcb_window",
+          "doc": "TODO\n"
+        },
+        {
+          "name": "render_pass_descriptor_max_draw_count",
+          "value": 15,
           "doc": "TODO\n"
         }
       ]
     },
     {
       "name": "surface_get_current_texture_status",
-      "doc": "The status enum for `::wgpuSurfaceGetCurrentTexture`.",
+      "doc": "TODO\n",
       "entries": [
-        null,
         {
-          "name": "success_optimal",
-          "doc": "Yay! Everything is good and we can render this frame."
-        },
-        {
-          "name": "success_suboptimal",
-          "doc": "Still OK - the surface can present the frame, but in a suboptimal way. The surface may need reconfiguration."
+          "name": "success",
+          "doc": "TODO\n"
         },
         {
           "name": "timeout",
-          "doc": "Some operation timed out while trying to acquire the frame."
+          "doc": "TODO\n"
         },
         {
           "name": "outdated",
-          "doc": "The surface is too different to be used, compared to when it was originally created."
+          "doc": "TODO\n"
         },
         {
           "name": "lost",
-          "doc": "The connection to whatever owns the surface was lost."
+          "doc": "TODO\n"
         },
         {
           "name": "out_of_memory",
-          "doc": "The system ran out of memory."
+          "doc": "TODO\n"
         },
         {
           "name": "device_lost",
-          "doc": "The @ref WGPUDevice configured on the @ref WGPUSurface was lost."
-        },
-        {
-          "name": "error",
-          "doc": "The surface is not configured, or there was an @ref OutStructChainError."
+          "doc": "TODO\n"
         }
       ]
     },
@@ -1156,10 +1030,6 @@
       "name": "texture_aspect",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
         {
           "name": "all",
           "doc": "TODO\n"
@@ -1178,10 +1048,6 @@
       "name": "texture_dimension",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
         {
           "name": "1D",
           "doc": "TODO\n"
@@ -1202,7 +1068,7 @@
       "entries": [
         {
           "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
+          "doc": "TODO\n"
         },
         {
           "name": "R8_unorm",
@@ -1587,46 +1453,12 @@
       ]
     },
     {
-      "name": "texture_sample_type",
-      "doc": "TODO\n",
-      "entries": [
-        {
-          "name": "binding_not_used",
-          "doc": "Indicates that this @ref WGPUTextureBindingLayout member of\nits parent @ref WGPUBindGroupLayoutEntry is not used.\n(See also @ref SentinelValues.)\n"
-        },
-        {
-          "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
-        {
-          "name": "float",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "unfilterable_float",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "depth",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "sint",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "uint",
-          "doc": "TODO\n"
-        }
-      ]
-    },
-    {
       "name": "texture_view_dimension",
       "doc": "TODO\n",
       "entries": [
         {
           "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
+          "doc": "TODO\n"
         },
         {
           "name": "1D",
@@ -1658,9 +1490,8 @@
       "name": "vertex_format",
       "doc": "TODO\n",
       "entries": [
-        null,
         {
-          "name": "uint8",
+          "name": "undefined",
           "doc": "TODO\n"
         },
         {
@@ -1672,19 +1503,11 @@
           "doc": "TODO\n"
         },
         {
-          "name": "sint8",
-          "doc": "TODO\n"
-        },
-        {
           "name": "sint8x2",
           "doc": "TODO\n"
         },
         {
           "name": "sint8x4",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "unorm8",
           "doc": "TODO\n"
         },
         {
@@ -1696,19 +1519,11 @@
           "doc": "TODO\n"
         },
         {
-          "name": "snorm8",
-          "doc": "TODO\n"
-        },
-        {
           "name": "snorm8x2",
           "doc": "TODO\n"
         },
         {
           "name": "snorm8x4",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "uint16",
           "doc": "TODO\n"
         },
         {
@@ -1720,19 +1535,11 @@
           "doc": "TODO\n"
         },
         {
-          "name": "sint16",
-          "doc": "TODO\n"
-        },
-        {
           "name": "sint16x2",
           "doc": "TODO\n"
         },
         {
           "name": "sint16x4",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "unorm16",
           "doc": "TODO\n"
         },
         {
@@ -1744,19 +1551,11 @@
           "doc": "TODO\n"
         },
         {
-          "name": "snorm16",
-          "doc": "TODO\n"
-        },
-        {
           "name": "snorm16x2",
           "doc": "TODO\n"
         },
         {
           "name": "snorm16x4",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "float16",
           "doc": "TODO\n"
         },
         {
@@ -1814,71 +1613,17 @@
         {
           "name": "sint32x4",
           "doc": "TODO\n"
-        },
-        {
-          "name": "unorm10__10__10__2",
-          "doc": "TODO\n"
-        },
-        {
-          "name": "unorm8x4_B_G_R_A",
-          "doc": "TODO\n"
         }
       ]
     },
     {
-      "name": "vertex_step_mode",
+      "name": "WGSL_feature_name",
       "doc": "TODO\n",
       "entries": [
-        {
-          "name": "vertex_buffer_not_used",
-          "doc": "This @ref WGPUVertexBufferLayout is a \"hole\" in the @ref WGPUVertexState `buffers` array.\n(See also @ref SentinelValues.)\n"
-        },
         {
           "name": "undefined",
-          "doc": "Indicates no value is passed for this argument. See @ref SentinelValues."
-        },
-        {
-          "name": "vertex",
           "doc": "TODO\n"
         },
-        {
-          "name": "instance",
-          "doc": "TODO\n"
-        }
-      ]
-    },
-    {
-      "name": "wait_status",
-      "doc": "Status returned from a call to ::wgpuInstanceWaitAny.",
-      "entries": [
-        null,
-        {
-          "name": "success",
-          "doc": "At least one WGPUFuture completed successfully."
-        },
-        {
-          "name": "timed_out",
-          "doc": "No WGPUFutures completed within the timeout."
-        },
-        {
-          "name": "unsupported_timeout",
-          "doc": "A @ref Timed-Wait was performed when WGPUInstanceFeatures::timedWaitAnyEnable is false."
-        },
-        {
-          "name": "unsupported_count",
-          "doc": "The number of futures waited on in a @ref Timed-Wait is greater than the supported WGPUInstanceFeatures::timedWaitAnyMaxCount."
-        },
-        {
-          "name": "unsupported_mixed_sources",
-          "doc": "An invalid wait was performed with @ref Mixed-Sources."
-        }
-      ]
-    },
-    {
-      "name": "WGSL_language_feature_name",
-      "doc": "TODO\n",
-      "entries": [
-        null,
         {
           "name": "readonly_and_readwrite_storage_textures",
           "doc": "TODO\n"
@@ -1976,6 +1721,7 @@
         {
           "name": "all",
           "value_combination": [
+            "none",
             "red",
             "green",
             "blue",
@@ -2056,7 +1802,81 @@
       ]
     }
   ],
+  "function_types": [
+    {
+      "name": "device_lost_callback",
+      "doc": "TODO\n",
+      "args": [
+        {
+          "name": "reason",
+          "doc": "TODO\n",
+          "type": "enum.device_lost_reason"
+        },
+        {
+          "name": "message",
+          "doc": "TODO\n",
+          "type": "string"
+        },
+        {
+          "name": "userdata",
+          "doc": "TODO\n",
+          "type": "c_void",
+          "pointer": "mutable"
+        }
+      ]
+    },
+    {
+      "name": "error_callback",
+      "doc": "TODO\n",
+      "args": [
+        {
+          "name": "type",
+          "doc": "TODO\n",
+          "type": "enum.error_type"
+        },
+        {
+          "name": "message",
+          "doc": "TODO\n",
+          "type": "string"
+        },
+        {
+          "name": "userdata",
+          "doc": "TODO\n",
+          "type": "c_void",
+          "pointer": "mutable"
+        }
+      ]
+    }
+  ],
   "structs": [
+    {
+      "name": "request_adapter_options",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "compatible_surface",
+          "doc": "TODO\n",
+          "type": "object.surface",
+          "optional": true
+        },
+        {
+          "name": "power_preference",
+          "doc": "TODO\n",
+          "type": "enum.power_preference"
+        },
+        {
+          "name": "backend_type",
+          "doc": "TODO\n",
+          "type": "enum.backend_type"
+        },
+        {
+          "name": "force_fallback_adapter",
+          "doc": "TODO\n",
+          "type": "bool"
+        }
+      ]
+    },
     {
       "name": "adapter_info",
       "doc": "TODO\n",
@@ -2066,22 +1886,22 @@
         {
           "name": "vendor",
           "doc": "TODO\n",
-          "type": "out_string"
+          "type": "string"
         },
         {
           "name": "architecture",
           "doc": "TODO\n",
-          "type": "out_string"
+          "type": "string"
         },
         {
           "name": "device",
           "doc": "TODO\n",
-          "type": "out_string"
+          "type": "string"
         },
         {
           "name": "description",
           "doc": "TODO\n",
-          "type": "out_string"
+          "type": "string"
         },
         {
           "name": "backend_type",
@@ -2106,25 +1926,49 @@
       ]
     },
     {
-      "name": "bind_group_descriptor",
+      "name": "device_descriptor",
       "doc": "TODO\n",
       "type": "base_in",
       "members": [
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
-          "name": "layout",
+          "name": "required_features",
           "doc": "TODO\n",
-          "type": "object.bind_group_layout"
-        },
-        {
-          "name": "entries",
-          "doc": "TODO\n",
-          "type": "array<struct.bind_group_entry>",
+          "type": "array<enum.feature_name>",
           "pointer": "immutable"
+        },
+        {
+          "name": "required_limits",
+          "doc": "TODO\n",
+          "type": "struct.required_limits",
+          "pointer": "immutable",
+          "optional": true
+        },
+        {
+          "name": "default_queue",
+          "doc": "TODO\n",
+          "type": "struct.queue_descriptor"
+        },
+        {
+          "name": "device_lost_callback",
+          "doc": "TODO\n",
+          "type": "function_type.device_lost_callback"
+        },
+        {
+          "name": "device_lost_userdata",
+          "doc": "TODO\n",
+          "type": "c_void",
+          "pointer": "mutable"
+        },
+        {
+          "name": "uncaptured_error_callback_info",
+          "doc": "TODO\n",
+          "type": "function_type.uncaptured_error_callback_info"
         }
       ]
     },
@@ -2169,20 +2013,183 @@
       ]
     },
     {
-      "name": "bind_group_layout_descriptor",
+      "name": "bind_group_descriptor",
       "doc": "TODO\n",
       "type": "base_in",
       "members": [
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "layout",
+          "doc": "TODO\n",
+          "type": "object.bind_group_layout"
         },
         {
           "name": "entries",
           "doc": "TODO\n",
-          "type": "array<struct.bind_group_layout_entry>",
+          "type": "array<struct.bind_group_entry>",
           "pointer": "immutable"
+        }
+      ]
+    },
+    {
+      "name": "buffer_binding_layout",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "type",
+          "doc": "TODO\n",
+          "type": "enum.buffer_binding_type"
+        },
+        {
+          "name": "has_dynamic_offset",
+          "doc": "TODO\n",
+          "type": "bool"
+        },
+        {
+          "name": "min_binding_size",
+          "doc": "TODO\n",
+          "type": "uint64"
+        }
+      ]
+    },
+    {
+      "name": "sampler_binding_layout",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "type",
+          "doc": "TODO\n",
+          "type": "enum.sampler_binding_type"
+        }
+      ]
+    },
+    {
+      "name": "texture_binding_layout",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "sample_type",
+          "doc": "TODO\n",
+          "type": "enum.texture_sample_type"
+        },
+        {
+          "name": "view_dimension",
+          "doc": "TODO\n",
+          "type": "enum.texture_view_dimension"
+        },
+        {
+          "name": "multisampled",
+          "doc": "TODO\n",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "surface_capabilities",
+      "doc": "TODO\n",
+      "type": "base_out",
+      "free_members": true,
+      "members": [
+        {
+          "name": "usages",
+          "doc": "TODO\n",
+          "type": "bitflag.texture_usage"
+        },
+        {
+          "name": "formats",
+          "doc": "TODO\n",
+          "type": "array<enum.texture_format>",
+          "pointer": "immutable"
+        },
+        {
+          "name": "present_modes",
+          "doc": "TODO\n",
+          "type": "array<enum.present_mode>",
+          "pointer": "immutable"
+        },
+        {
+          "name": "alpha_modes",
+          "doc": "TODO\n",
+          "type": "array<enum.composite_alpha_mode>",
+          "pointer": "immutable"
+        }
+      ]
+    },
+    {
+      "name": "surface_configuration",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "device",
+          "doc": "TODO\n",
+          "type": "object.device"
+        },
+        {
+          "name": "format",
+          "doc": "TODO\n",
+          "type": "enum.texture_format"
+        },
+        {
+          "name": "usage",
+          "doc": "TODO\n",
+          "type": "bitflag.texture_usage"
+        },
+        {
+          "name": "view_formats",
+          "doc": "TODO\n",
+          "type": "array<enum.texture_format>",
+          "pointer": "immutable"
+        },
+        {
+          "name": "alpha_mode",
+          "doc": "TODO\n",
+          "type": "enum.composite_alpha_mode"
+        },
+        {
+          "name": "width",
+          "doc": "TODO\n",
+          "type": "uint32"
+        },
+        {
+          "name": "height",
+          "doc": "TODO\n",
+          "type": "uint32"
+        },
+        {
+          "name": "present_mode",
+          "doc": "TODO\n",
+          "type": "enum.present_mode"
+        }
+      ]
+    },
+    {
+      "name": "storage_texture_binding_layout",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "access",
+          "doc": "TODO\n",
+          "type": "enum.storage_texture_access"
+        },
+        {
+          "name": "format",
+          "doc": "TODO\n",
+          "type": "enum.texture_format"
+        },
+        {
+          "name": "view_dimension",
+          "doc": "TODO\n",
+          "type": "enum.texture_view_dimension"
         }
       ]
     },
@@ -2224,6 +2231,25 @@
       ]
     },
     {
+      "name": "bind_group_layout_descriptor",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "label",
+          "doc": "TODO\n",
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "entries",
+          "doc": "TODO\n",
+          "type": "array<struct.bind_group_layout_entry>",
+          "pointer": "immutable"
+        }
+      ]
+    },
+    {
       "name": "blend_component",
       "doc": "TODO\n",
       "type": "standalone",
@@ -2246,45 +2272,6 @@
       ]
     },
     {
-      "name": "blend_state",
-      "doc": "TODO\n",
-      "type": "standalone",
-      "members": [
-        {
-          "name": "color",
-          "doc": "TODO\n",
-          "type": "struct.blend_component"
-        },
-        {
-          "name": "alpha",
-          "doc": "TODO\n",
-          "type": "struct.blend_component"
-        }
-      ]
-    },
-    {
-      "name": "buffer_binding_layout",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "type",
-          "doc": "TODO\n",
-          "type": "enum.buffer_binding_type"
-        },
-        {
-          "name": "has_dynamic_offset",
-          "doc": "TODO\n",
-          "type": "bool"
-        },
-        {
-          "name": "min_binding_size",
-          "doc": "TODO\n",
-          "type": "uint64"
-        }
-      ]
-    },
-    {
       "name": "buffer_descriptor",
       "doc": "TODO\n",
       "type": "base_in",
@@ -2292,7 +2279,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "usage",
@@ -2339,26 +2327,19 @@
       ]
     },
     {
-      "name": "color_target_state",
+      "name": "constant_entry",
       "doc": "TODO\n",
       "type": "base_in",
       "members": [
         {
-          "name": "format",
-          "doc": "The texture format of the target. If @ref WGPUTextureFormat_Undefined,\nindicates a \"hole\" in the parent @ref WGPUFragmentState `targets` array:\nthe pipeline does not output a value at this `location`.\n",
-          "type": "enum.texture_format"
+          "name": "key",
+          "doc": "TODO\n",
+          "type": "string"
         },
         {
-          "name": "blend",
+          "name": "value",
           "doc": "TODO\n",
-          "type": "struct.blend_state",
-          "pointer": "immutable",
-          "optional": true
-        },
-        {
-          "name": "write_mask",
-          "doc": "TODO\n",
-          "type": "bitflag.color_write_mask"
+          "type": "float64"
         }
       ]
     },
@@ -2370,7 +2351,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         }
       ]
     },
@@ -2382,7 +2364,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         }
       ]
     },
@@ -2406,32 +2389,48 @@
       "members": [
         {
           "name": "message",
-          "doc": "A @ref LocalizableHumanReadableMessageString.\n",
-          "type": "out_string"
+          "doc": "TODO\n",
+          "type": "string",
+          "optional": true
         },
         {
           "name": "type",
-          "doc": "Severity level of the message.\n",
+          "doc": "TODO\n",
           "type": "enum.compilation_message_type"
         },
         {
           "name": "line_num",
-          "doc": "Line number where the message is attached, starting at 1.\n",
+          "doc": "TODO\n",
           "type": "uint64"
         },
         {
           "name": "line_pos",
-          "doc": "Offset in UTF-8 code units (bytes) from the beginning of the line, starting at 1.\n",
+          "doc": "TODO\n",
           "type": "uint64"
         },
         {
           "name": "offset",
-          "doc": "Offset in UTF-8 code units (bytes) from the beginning of the shader code, starting at 0.\n",
+          "doc": "TODO\n",
           "type": "uint64"
         },
         {
           "name": "length",
-          "doc": "Length in UTF-8 code units (bytes) of the span the message corresponds to.\n",
+          "doc": "TODO\n",
+          "type": "uint64"
+        },
+        {
+          "name": "utf16_line_pos",
+          "doc": "TODO\n",
+          "type": "uint64"
+        },
+        {
+          "name": "utf16_offset",
+          "doc": "TODO\n",
+          "type": "uint64"
+        },
+        {
+          "name": "utf16_length",
+          "doc": "TODO\n",
           "type": "uint64"
         }
       ]
@@ -2444,7 +2443,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "timestamp_writes",
@@ -2485,7 +2485,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "layout",
@@ -2501,232 +2502,9 @@
       ]
     },
     {
-      "name": "constant_entry",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "key",
-          "doc": "TODO\n",
-          "type": "string_with_default_empty"
-        },
-        {
-          "name": "value",
-          "doc": "TODO\n",
-          "type": "float64"
-        }
-      ]
-    },
-    {
-      "name": "depth_stencil_state",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "format",
-          "doc": "TODO\n",
-          "type": "enum.texture_format"
-        },
-        {
-          "name": "depth_write_enabled",
-          "doc": "TODO\n",
-          "type": "enum.optional_bool"
-        },
-        {
-          "name": "depth_compare",
-          "doc": "TODO\n",
-          "type": "enum.compare_function"
-        },
-        {
-          "name": "stencil_front",
-          "doc": "TODO\n",
-          "type": "struct.stencil_face_state"
-        },
-        {
-          "name": "stencil_back",
-          "doc": "TODO\n",
-          "type": "struct.stencil_face_state"
-        },
-        {
-          "name": "stencil_read_mask",
-          "doc": "TODO\n",
-          "type": "uint32"
-        },
-        {
-          "name": "stencil_write_mask",
-          "doc": "TODO\n",
-          "type": "uint32"
-        },
-        {
-          "name": "depth_bias",
-          "doc": "TODO\n",
-          "type": "int32"
-        },
-        {
-          "name": "depth_bias_slope_scale",
-          "doc": "TODO\n",
-          "type": "float32"
-        },
-        {
-          "name": "depth_bias_clamp",
-          "doc": "TODO\n",
-          "type": "float32"
-        }
-      ]
-    },
-    {
-      "name": "device_descriptor",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "label",
-          "doc": "TODO\n",
-          "type": "string_with_default_empty"
-        },
-        {
-          "name": "required_features",
-          "doc": "TODO\n",
-          "type": "array<enum.feature_name>",
-          "pointer": "immutable"
-        },
-        {
-          "name": "required_limits",
-          "doc": "TODO\n",
-          "type": "struct.limits",
-          "pointer": "immutable",
-          "optional": true
-        },
-        {
-          "name": "default_queue",
-          "doc": "TODO\n",
-          "type": "struct.queue_descriptor"
-        },
-        {
-          "name": "device_lost_callback_info",
-          "doc": "TODO\n",
-          "type": "callback.device_lost"
-        },
-        {
-          "name": "uncaptured_error_callback_info",
-          "doc": "TODO\n",
-          "type": "callback.uncaptured_error"
-        }
-      ]
-    },
-    {
-      "name": "extent_3D",
-      "doc": "TODO\n",
-      "type": "standalone",
-      "members": [
-        {
-          "name": "width",
-          "doc": "TODO\n",
-          "type": "uint32"
-        },
-        {
-          "name": "height",
-          "doc": "TODO\n",
-          "type": "uint32"
-        },
-        {
-          "name": "depth_or_array_layers",
-          "doc": "TODO\n",
-          "type": "uint32"
-        }
-      ]
-    },
-    {
-      "name": "fragment_state",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "module",
-          "doc": "TODO\n",
-          "type": "object.shader_module"
-        },
-        {
-          "name": "entry_point",
-          "doc": "TODO\n",
-          "type": "nullable_string"
-        },
-        {
-          "name": "constants",
-          "doc": "TODO\n",
-          "type": "array<struct.constant_entry>",
-          "pointer": "immutable"
-        },
-        {
-          "name": "targets",
-          "doc": "TODO\n",
-          "type": "array<struct.color_target_state>",
-          "pointer": "immutable"
-        }
-      ]
-    },
-    {
-      "name": "future",
-      "doc": "Opaque handle to an asynchronous operation. See @ref Asynchronous-Operations for more information.",
-      "type": "standalone",
-      "members": [
-        {
-          "name": "id",
-          "doc": "Opaque id of the @ref WGPUFuture",
-          "type": "uint64"
-        }
-      ]
-    },
-    {
-      "name": "future_wait_info",
-      "doc": "Struct holding a future to wait on, and a `completed` boolean flag.",
-      "type": "standalone",
-      "members": [
-        {
-          "name": "future",
-          "doc": "The future to wait on.",
-          "type": "struct.future"
-        },
-        {
-          "name": "completed",
-          "doc": "Whether or not the future completed.",
-          "type": "bool"
-        }
-      ]
-    },
-    {
-      "name": "instance_capabilities",
-      "doc": "Features enabled on the WGPUInstance\n",
-      "type": "base_in_or_out",
-      "members": [
-        {
-          "name": "timed_wait_any_enable",
-          "doc": "Enable use of ::wgpuInstanceWaitAny with `timeoutNS > 0`.",
-          "type": "bool"
-        },
-        {
-          "name": "timed_wait_any_max_count",
-          "doc": "The maximum number @ref WGPUFutureWaitInfo supported in a call to ::wgpuInstanceWaitAny with `timeoutNS > 0`.",
-          "type": "usize"
-        }
-      ]
-    },
-    {
-      "name": "instance_descriptor",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "features",
-          "doc": "Instance features to enable",
-          "type": "struct.instance_capabilities"
-        }
-      ]
-    },
-    {
       "name": "limits",
       "doc": "TODO\n",
-      "type": "base_in_or_out",
+      "type": "standalone",
       "members": [
         {
           "name": "max_texture_dimension_1D",
@@ -2839,6 +2617,11 @@
           "type": "uint32"
         },
         {
+          "name": "max_inter_stage_shader_components",
+          "doc": "TODO\n",
+          "type": "uint32"
+        },
+        {
           "name": "max_inter_stage_shader_variables",
           "doc": "TODO\n",
           "type": "uint32"
@@ -2886,24 +2669,142 @@
       ]
     },
     {
-      "name": "multisample_state",
+      "name": "required_limits",
       "doc": "TODO\n",
       "type": "base_in",
       "members": [
         {
-          "name": "count",
+          "name": "limits",
+          "doc": "TODO\n",
+          "type": "struct.limits"
+        }
+      ]
+    },
+    {
+      "name": "supported_limits",
+      "doc": "TODO\n",
+      "type": "base_out",
+      "members": [
+        {
+          "name": "limits",
+          "doc": "TODO\n",
+          "type": "struct.limits"
+        }
+      ]
+    },
+    {
+      "name": "extent_3D",
+      "doc": "TODO\n",
+      "type": "standalone",
+      "members": [
+        {
+          "name": "width",
           "doc": "TODO\n",
           "type": "uint32"
         },
         {
-          "name": "mask",
+          "name": "height",
           "doc": "TODO\n",
           "type": "uint32"
         },
         {
-          "name": "alpha_to_coverage_enabled",
+          "name": "depth_or_array_layers",
           "doc": "TODO\n",
-          "type": "bool"
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "image_copy_buffer",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "layout",
+          "doc": "TODO\n",
+          "type": "struct.texture_data_layout"
+        },
+        {
+          "name": "buffer",
+          "doc": "TODO\n",
+          "type": "object.buffer"
+        }
+      ]
+    },
+    {
+      "name": "image_copy_texture",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "texture",
+          "doc": "TODO\n",
+          "type": "object.texture"
+        },
+        {
+          "name": "mip_level",
+          "doc": "TODO\n",
+          "type": "uint32"
+        },
+        {
+          "name": "origin",
+          "doc": "TODO\n",
+          "type": "struct.origin_3D"
+        },
+        {
+          "name": "aspect",
+          "doc": "TODO\n",
+          "type": "enum.texture_aspect"
+        }
+      ]
+    },
+    {
+      "name": "instance_descriptor",
+      "doc": "TODO\n",
+      "type": "base_in"
+    },
+    {
+      "name": "vertex_attribute",
+      "doc": "TODO\n",
+      "type": "standalone",
+      "members": [
+        {
+          "name": "format",
+          "doc": "TODO\n",
+          "type": "enum.vertex_format"
+        },
+        {
+          "name": "offset",
+          "doc": "TODO\n",
+          "type": "uint64"
+        },
+        {
+          "name": "shader_location",
+          "doc": "TODO\n",
+          "type": "uint32"
+        }
+      ]
+    },
+    {
+      "name": "vertex_buffer_layout",
+      "doc": "TODO\n",
+      "type": "standalone",
+      "members": [
+        {
+          "name": "array_stride",
+          "doc": "TODO\n",
+          "type": "uint64"
+        },
+        {
+          "name": "step_mode",
+          "doc": "TODO\n",
+          "type": "enum.vertex_step_mode"
+        },
+        {
+          "name": "attributes",
+          "doc": "TODO\n",
+          "type": "array<struct.vertex_attribute>",
+          "pointer": "immutable"
         }
       ]
     },
@@ -2937,45 +2838,14 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "bind_group_layouts",
           "doc": "TODO\n",
           "type": "array<object.bind_group_layout>",
           "pointer": "immutable"
-        }
-      ]
-    },
-    {
-      "name": "primitive_state",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "topology",
-          "doc": "TODO\n",
-          "type": "enum.primitive_topology"
-        },
-        {
-          "name": "strip_index_format",
-          "doc": "TODO\n",
-          "type": "enum.index_format"
-        },
-        {
-          "name": "front_face",
-          "doc": "TODO\n",
-          "type": "enum.front_face"
-        },
-        {
-          "name": "cull_mode",
-          "doc": "TODO\n",
-          "type": "enum.cull_mode"
-        },
-        {
-          "name": "unclipped_depth",
-          "doc": "TODO\n",
-          "type": "bool"
         }
       ]
     },
@@ -2992,7 +2862,8 @@
         {
           "name": "entry_point",
           "doc": "TODO\n",
-          "type": "nullable_string"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "constants",
@@ -3010,7 +2881,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "type",
@@ -3032,7 +2904,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         }
       ]
     },
@@ -3044,7 +2917,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         }
       ]
     },
@@ -3056,7 +2930,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "color_formats",
@@ -3185,7 +3060,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "color_attachments",
@@ -3216,7 +3092,7 @@
       ]
     },
     {
-      "name": "render_pass_max_draw_count",
+      "name": "render_pass_descriptor_max_draw_count",
       "doc": "TODO\n",
       "type": "extension_in",
       "extends": [
@@ -3253,6 +3129,228 @@
       ]
     },
     {
+      "name": "vertex_state",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "module",
+          "doc": "TODO\n",
+          "type": "object.shader_module"
+        },
+        {
+          "name": "entry_point",
+          "doc": "TODO\n",
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "constants",
+          "doc": "TODO\n",
+          "type": "array<struct.constant_entry>",
+          "pointer": "immutable"
+        },
+        {
+          "name": "buffers",
+          "doc": "TODO\n",
+          "type": "array<struct.vertex_buffer_layout>",
+          "pointer": "immutable"
+        }
+      ]
+    },
+    {
+      "name": "primitive_state",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "topology",
+          "doc": "TODO\n",
+          "type": "enum.primitive_topology"
+        },
+        {
+          "name": "strip_index_format",
+          "doc": "TODO\n",
+          "type": "enum.index_format"
+        },
+        {
+          "name": "front_face",
+          "doc": "TODO\n",
+          "type": "enum.front_face"
+        },
+        {
+          "name": "cull_mode",
+          "doc": "TODO\n",
+          "type": "enum.cull_mode"
+        }
+      ]
+    },
+    {
+      "name": "primitive_depth_clip_control",
+      "doc": "TODO\n",
+      "type": "extension_in",
+      "extends": [
+        "primitive_state"
+      ],
+      "members": [
+        {
+          "name": "unclipped_depth",
+          "doc": "TODO\n",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "depth_stencil_state",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "format",
+          "doc": "TODO\n",
+          "type": "enum.texture_format"
+        },
+        {
+          "name": "depth_write_enabled",
+          "doc": "TODO\n",
+          "type": "bool"
+        },
+        {
+          "name": "depth_compare",
+          "doc": "TODO\n",
+          "type": "enum.compare_function"
+        },
+        {
+          "name": "stencil_front",
+          "doc": "TODO\n",
+          "type": "struct.stencil_face_state"
+        },
+        {
+          "name": "stencil_back",
+          "doc": "TODO\n",
+          "type": "struct.stencil_face_state"
+        },
+        {
+          "name": "stencil_read_mask",
+          "doc": "TODO\n",
+          "type": "uint32"
+        },
+        {
+          "name": "stencil_write_mask",
+          "doc": "TODO\n",
+          "type": "uint32"
+        },
+        {
+          "name": "depth_bias",
+          "doc": "TODO\n",
+          "type": "int32"
+        },
+        {
+          "name": "depth_bias_slope_scale",
+          "doc": "TODO\n",
+          "type": "float32"
+        },
+        {
+          "name": "depth_bias_clamp",
+          "doc": "TODO\n",
+          "type": "float32"
+        }
+      ]
+    },
+    {
+      "name": "multisample_state",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "count",
+          "doc": "TODO\n",
+          "type": "uint32"
+        },
+        {
+          "name": "mask",
+          "doc": "TODO\n",
+          "type": "uint32"
+        },
+        {
+          "name": "alpha_to_coverage_enabled",
+          "doc": "TODO\n",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "fragment_state",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "module",
+          "doc": "TODO\n",
+          "type": "object.shader_module"
+        },
+        {
+          "name": "entry_point",
+          "doc": "TODO\n",
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "constants",
+          "doc": "TODO\n",
+          "type": "array<struct.constant_entry>",
+          "pointer": "immutable"
+        },
+        {
+          "name": "targets",
+          "doc": "TODO\n",
+          "type": "array<struct.color_target_state>",
+          "pointer": "immutable"
+        }
+      ]
+    },
+    {
+      "name": "color_target_state",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "format",
+          "doc": "TODO\n",
+          "type": "enum.texture_format"
+        },
+        {
+          "name": "blend",
+          "doc": "TODO\n",
+          "type": "struct.blend_state",
+          "pointer": "immutable",
+          "optional": true
+        },
+        {
+          "name": "write_mask",
+          "doc": "TODO\n",
+          "type": "bitflag.color_write_mask"
+        }
+      ]
+    },
+    {
+      "name": "blend_state",
+      "doc": "TODO\n",
+      "type": "standalone",
+      "members": [
+        {
+          "name": "color",
+          "doc": "TODO\n",
+          "type": "struct.blend_component"
+        },
+        {
+          "name": "alpha",
+          "doc": "TODO\n",
+          "type": "struct.blend_component"
+        }
+      ]
+    },
+    {
       "name": "render_pipeline_descriptor",
       "doc": "TODO\n",
       "type": "base_in",
@@ -3260,7 +3358,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "layout",
@@ -3300,51 +3399,6 @@
       ]
     },
     {
-      "name": "request_adapter_options",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "feature_level",
-          "doc": "\"Feature level\" for the adapter request. If an adapter is returned, it must support the features and limits in the requested feature level.\n\nImplementations may ignore @ref WGPUFeatureLevel_Compatibility and provide @ref WGPUFeatureLevel_Core instead. @ref WGPUFeatureLevel_Core is the default in the JS API, but in C, this field is **required** (must not be undefined).\n",
-          "type": "enum.feature_level"
-        },
-        {
-          "name": "power_preference",
-          "doc": "TODO\n",
-          "type": "enum.power_preference"
-        },
-        {
-          "name": "force_fallback_adapter",
-          "doc": "If true, requires the adapter to be a \"fallback\" adapter as defined by the JS spec.\nIf this is not possible, the request returns null.\n",
-          "type": "bool"
-        },
-        {
-          "name": "backend_type",
-          "doc": "If set, requires the adapter to have a particular backend type.\nIf this is not possible, the request returns null.\n",
-          "type": "enum.backend_type"
-        },
-        {
-          "name": "compatible_surface",
-          "doc": "If set, requires the adapter to be able to output to a particular surface.\nIf this is not possible, the request returns null.\n",
-          "type": "object.surface",
-          "optional": true
-        }
-      ]
-    },
-    {
-      "name": "sampler_binding_layout",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "type",
-          "doc": "TODO\n",
-          "type": "enum.sampler_binding_type"
-        }
-      ]
-    },
-    {
       "name": "sampler_descriptor",
       "doc": "TODO\n",
       "type": "base_in",
@@ -3352,7 +3406,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "address_mode_u",
@@ -3414,12 +3469,36 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "hints",
+          "doc": "TODO\n",
+          "type": "array<struct.shader_module_compilation_hint>",
+          "pointer": "immutable"
         }
       ]
     },
     {
-      "name": "shader_source_SPIRV",
+      "name": "shader_module_compilation_hint",
+      "doc": "TODO\n",
+      "type": "base_in",
+      "members": [
+        {
+          "name": "entry_point",
+          "doc": "TODO\n",
+          "type": "string"
+        },
+        {
+          "name": "layout",
+          "doc": "TODO\n",
+          "type": "object.pipeline_layout"
+        }
+      ]
+    },
+    {
+      "name": "shader_module_SPIRV_descriptor",
       "doc": "TODO\n",
       "type": "extension_in",
       "extends": [
@@ -3440,7 +3519,7 @@
       ]
     },
     {
-      "name": "shader_source_WGSL",
+      "name": "shader_module_WGSL_descriptor",
       "doc": "TODO\n",
       "type": "extension_in",
       "extends": [
@@ -3450,7 +3529,7 @@
         {
           "name": "code",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string"
         }
       ]
     },
@@ -3482,149 +3561,21 @@
       ]
     },
     {
-      "name": "storage_texture_binding_layout",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "access",
-          "doc": "TODO\n",
-          "type": "enum.storage_texture_access"
-        },
-        {
-          "name": "format",
-          "doc": "TODO\n",
-          "type": "enum.texture_format"
-        },
-        {
-          "name": "view_dimension",
-          "doc": "TODO\n",
-          "type": "enum.texture_view_dimension"
-        }
-      ]
-    },
-    {
-      "name": "supported_features",
-      "doc": "TODO\n",
-      "type": "standalone",
-      "free_members": true,
-      "members": [
-        {
-          "name": "features",
-          "doc": "TODO\n",
-          "type": "array<enum.feature_name>",
-          "pointer": "immutable"
-        }
-      ]
-    },
-    {
-      "name": "supported_WGSL_language_features",
-      "doc": "TODO\n",
-      "type": "standalone",
-      "free_members": true,
-      "members": [
-        {
-          "name": "features",
-          "doc": "TODO\n",
-          "type": "array<enum.WGSL_language_feature_name>",
-          "pointer": "immutable"
-        }
-      ]
-    },
-    {
-      "name": "surface_capabilities",
-      "doc": "Filled by `::wgpuSurfaceGetCapabilities` with what's supported for `::wgpuSurfaceConfigure` for a pair of @ref WGPUSurface and @ref WGPUAdapter.",
-      "type": "base_out",
-      "free_members": true,
-      "members": [
-        {
-          "name": "usages",
-          "doc": "The bit set of supported @ref WGPUTextureUsage bits.\nGuaranteed to contain @ref WGPUTextureUsage_RenderAttachment.\n",
-          "type": "bitflag.texture_usage"
-        },
-        {
-          "name": "formats",
-          "doc": "A list of supported @ref WGPUTextureFormat values, in order of preference.",
-          "type": "array<enum.texture_format>",
-          "pointer": "immutable"
-        },
-        {
-          "name": "present_modes",
-          "doc": "A list of supported @ref WGPUPresentMode values.\nGuaranteed to contain @ref WGPUPresentMode_Fifo.\n",
-          "type": "array<enum.present_mode>",
-          "pointer": "immutable"
-        },
-        {
-          "name": "alpha_modes",
-          "doc": "A list of supported @ref WGPUCompositeAlphaMode values.\n@ref WGPUCompositeAlphaMode_Auto will be an alias for the first element and will never be present in this array.\n",
-          "type": "array<enum.composite_alpha_mode>",
-          "pointer": "immutable"
-        }
-      ]
-    },
-    {
-      "name": "surface_configuration",
-      "doc": "Options to `::wgpuSurfaceConfigure` for defining how a @ref WGPUSurface will be rendered to and presented to the user.\nSee @ref Surface-Configuration for more details.\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "device",
-          "doc": "The @ref WGPUDevice to use to render to surface's textures.",
-          "type": "object.device"
-        },
-        {
-          "name": "format",
-          "doc": "The @ref WGPUTextureFormat of the surface's textures.",
-          "type": "enum.texture_format"
-        },
-        {
-          "name": "usage",
-          "doc": "The @ref WGPUTextureUsage of the surface's textures.",
-          "type": "bitflag.texture_usage"
-        },
-        {
-          "name": "width",
-          "doc": "The width of the surface's textures.",
-          "type": "uint32"
-        },
-        {
-          "name": "height",
-          "doc": "The height of the surface's textures.",
-          "type": "uint32"
-        },
-        {
-          "name": "view_formats",
-          "doc": "The additional @ref WGPUTextureFormat for @ref WGPUTextureView format reinterpretation of the surface's textures.",
-          "type": "array<enum.texture_format>",
-          "pointer": "immutable"
-        },
-        {
-          "name": "alpha_mode",
-          "doc": "How the surface's frames will be composited on the screen.",
-          "type": "enum.composite_alpha_mode"
-        },
-        {
-          "name": "present_mode",
-          "doc": "When and in which order the surface's frames will be shown on the screen. Defaults to @ref WGPUPresentMode_Fifo.",
-          "type": "enum.present_mode"
-        }
-      ]
-    },
-    {
       "name": "surface_descriptor",
-      "doc": "The root descriptor for the creation of an @ref WGPUSurface with `::wgpuInstanceCreateSurface`.\nIt isn't sufficient by itself and must have one of the `WGPUSurfaceSource*` in its chain.\nSee @ref Surface-Creation for more details.\n",
+      "doc": "TODO\n",
       "type": "base_in",
       "members": [
         {
           "name": "label",
-          "doc": "Label used to refer to the object.",
-          "type": "string_with_default_empty"
+          "doc": "TODO\n",
+          "type": "string",
+          "optional": true
         }
       ]
     },
     {
-      "name": "surface_source_android_native_window",
-      "doc": "Chained in @ref WGPUSurfaceDescriptor to make an @ref WGPUSurface wrapping an Android [`ANativeWindow`](https://developer.android.com/ndk/reference/group/a-native-window).",
+      "name": "surface_descriptor_from_android_native_window",
+      "doc": "TODO\n",
       "type": "extension_in",
       "extends": [
         "surface_descriptor"
@@ -3632,15 +3583,30 @@
       "members": [
         {
           "name": "window",
-          "doc": "The pointer to the [`ANativeWindow`](https://developer.android.com/ndk/reference/group/a-native-window) that will be wrapped by the @ref WGPUSurface.",
+          "doc": "TODO\n",
           "type": "c_void",
           "pointer": "mutable"
         }
       ]
     },
     {
-      "name": "surface_source_metal_layer",
-      "doc": "Chained in @ref WGPUSurfaceDescriptor to make an @ref WGPUSurface wrapping a [`CAMetalLayer`](https://developer.apple.com/documentation/quartzcore/cametallayer?language=objc).",
+      "name": "surface_descriptor_from_canvas_HTML_selector",
+      "doc": "TODO\n",
+      "type": "extension_in",
+      "extends": [
+        "surface_descriptor"
+      ],
+      "members": [
+        {
+          "name": "selector",
+          "doc": "TODO\n",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "surface_descriptor_from_metal_layer",
+      "doc": "TODO\n",
       "type": "extension_in",
       "extends": [
         "surface_descriptor"
@@ -3648,37 +3614,15 @@
       "members": [
         {
           "name": "layer",
-          "doc": "The pointer to the [`CAMetalLayer`](https://developer.apple.com/documentation/quartzcore/cametallayer?language=objc) that will be wrapped by the @ref WGPUSurface.",
+          "doc": "TODO\n",
           "type": "c_void",
           "pointer": "mutable"
         }
       ]
     },
     {
-      "name": "surface_source_wayland_surface",
-      "doc": "Chained in @ref WGPUSurfaceDescriptor to make an @ref WGPUSurface wrapping a [Wayland](https://wayland.freedesktop.org/) [`wl_surface`](https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_surface).",
-      "type": "extension_in",
-      "extends": [
-        "surface_descriptor"
-      ],
-      "members": [
-        {
-          "name": "display",
-          "doc": "A [`wl_display`](https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_display) for this Wayland instance.",
-          "type": "c_void",
-          "pointer": "mutable"
-        },
-        {
-          "name": "surface",
-          "doc": "A [`wl_surface`](https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_surface) that will be wrapped by the @ref WGPUSurface",
-          "type": "c_void",
-          "pointer": "mutable"
-        }
-      ]
-    },
-    {
-      "name": "surface_source_windows_HWND",
-      "doc": "Chained in @ref WGPUSurfaceDescriptor to make an @ref WGPUSurface wrapping a Windows [`HWND`](https://learn.microsoft.com/en-us/windows/apps/develop/ui-input/retrieve-hwnd).",
+      "name": "surface_descriptor_from_windows_HWND",
+      "doc": "TODO\n",
       "type": "extension_in",
       "extends": [
         "surface_descriptor"
@@ -3686,21 +3630,21 @@
       "members": [
         {
           "name": "hinstance",
-          "doc": "The [`HINSTANCE`](https://learn.microsoft.com/en-us/windows/win32/learnwin32/winmain--the-application-entry-point) for this application.\nMost commonly `GetModuleHandle(nullptr)`.\n",
+          "doc": "TODO\n",
           "type": "c_void",
           "pointer": "mutable"
         },
         {
           "name": "hwnd",
-          "doc": "The [`HWND`](https://learn.microsoft.com/en-us/windows/apps/develop/ui-input/retrieve-hwnd) that will be wrapped by the @ref WGPUSurface.",
+          "doc": "TODO\n",
           "type": "c_void",
           "pointer": "mutable"
         }
       ]
     },
     {
-      "name": "surface_source_XCB_window",
-      "doc": "Chained in @ref WGPUSurfaceDescriptor to make an @ref WGPUSurface wrapping an [XCB](https://xcb.freedesktop.org/) `xcb_window_t`.",
+      "name": "surface_descriptor_from_xcb_window",
+      "doc": "TODO\n",
       "type": "extension_in",
       "extends": [
         "surface_descriptor"
@@ -3708,20 +3652,20 @@
       "members": [
         {
           "name": "connection",
-          "doc": "The `xcb_connection_t` for the connection to the X server.",
+          "doc": "TODO\n",
           "type": "c_void",
           "pointer": "mutable"
         },
         {
           "name": "window",
-          "doc": "The `xcb_window_t` for the window that will be wrapped by the @ref WGPUSurface.",
+          "doc": "TODO\n",
           "type": "uint32"
         }
       ]
     },
     {
-      "name": "surface_source_xlib_window",
-      "doc": "Chained in @ref WGPUSurfaceDescriptor to make an @ref WGPUSurface wrapping an [Xlib](https://www.x.org/releases/current/doc/libX11/libX11/libX11.html) `Window`.",
+      "name": "surface_descriptor_from_xlib_window",
+      "doc": "TODO\n",
       "type": "extension_in",
       "extends": [
         "surface_descriptor"
@@ -3729,55 +3673,65 @@
       "members": [
         {
           "name": "display",
-          "doc": "A pointer to the [`Display`](https://www.x.org/releases/current/doc/libX11/libX11/libX11.html#Opening_the_Display) connected to the X server.",
+          "doc": "TODO\n",
           "type": "c_void",
           "pointer": "mutable"
         },
         {
           "name": "window",
-          "doc": "The [`Window`](https://www.x.org/releases/current/doc/libX11/libX11/libX11.html#Creating_Windows) that will be wrapped by the @ref WGPUSurface.",
+          "doc": "TODO\n",
           "type": "uint64"
         }
       ]
     },
     {
+      "name": "surface_descriptor_from_wayland_surface",
+      "doc": "TODO\n",
+      "type": "extension_in",
+      "extends": [
+        "surface_descriptor"
+      ],
+      "members": [
+        {
+          "name": "display",
+          "doc": "TODO\n",
+          "type": "c_void",
+          "pointer": "mutable"
+        },
+        {
+          "name": "surface",
+          "doc": "TODO\n",
+          "type": "c_void",
+          "pointer": "mutable"
+        }
+      ]
+    },
+    {
       "name": "surface_texture",
-      "doc": "Queried each frame from a @ref WGPUSurface to get a @ref WGPUTexture to render to along with some metadata.\nSee @ref Surface-Presenting for more details.\n",
-      "type": "base_out",
+      "doc": "TODO\n",
+      "type": "standalone",
       "members": [
         {
           "name": "texture",
-          "doc": "The @ref WGPUTexture representing the frame that will be shown on the surface.\nIt is @ref ReturnedWithOwnership from @ref wgpuSurfaceGetCurrentTexture.\n",
+          "doc": "TODO\n",
           "type": "object.texture"
         },
         {
+          "name": "suboptimal",
+          "doc": "TODO\n",
+          "type": "bool"
+        },
+        {
           "name": "status",
-          "doc": "Whether the call to `::wgpuSurfaceGetCurrentTexture` succeeded and a hint as to why it might not have.",
+          "doc": "TODO\n",
           "type": "enum.surface_get_current_texture_status"
         }
       ]
     },
     {
-      "name": "texel_copy_buffer_info",
+      "name": "texture_data_layout",
       "doc": "TODO\n",
-      "type": "standalone",
-      "members": [
-        {
-          "name": "layout",
-          "doc": "TODO\n",
-          "type": "struct.texel_copy_buffer_layout"
-        },
-        {
-          "name": "buffer",
-          "doc": "TODO\n",
-          "type": "object.buffer"
-        }
-      ]
-    },
-    {
-      "name": "texel_copy_buffer_layout",
-      "doc": "TODO\n",
-      "type": "standalone",
+      "type": "base_in",
       "members": [
         {
           "name": "offset",
@@ -3797,55 +3751,6 @@
       ]
     },
     {
-      "name": "texel_copy_texture_info",
-      "doc": "TODO\n",
-      "type": "standalone",
-      "members": [
-        {
-          "name": "texture",
-          "doc": "TODO\n",
-          "type": "object.texture"
-        },
-        {
-          "name": "mip_level",
-          "doc": "TODO\n",
-          "type": "uint32"
-        },
-        {
-          "name": "origin",
-          "doc": "TODO\n",
-          "type": "struct.origin_3D"
-        },
-        {
-          "name": "aspect",
-          "doc": "TODO\n",
-          "type": "enum.texture_aspect"
-        }
-      ]
-    },
-    {
-      "name": "texture_binding_layout",
-      "doc": "TODO\n",
-      "type": "base_in",
-      "members": [
-        {
-          "name": "sample_type",
-          "doc": "TODO\n",
-          "type": "enum.texture_sample_type"
-        },
-        {
-          "name": "view_dimension",
-          "doc": "TODO\n",
-          "type": "enum.texture_view_dimension"
-        },
-        {
-          "name": "multisampled",
-          "doc": "TODO\n",
-          "type": "bool"
-        }
-      ]
-    },
-    {
       "name": "texture_descriptor",
       "doc": "TODO\n",
       "type": "base_in",
@@ -3853,7 +3758,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "usage",
@@ -3901,7 +3807,8 @@
         {
           "name": "label",
           "doc": "TODO\n",
-          "type": "string_with_default_empty"
+          "type": "string",
+          "optional": true
         },
         {
           "name": "format",
@@ -3937,303 +3844,24 @@
           "name": "aspect",
           "doc": "TODO\n",
           "type": "enum.texture_aspect"
-        },
-        {
-          "name": "usage",
-          "doc": "TODO\n",
-          "type": "bitflag.texture_usage"
         }
       ]
     },
     {
-      "name": "vertex_attribute",
-      "doc": "TODO\n",
-      "type": "standalone",
-      "members": [
-        {
-          "name": "format",
-          "doc": "TODO\n",
-          "type": "enum.vertex_format"
-        },
-        {
-          "name": "offset",
-          "doc": "TODO\n",
-          "type": "uint64"
-        },
-        {
-          "name": "shader_location",
-          "doc": "TODO\n",
-          "type": "uint32"
-        }
-      ]
-    },
-    {
-      "name": "vertex_buffer_layout",
-      "doc": "TODO\n",
-      "type": "standalone",
-      "members": [
-        {
-          "name": "step_mode",
-          "doc": "The step mode for the vertex buffer. If @ref WGPUVertexStepMode_VertexBufferNotUsed,\nindicates a \"hole\" in the parent @ref WGPUVertexState `buffers` array:\nthe pipeline does not use a vertex buffer at this `location`.\n",
-          "type": "enum.vertex_step_mode"
-        },
-        {
-          "name": "array_stride",
-          "doc": "TODO\n",
-          "type": "uint64"
-        },
-        {
-          "name": "attributes",
-          "doc": "TODO\n",
-          "type": "array<struct.vertex_attribute>",
-          "pointer": "immutable"
-        }
-      ]
-    },
-    {
-      "name": "vertex_state",
+      "name": "uncaptured_error_callback_info",
       "doc": "TODO\n",
       "type": "base_in",
       "members": [
         {
-          "name": "module",
+          "name": "callback",
           "doc": "TODO\n",
-          "type": "object.shader_module"
+          "type": "function_type.error_callback"
         },
         {
-          "name": "entry_point",
+          "name": "userdata",
           "doc": "TODO\n",
-          "type": "nullable_string"
-        },
-        {
-          "name": "constants",
-          "doc": "TODO\n",
-          "type": "array<struct.constant_entry>",
-          "pointer": "immutable"
-        },
-        {
-          "name": "buffers",
-          "doc": "TODO\n",
-          "type": "array<struct.vertex_buffer_layout>",
-          "pointer": "immutable"
-        }
-      ]
-    }
-  ],
-  "callbacks": [
-    {
-      "name": "buffer_map",
-      "doc": "TODO\n",
-      "style": "callback_mode",
-      "args": [
-        {
-          "name": "status",
-          "doc": "TODO\n",
-          "type": "enum.map_async_status"
-        },
-        {
-          "name": "message",
-          "doc": "TODO\n",
-          "type": "out_string",
-          "passed_with_ownership": false
-        }
-      ]
-    },
-    {
-      "name": "compilation_info",
-      "doc": "TODO\n",
-      "style": "callback_mode",
-      "args": [
-        {
-          "name": "status",
-          "doc": "TODO\n",
-          "type": "enum.compilation_info_request_status"
-        },
-        {
-          "name": "compilation_info",
-          "doc": "TODO\n",
-          "type": "struct.compilation_info",
-          "pointer": "immutable",
-          "passed_with_ownership": false
-        }
-      ]
-    },
-    {
-      "name": "create_compute_pipeline_async",
-      "doc": "TODO\n",
-      "style": "callback_mode",
-      "args": [
-        {
-          "name": "status",
-          "doc": "TODO\n",
-          "type": "enum.create_pipeline_async_status"
-        },
-        {
-          "name": "pipeline",
-          "doc": "TODO\n",
-          "type": "object.compute_pipeline",
-          "passed_with_ownership": true
-        },
-        {
-          "name": "message",
-          "doc": "TODO\n",
-          "type": "out_string"
-        }
-      ]
-    },
-    {
-      "name": "create_render_pipeline_async",
-      "doc": "TODO\n",
-      "style": "callback_mode",
-      "args": [
-        {
-          "name": "status",
-          "doc": "TODO\n",
-          "type": "enum.create_pipeline_async_status"
-        },
-        {
-          "name": "pipeline",
-          "doc": "TODO\n",
-          "type": "object.render_pipeline",
-          "passed_with_ownership": true
-        },
-        {
-          "name": "message",
-          "doc": "TODO\n",
-          "type": "out_string"
-        }
-      ]
-    },
-    {
-      "name": "device_lost",
-      "doc": "TODO",
-      "style": "callback_mode",
-      "args": [
-        {
-          "name": "device",
-          "doc": "Reference to the device which was lost. If, and only if, the `reason` is @ref WGPUDeviceLostReason_FailedCreation, this is a non-null pointer to a null @ref WGPUDevice.\n",
-          "type": "object.device",
-          "pointer": "immutable",
-          "passed_with_ownership": false
-        },
-        {
-          "name": "reason",
-          "doc": "TODO\n",
-          "type": "enum.device_lost_reason"
-        },
-        {
-          "name": "message",
-          "doc": "TODO\n",
-          "type": "out_string",
-          "passed_with_ownership": false
-        }
-      ]
-    },
-    {
-      "name": "pop_error_scope",
-      "doc": "TODO\n",
-      "style": "callback_mode",
-      "args": [
-        {
-          "name": "status",
-          "doc": "See @ref WGPUPopErrorScopeStatus.\n",
-          "type": "enum.pop_error_scope_status"
-        },
-        {
-          "name": "type",
-          "doc": "The type of the error caught by the scope, or @ref WGPUErrorType_NoError if there was none.\nIf the `status` is not @ref WGPUPopErrorScopeStatus_Success, this is @ref WGPUErrorType_NoError.\n",
-          "type": "enum.error_type"
-        },
-        {
-          "name": "message",
-          "doc": "If the `type` is not @ref WGPUErrorType_NoError, this is a non-empty @ref LocalizableHumanReadableMessageString;\notherwise, this is an empty string.\n",
-          "type": "out_string",
-          "passed_with_ownership": false
-        }
-      ]
-    },
-    {
-      "name": "queue_work_done",
-      "doc": "TODO\n",
-      "style": "callback_mode",
-      "args": [
-        {
-          "name": "status",
-          "doc": "TODO\n",
-          "type": "enum.queue_work_done_status"
-        }
-      ]
-    },
-    {
-      "name": "request_adapter",
-      "doc": "TODO\n",
-      "style": "callback_mode",
-      "args": [
-        {
-          "name": "status",
-          "doc": "TODO\n",
-          "type": "enum.request_adapter_status"
-        },
-        {
-          "name": "adapter",
-          "doc": "TODO\n",
-          "type": "object.adapter",
-          "passed_with_ownership": true
-        },
-        {
-          "name": "message",
-          "doc": "TODO\n",
-          "type": "out_string",
-          "passed_with_ownership": false
-        }
-      ]
-    },
-    {
-      "name": "request_device",
-      "doc": "TODO\n",
-      "style": "callback_mode",
-      "args": [
-        {
-          "name": "status",
-          "doc": "TODO\n",
-          "type": "enum.request_device_status"
-        },
-        {
-          "name": "device",
-          "doc": "TODO\n",
-          "type": "object.device",
-          "passed_with_ownership": true
-        },
-        {
-          "name": "message",
-          "doc": "TODO\n",
-          "type": "out_string",
-          "passed_with_ownership": false
-        }
-      ]
-    },
-    {
-      "name": "uncaptured_error",
-      "doc": "TODO\n",
-      "style": "immediate",
-      "args": [
-        {
-          "name": "device",
-          "doc": "TODO\n",
-          "type": "object.device",
-          "pointer": "immutable",
-          "passed_with_ownership": false
-        },
-        {
-          "name": "type",
-          "doc": "TODO\n",
-          "type": "enum.error_type"
-        },
-        {
-          "name": "message",
-          "doc": "TODO\n",
-          "type": "out_string",
-          "passed_with_ownership": false
+          "type": "c_void",
+          "pointer": "mutable"
         }
       ]
     }
@@ -4241,11 +3869,10 @@
   "functions": [
     {
       "name": "create_instance",
-      "doc": "Create a WGPUInstance",
+      "doc": "TODO\n",
       "returns": {
         "doc": "TODO\n",
-        "type": "object.instance",
-        "passed_with_ownership": true
+        "type": "object.instance"
       },
       "args": [
         {
@@ -4254,22 +3881,6 @@
           "type": "struct.instance_descriptor",
           "pointer": "immutable",
           "optional": true
-        }
-      ]
-    },
-    {
-      "name": "get_instance_capabilities",
-      "doc": "Query the supported instance capabilities.",
-      "returns": {
-        "doc": "Indicates if there was an @ref OutStructChainError.",
-        "type": "enum.status"
-      },
-      "args": [
-        {
-          "name": "capabilities",
-          "doc": "The supported instance capabilities",
-          "type": "struct.instance_capabilities",
-          "pointer": "mutable"
         }
       ]
     }
@@ -4283,14 +3894,14 @@
           "name": "get_limits",
           "doc": "TODO\n",
           "returns": {
-            "doc": "Indicates if there was an @ref OutStructChainError.",
-            "type": "enum.status"
+            "doc": "TODO\n",
+            "type": "bool"
           },
           "args": [
             {
               "name": "limits",
               "doc": "TODO\n",
-              "type": "struct.limits",
+              "type": "struct.supported_limits",
               "pointer": "mutable"
             }
           ]
@@ -4311,39 +3922,53 @@
           ]
         },
         {
-          "name": "get_features",
-          "doc": "Get the list of @ref WGPUFeatureName values supported by the adapter.\n",
+          "name": "enumerate_features",
+          "doc": "TODO\n",
+          "returns": {
+            "doc": "TODO\n",
+            "type": "usize"
+          },
           "args": [
             {
               "name": "features",
               "doc": "TODO\n",
-              "type": "struct.supported_features",
-              "pointer": "mutable",
-              "passed_with_ownership": true
+              "type": "enum.feature_name",
+              "pointer": "mutable"
             }
           ]
         },
         {
           "name": "get_info",
           "doc": "TODO\n",
-          "returns": {
-            "doc": "Indicates if there was an @ref OutStructChainError.",
-            "type": "enum.status"
-          },
           "args": [
             {
               "name": "info",
               "doc": "TODO\n",
               "type": "struct.adapter_info",
-              "pointer": "mutable",
-              "passed_with_ownership": true
+              "pointer": "mutable"
             }
           ]
         },
         {
           "name": "request_device",
           "doc": "TODO\n",
-          "callback": "callback.request_device",
+          "returns_async": [
+            {
+              "name": "status",
+              "doc": "TODO\n",
+              "type": "enum.request_device_status"
+            },
+            {
+              "name": "device",
+              "doc": "TODO\n",
+              "type": "object.device"
+            },
+            {
+              "name": "message",
+              "doc": "TODO\n",
+              "type": "string"
+            }
+          ],
           "args": [
             {
               "name": "descriptor",
@@ -4367,7 +3992,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -4384,7 +4009,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -4397,7 +4022,13 @@
         {
           "name": "map_async",
           "doc": "TODO\n",
-          "callback": "callback.buffer_map",
+          "returns_async": [
+            {
+              "name": "status",
+              "doc": "TODO\n",
+              "type": "enum.buffer_map_async_status"
+            }
+          ],
           "args": [
             {
               "name": "mode",
@@ -4420,19 +4051,19 @@
           "name": "get_mapped_range",
           "doc": "TODO\n",
           "returns": {
-            "doc": "Returns a mutable pointer to beginning of the mapped range.\nReturns `NULL` with @ref ImplementationDefinedLogging if:\n\n- There is any content-timeline error as defined in the WebGPU specification for `getMappedRange()` (alignments, overlaps, etc.)\n- The buffer is not mapped with @ref WGPUMapMode_Write.\n",
+            "doc": "TODO\n",
             "type": "c_void",
             "pointer": "mutable"
           },
           "args": [
             {
               "name": "offset",
-              "doc": "Byte offset relative to the beginning of the buffer.\n",
+              "doc": "TODO\n",
               "type": "usize"
             },
             {
               "name": "size",
-              "doc": "Byte size of the range to get. The returned pointer is valid for exactly this many bytes.\n",
+              "doc": "TODO\n",
               "type": "usize"
             }
           ]
@@ -4441,19 +4072,19 @@
           "name": "get_const_mapped_range",
           "doc": "TODO\n",
           "returns": {
-            "doc": "Returns a const pointer to beginning of the mapped range.\nIt must not be written; writing to this range causes undefined behavior.\nReturns `NULL` with @ref ImplementationDefinedLogging if:\n\n- There is any content-timeline error as defined in the WebGPU specification for `getMappedRange()` (alignments, overlaps, etc.)\n  **except** for overlaps with other *const* ranges, which are allowed in C.\n  (JS does not allow this because const ranges do not exist.)\n",
+            "doc": "TODO\n",
             "type": "c_void",
             "pointer": "immutable"
           },
           "args": [
             {
               "name": "offset",
-              "doc": "Byte offset relative to the beginning of the buffer.\n",
+              "doc": "TODO\n",
               "type": "usize"
             },
             {
               "name": "size",
-              "doc": "Byte size of the range to get. The returned pointer is valid for exactly this many bytes.\n",
+              "doc": "TODO\n",
               "type": "usize"
             }
           ]
@@ -4465,7 +4096,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -4514,7 +4145,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -4529,8 +4160,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.command_buffer",
-            "passed_with_ownership": true
+            "type": "object.command_buffer"
           },
           "args": [
             {
@@ -4547,8 +4177,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.compute_pass_encoder",
-            "passed_with_ownership": true
+            "type": "object.compute_pass_encoder"
           },
           "args": [
             {
@@ -4565,8 +4194,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.render_pass_encoder",
-            "passed_with_ownership": true
+            "type": "object.render_pass_encoder"
           },
           "args": [
             {
@@ -4615,13 +4243,13 @@
             {
               "name": "source",
               "doc": "TODO\n",
-              "type": "struct.texel_copy_buffer_info",
+              "type": "struct.image_copy_buffer",
               "pointer": "immutable"
             },
             {
               "name": "destination",
               "doc": "TODO\n",
-              "type": "struct.texel_copy_texture_info",
+              "type": "struct.image_copy_texture",
               "pointer": "immutable"
             },
             {
@@ -4639,13 +4267,13 @@
             {
               "name": "source",
               "doc": "TODO\n",
-              "type": "struct.texel_copy_texture_info",
+              "type": "struct.image_copy_texture",
               "pointer": "immutable"
             },
             {
               "name": "destination",
               "doc": "TODO\n",
-              "type": "struct.texel_copy_buffer_info",
+              "type": "struct.image_copy_buffer",
               "pointer": "immutable"
             },
             {
@@ -4663,13 +4291,13 @@
             {
               "name": "source",
               "doc": "TODO\n",
-              "type": "struct.texel_copy_texture_info",
+              "type": "struct.image_copy_texture",
               "pointer": "immutable"
             },
             {
               "name": "destination",
               "doc": "TODO\n",
-              "type": "struct.texel_copy_texture_info",
+              "type": "struct.image_copy_texture",
               "pointer": "immutable"
             },
             {
@@ -4708,7 +4336,7 @@
             {
               "name": "marker_label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -4723,7 +4351,7 @@
             {
               "name": "group_label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -4781,7 +4409,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -4798,7 +4426,7 @@
             {
               "name": "marker_label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -4813,7 +4441,7 @@
             {
               "name": "group_label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -4899,7 +4527,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -4914,8 +4542,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.bind_group_layout",
-            "passed_with_ownership": true
+            "type": "object.bind_group_layout"
           },
           "args": [
             {
@@ -4932,7 +4559,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -4947,8 +4574,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.bind_group",
-            "passed_with_ownership": true
+            "type": "object.bind_group"
           },
           "args": [
             {
@@ -4964,8 +4590,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.bind_group_layout",
-            "passed_with_ownership": true
+            "type": "object.bind_group_layout"
           },
           "args": [
             {
@@ -4981,8 +4606,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.buffer",
-            "passed_with_ownership": true
+            "type": "object.buffer"
           },
           "args": [
             {
@@ -4998,8 +4622,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.command_encoder",
-            "passed_with_ownership": true
+            "type": "object.command_encoder"
           },
           "args": [
             {
@@ -5016,8 +4639,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.compute_pipeline",
-            "passed_with_ownership": true
+            "type": "object.compute_pipeline"
           },
           "args": [
             {
@@ -5031,7 +4653,23 @@
         {
           "name": "create_compute_pipeline_async",
           "doc": "TODO\n",
-          "callback": "callback.create_compute_pipeline_async",
+          "returns_async": [
+            {
+              "name": "status",
+              "doc": "TODO\n",
+              "type": "enum.create_pipeline_async_status"
+            },
+            {
+              "name": "pipeline",
+              "doc": "TODO\n",
+              "type": "object.compute_pipeline"
+            },
+            {
+              "name": "message",
+              "doc": "TODO\n",
+              "type": "string"
+            }
+          ],
           "args": [
             {
               "name": "descriptor",
@@ -5046,8 +4684,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.pipeline_layout",
-            "passed_with_ownership": true
+            "type": "object.pipeline_layout"
           },
           "args": [
             {
@@ -5063,8 +4700,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.query_set",
-            "passed_with_ownership": true
+            "type": "object.query_set"
           },
           "args": [
             {
@@ -5078,7 +4714,23 @@
         {
           "name": "create_render_pipeline_async",
           "doc": "TODO\n",
-          "callback": "callback.create_render_pipeline_async",
+          "returns_async": [
+            {
+              "name": "status",
+              "doc": "TODO\n",
+              "type": "enum.create_pipeline_async_status"
+            },
+            {
+              "name": "pipeline",
+              "doc": "TODO\n",
+              "type": "object.render_pipeline"
+            },
+            {
+              "name": "message",
+              "doc": "TODO\n",
+              "type": "string"
+            }
+          ],
           "args": [
             {
               "name": "descriptor",
@@ -5093,8 +4745,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.render_bundle_encoder",
-            "passed_with_ownership": true
+            "type": "object.render_bundle_encoder"
           },
           "args": [
             {
@@ -5110,8 +4761,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.render_pipeline",
-            "passed_with_ownership": true
+            "type": "object.render_pipeline"
           },
           "args": [
             {
@@ -5127,8 +4777,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.sampler",
-            "passed_with_ownership": true
+            "type": "object.sampler"
           },
           "args": [
             {
@@ -5145,8 +4794,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.shader_module",
-            "passed_with_ownership": true
+            "type": "object.shader_module"
           },
           "args": [
             {
@@ -5162,8 +4810,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.texture",
-            "passed_with_ownership": true
+            "type": "object.texture"
           },
           "args": [
             {
@@ -5179,25 +4826,17 @@
           "doc": "TODO\n"
         },
         {
-          "name": "get_lost_future",
-          "doc": "",
-          "returns": {
-            "doc": "The @ref WGPUFuture for the device-lost event of the device.\n",
-            "type": "struct.future"
-          }
-        },
-        {
           "name": "get_limits",
           "doc": "TODO\n",
           "returns": {
-            "doc": "Indicates if there was an @ref OutStructChainError.",
-            "type": "enum.status"
+            "doc": "TODO\n",
+            "type": "bool"
           },
           "args": [
             {
               "name": "limits",
               "doc": "TODO\n",
-              "type": "struct.limits",
+              "type": "struct.supported_limits",
               "pointer": "mutable"
             }
           ]
@@ -5218,34 +4857,27 @@
           ]
         },
         {
-          "name": "get_features",
-          "doc": "Get the list of @ref WGPUFeatureName values supported by the device.\n",
+          "name": "enumerate_features",
+          "doc": "TODO\n",
+          "returns": {
+            "doc": "TODO\n",
+            "type": "usize"
+          },
           "args": [
             {
               "name": "features",
               "doc": "TODO\n",
-              "type": "struct.supported_features",
-              "pointer": "mutable",
-              "passed_with_ownership": true
+              "type": "enum.feature_name",
+              "pointer": "mutable"
             }
           ]
-        },
-        {
-          "name": "get_adapter_info",
-          "doc": "TODO\n",
-          "returns": {
-            "doc": "TODO\n",
-            "type": "struct.adapter_info",
-            "passed_with_ownership": true
-          }
         },
         {
           "name": "get_queue",
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.queue",
-            "passed_with_ownership": true
+            "type": "object.queue"
           }
         },
         {
@@ -5262,7 +4894,19 @@
         {
           "name": "pop_error_scope",
           "doc": "TODO\n",
-          "callback": "callback.pop_error_scope"
+          "args": [
+            {
+              "name": "callback",
+              "doc": "TODO\n",
+              "type": "function_type.error_callback"
+            },
+            {
+              "name": "userdata",
+              "doc": "TODO\n",
+              "type": "c_void",
+              "pointer": "mutable"
+            }
+          ]
         },
         {
           "name": "set_label",
@@ -5271,7 +4915,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -5283,34 +4927,17 @@
       "methods": [
         {
           "name": "create_surface",
-          "doc": "Creates a @ref WGPUSurface, see @ref Surface-Creation for more details.",
+          "doc": "TODO\n",
           "returns": {
-            "doc": "A new @ref WGPUSurface for this descriptor (or an error @ref WGPUSurface).",
-            "type": "object.surface",
-            "passed_with_ownership": true
+            "doc": "TODO\n",
+            "type": "object.surface"
           },
           "args": [
             {
               "name": "descriptor",
-              "doc": "The description of the @ref WGPUSurface to create.",
+              "doc": "TODO\n",
               "type": "struct.surface_descriptor",
               "pointer": "immutable"
-            }
-          ]
-        },
-        {
-          "name": "get_WGSL_language_features",
-          "doc": "Get the list of @ref WGPUWGSLLanguageFeatureName values supported by the instance.\n",
-          "returns": {
-            "doc": "TODO\n",
-            "type": "enum.status"
-          },
-          "args": [
-            {
-              "name": "features",
-              "doc": "TODO\n",
-              "type": "struct.supported_WGSL_language_features",
-              "pointer": "mutable"
             }
           ]
         },
@@ -5325,18 +4952,34 @@
             {
               "name": "feature",
               "doc": "TODO\n",
-              "type": "enum.WGSL_language_feature_name"
+              "type": "enum.WGSL_feature_name"
             }
           ]
         },
         {
           "name": "process_events",
-          "doc": "Processes asynchronous events on this `WGPUInstance`, calling any callbacks for asynchronous operations created with `::WGPUCallbackMode_AllowProcessEvents`.\n\nSee @ref Process-Events for more information.\n"
+          "doc": "TODO\n"
         },
         {
           "name": "request_adapter",
           "doc": "TODO\n",
-          "callback": "callback.request_adapter",
+          "returns_async": [
+            {
+              "name": "status",
+              "doc": "TODO\n",
+              "type": "enum.request_adapter_status"
+            },
+            {
+              "name": "adapter",
+              "doc": "TODO\n",
+              "type": "object.adapter"
+            },
+            {
+              "name": "message",
+              "doc": "TODO\n",
+              "type": "string"
+            }
+          ],
           "args": [
             {
               "name": "options",
@@ -5344,33 +4987,6 @@
               "type": "struct.request_adapter_options",
               "pointer": "immutable",
               "optional": true
-            }
-          ]
-        },
-        {
-          "name": "wait_any",
-          "doc": "Wait for at least one WGPUFuture in `futures` to complete, and call callbacks of the respective completed asynchronous operations.\n\nSee @ref Wait-Any for more information.\n",
-          "returns": {
-            "doc": "TODO\n",
-            "type": "enum.wait_status"
-          },
-          "args": [
-            {
-              "name": "future_count",
-              "doc": "TODO\n",
-              "type": "usize"
-            },
-            {
-              "name": "futures",
-              "doc": "TODO\n",
-              "type": "struct.future_wait_info",
-              "pointer": "mutable",
-              "optional": true
-            },
-            {
-              "name": "timeout_NS",
-              "doc": "TODO\n",
-              "type": "uint64"
             }
           ]
         }
@@ -5387,7 +5003,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -5404,7 +5020,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -5449,11 +5065,17 @@
         {
           "name": "on_submitted_work_done",
           "doc": "TODO\n",
-          "callback": "callback.queue_work_done"
+          "returns_async": [
+            {
+              "name": "status",
+              "doc": "TODO\n",
+              "type": "enum.queue_work_done_status"
+            }
+          ]
         },
         {
           "name": "write_buffer",
-          "doc": "Produces a @ref DeviceError both content-timeline (`size` alignment) and device-timeline\nerrors defined by the WebGPU specification.\n",
+          "doc": "TODO\n",
           "args": [
             {
               "name": "buffer",
@@ -5485,7 +5107,7 @@
             {
               "name": "destination",
               "doc": "TODO\n",
-              "type": "struct.texel_copy_texture_info",
+              "type": "struct.image_copy_texture",
               "pointer": "immutable"
             },
             {
@@ -5502,7 +5124,7 @@
             {
               "name": "data_layout",
               "doc": "TODO\n",
-              "type": "struct.texel_copy_buffer_layout",
+              "type": "struct.texture_data_layout",
               "pointer": "immutable"
             },
             {
@@ -5520,7 +5142,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -5537,7 +5159,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -5677,7 +5299,7 @@
             {
               "name": "marker_label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -5692,7 +5314,7 @@
             {
               "name": "group_label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -5754,8 +5376,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.render_bundle",
-            "passed_with_ownership": true
+            "type": "object.render_bundle"
           },
           "args": [
             {
@@ -5774,7 +5395,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -5926,7 +5547,7 @@
             {
               "name": "marker_label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -5941,7 +5562,7 @@
             {
               "name": "group_label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -6109,7 +5730,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -6124,8 +5745,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.bind_group_layout",
-            "passed_with_ownership": true
+            "type": "object.bind_group_layout"
           },
           "args": [
             {
@@ -6142,7 +5762,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -6159,7 +5779,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -6172,7 +5792,19 @@
         {
           "name": "get_compilation_info",
           "doc": "TODO\n",
-          "callback": "callback.compilation_info"
+          "returns_async": [
+            {
+              "name": "status",
+              "doc": "TODO\n",
+              "type": "enum.compilation_info_request_status"
+            },
+            {
+              "name": "compilation_info",
+              "doc": "TODO\n",
+              "type": "struct.compilation_info",
+              "pointer": "immutable"
+            }
+          ]
         },
         {
           "name": "set_label",
@@ -6181,7 +5813,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }
@@ -6189,15 +5821,15 @@
     },
     {
       "name": "surface",
-      "doc": "An object used to continuously present image data to the user, see @ref Surfaces for more details.",
+      "doc": "TODO\n",
       "methods": [
         {
           "name": "configure",
-          "doc": "Configures parameters for rendering to `surface`.\nProduces a @ref DeviceError for all content-timeline errors defined by the WebGPU specification.\n\nSee @ref Surface-Configuration for more details.\n",
+          "doc": "TODO\n",
           "args": [
             {
               "name": "config",
-              "doc": "The new configuration to use.",
+              "doc": "TODO\n",
               "type": "struct.surface_configuration",
               "pointer": "immutable"
             }
@@ -6205,33 +5837,28 @@
         },
         {
           "name": "get_capabilities",
-          "doc": "Provides information on how `adapter` is able to use `surface`.\nSee @ref Surface-Capabilities for more details.\n",
-          "returns": {
-            "doc": "Indicates if there was an @ref OutStructChainError.",
-            "type": "enum.status"
-          },
+          "doc": "TODO\n",
           "args": [
             {
               "name": "adapter",
-              "doc": "The @ref WGPUAdapter to get capabilities for presenting to this @ref WGPUSurface.",
+              "doc": "TODO\n",
               "type": "object.adapter"
             },
             {
               "name": "capabilities",
-              "doc": "The structure to fill capabilities in.\nIt may contain memory allocations so `::wgpuSurfaceCapabilitiesFreeMembers` must be called to avoid memory leaks.\n",
+              "doc": "TODO\n",
               "type": "struct.surface_capabilities",
-              "pointer": "mutable",
-              "passed_with_ownership": true
+              "pointer": "mutable"
             }
           ]
         },
         {
           "name": "get_current_texture",
-          "doc": "Returns the @ref WGPUTexture to render to `surface` this frame along with metadata on the frame.\nReturns `NULL` and @ref WGPUSurfaceGetCurrentTextureStatus_Error if the surface is not configured.\n\nSee @ref Surface-Presenting for more details.\n",
+          "doc": "TODO\n",
           "args": [
             {
               "name": "surface_texture",
-              "doc": "The structure to fill the @ref WGPUTexture and metadata in.",
+              "doc": "TODO\n",
               "type": "struct.surface_texture",
               "pointer": "mutable"
             }
@@ -6239,24 +5866,20 @@
         },
         {
           "name": "present",
-          "doc": "Shows `surface`'s current texture to the user.\nSee @ref Surface-Presenting for more details.\n",
-          "returns": {
-            "doc": "Returns @ref WGPUStatus_Error if the surface doesn't have a current texture.\n",
-            "type": "enum.status"
-          }
+          "doc": "TODO\n"
         },
         {
           "name": "unconfigure",
-          "doc": "Removes the configuration for `surface`.\nSee @ref Surface-Configuration for more details.\n"
+          "doc": "TODO\n"
         },
         {
           "name": "set_label",
-          "doc": "Modifies the label used to refer to `surface`.",
+          "doc": "TODO\n",
           "args": [
             {
               "name": "label",
-              "doc": "The new label.",
-              "type": "string_with_default_empty"
+              "doc": "TODO\n",
+              "type": "string"
             }
           ]
         }
@@ -6271,8 +5894,7 @@
           "doc": "TODO\n",
           "returns": {
             "doc": "TODO\n",
-            "type": "object.texture_view",
-            "passed_with_ownership": true
+            "type": "object.texture_view"
           },
           "args": [
             {
@@ -6291,7 +5913,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         },
@@ -6376,7 +5998,7 @@
             {
               "name": "label",
               "doc": "TODO\n",
-              "type": "string_with_default_empty"
+              "type": "string"
             }
           ]
         }

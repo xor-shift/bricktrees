@@ -27,7 +27,7 @@ pub const UsageFlags = packed struct {
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUBufferDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
     usage: UsageFlags,
     size: u64,
     mapped_at_creation: bool = false,
@@ -35,7 +35,7 @@ pub const Descriptor = struct {
     pub fn get(self: Descriptor) NativeType {
         return .{
             .nextInChain = null,
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
             .usage = auto.get_flags(self.usage),
             .size = self.size,
             .mappedAtCreation = @intFromBool(self.mapped_at_creation),

@@ -19,14 +19,14 @@ pub const ProgrammableStageDescriptor = struct {
     pub const NativeType = c.WGPUProgrammableStageDescriptor;
 
     module: ShaderModule,
-    entry_point: ?[:0]const u8 = null,
+    entry_point: ?[]const u8 = null,
     constants: []const ConstantEntry,
 
     pub fn get(self: ProgrammableStageDescriptor, helper: *ConversionHelper) NativeType {
         return .{
             .nextInChain = null,
             .module = self.module.handle,
-            .entryPoint = if (self.entry_point) |v| v.ptr else null,
+            .entryPoint = auto.make_string(self.entry_point),
             .constantCount = self.constants.len,
             .constants = helper.array_helper(false, ConstantEntry, self.constants),
         };
@@ -36,14 +36,14 @@ pub const ProgrammableStageDescriptor = struct {
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUComputePipelineDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
     layout: ?PipelineLayout = null,
     compute: ProgrammableStageDescriptor,
 
     pub fn get(self: Descriptor, helper: *ConversionHelper) NativeType {
         return .{
             .nextInChain = null,
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
             .layout = if (self.layout) |v| v.handle else null,
             .compute = self.compute.get(helper),
         };

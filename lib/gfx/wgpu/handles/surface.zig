@@ -66,10 +66,16 @@ pub fn get_current_texture(self: Surface) Error!SurfaceTexture {
     c.wgpuSurfaceGetCurrentTexture(self.handle, &out);
 
     switch (out.status) {
-        c.WGPUSurfaceGetCurrentTextureStatus_Success => {
+        c.WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal => {
             return .{
                 .texture = .{ .handle = out.texture orelse return Error.UnexpectedNull },
-                .suboptimal = out.suboptimal != 0,
+                .suboptimal = false,
+            };
+        },
+        c.WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal => {
+            return .{
+                .texture = .{ .handle = out.texture orelse return Error.UnexpectedNull },
+                .suboptimal = true,
             };
         },
         c.WGPUSurfaceGetCurrentTextureStatus_Timeout => return Error.Timeout,
@@ -77,6 +83,7 @@ pub fn get_current_texture(self: Surface) Error!SurfaceTexture {
         c.WGPUSurfaceGetCurrentTextureStatus_Lost => return Error.Lost,
         c.WGPUSurfaceGetCurrentTextureStatus_OutOfMemory => return Error.OutOfMemory,
         c.WGPUSurfaceGetCurrentTextureStatus_DeviceLost => return Error.DeviceLost,
+        c.WGPUSurfaceGetCurrentTextureStatus_Error => return Error.Error,
 
         else => unreachable,
     }
@@ -87,6 +94,17 @@ pub fn configure(self: Surface, config: Configuration) Error!void {
     c.wgpuSurfaceConfigure(self.handle, &c_config);
 }
 
-pub fn present(self: Surface) void {
-    c.wgpuSurfacePresent(self.handle);
+pub fn present(self: Surface) !void {
+    const res = c.wgpuSurfacePresent(self.handle);
+    _ = res;
+    // TODO: this function returns bullshit values for some reason.
+    // This has started happening after the wgpu 22 -> 24 update. I probably
+    // missed some struct and have UB lying around.
+    // Double TODO: automate the generation of some structs to avoid this.
+
+    return switch (c.WGPUStatus_Success) {
+        c.WGPUStatus_Success => {},
+        c.WGPUStatus_Error => error.WGPUError,
+        else => unreachable,
+    };
 }

@@ -16,12 +16,12 @@ const PipelineLayout = @This();
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUPipelineLayoutDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
     bind_group_layouts: []const BindGroupLayout = &.{},
 
     pub fn get(self: Descriptor) Descriptor.NativeType {
         return .{
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
             .bindGroupLayoutCount = self.bind_group_layouts.len,
             .bindGroupLayouts = @ptrCast(self.bind_group_layouts.ptr),
         };

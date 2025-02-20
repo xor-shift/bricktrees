@@ -12,13 +12,13 @@ const Error = common.Error;
 pub const Descriptor = struct {
     pub const NativeType = c.WGPUComputePassDescriptor;
 
-    label: ?[:0]const u8 = null,
+    label: ?[]const u8 = null,
     // TODO: timestamp_writes
 
     pub fn get(self: Descriptor) NativeType {
         return .{
             .nextInChain = null,
-            .label = if (self.label) |v| v.ptr else null,
+            .label = auto.make_string(self.label),
             .timestampWrites = null,
         };
     }
