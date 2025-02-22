@@ -59,8 +59,8 @@ pub const Dependency = struct {
     kind: Kind = .run_after,
 
     /// special targets include:
-    /// - "right before end"
-    /// - "right after start"
+    /// - "start"
+    /// - "end"
     target: []const u8,
 };
 
@@ -150,6 +150,7 @@ pub fn process_graph(
 
     var stage: Stage = .pre_start;
 
+    // std.log.debug("-- began --", .{});
     while (true) {
         while (iter.next()) |name| {
             const thing = self.things.get(name) orelse continue;
@@ -173,16 +174,19 @@ pub fn process_graph(
 
         switch (stage) {
             .pre_start => {
-                iter.done("right after start") catch @panic("");
+                // std.log.debug("-- start --", .{});
+                iter.done("start") catch @panic("");
                 stage = .pre_end;
             },
             .pre_end => {
-                iter.done("right before end") catch @panic("");
+                // std.log.debug("-- end --", .{});
+                iter.done("end") catch @panic("");
                 stage = .post_end;
             },
             .post_end => break,
         }
     }
+    // std.log.debug("-- finished --", .{});
 }
 
 pub fn render(self: *Self, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) void {

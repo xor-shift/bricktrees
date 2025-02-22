@@ -83,6 +83,28 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const tracy = blk: {
+        const ret = b.addModule("tracy", .{
+            .root_source_file = b.path("lib/tracy/root.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+
+        ret.addCSourceFiles(.{
+            .root = b.path("thirdparty/tracy/public/"),
+            .files = &.{
+                "TracyClient.cpp",
+            },
+            .flags = &.{
+                "-DTRACY_ENABLE",
+            },
+        });
+
+        ret.addIncludePath(b.path("thirdparty/tracy/public"));
+
+        break :blk ret;
+    };
+
     const core = b.addModule("core", .{
         .root_source_file = b.path("lib/core/root.zig"),
         .target = target,
@@ -171,6 +193,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         });
+        exe.root_module.addImport("tracy", tracy);
         exe.root_module.addImport("core", core);
         exe.root_module.addImport("qoi", qoi);
         exe.root_module.addImport("wgm", wgm);
@@ -206,6 +229,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         });
+        exe_tests.root_module.addImport("tracy", tracy);
         exe_tests.root_module.addImport("core", core);
         exe_tests.root_module.addImport("qoi", qoi);
         exe_tests.root_module.addImport("wgm", wgm);

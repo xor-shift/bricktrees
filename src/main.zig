@@ -4,6 +4,7 @@ const core = @import("core");
 const imgui = @import("imgui");
 const qoi = @import("qoi");
 const sdl = @import("gfx").sdl;
+const tracy = @import("tracy");
 const wgm = @import("wgm");
 const wgpu = @import("gfx").wgpu;
 
@@ -19,101 +20,73 @@ pub var g: Globals = undefined;
 fn initialize_things(alloc: std.mem.Allocator) void {
     g = Globals.init(Globals.default_resolution, alloc) catch @panic("Globals.init");
 
-    const make_defaults = struct {
-        fn aufruf(graph: Things.Dependency.Graph) [2]Things.Dependency {
-            return .{
-                Things.Dependency{
-                    .graph = graph,
-                    .kind = .run_before,
-                    .target = "right before end",
-                },
-                Things.Dependency{
-                    .graph = graph,
-                    .kind = .run_after,
-                    .target = "right after start",
-                },
-            };
-        }
-    }.aufruf;
-
-    const defaults = make_defaults(.render) ++ make_defaults(.tick) ++ make_defaults(.event);
-
-    g.thing_store.add_thing(g.to_any(), "globals", &defaults);
+    g.thing_store.add_thing(g.to_any(), "globals", &.{});
 
     const GuiThing = @import("things/GuiThing.zig");
-    const gui = g.thing_store.add_new_thing(GuiThing, "gui", &(.{
-        Things.Dependency{
-            .graph = .render,
-            .kind = .run_after,
-            .target = "right before end",
-        },
-        Things.Dependency{
-            .graph = .event,
-            .kind = .run_before,
-            .target = "right after start",
-        },
-    } ++ make_defaults(.tick)));
+    const gui = g.thing_store.add_new_thing(GuiThing, "gui", &.{});
     gui.* = GuiThing.init() catch @panic("");
 
     const CameraThing = @import("things/CameraThing.zig");
-    const camera = g.thing_store.add_new_thing(CameraThing, "camera", &(.{
-        Things.Dependency{
-            .graph = .event,
-            .kind = .run_before,
-            .target = "map",
-        },
-        Things.Dependency{
-            .graph = .render,
-            .kind = .run_before,
-            .target = "gpu",
-        },
-        Things.Dependency{
-            .graph = .render,
-            .kind = .run_before,
-            .target = "map",
-        },
-    } ++ defaults));
+    const camera = g.thing_store.add_new_thing(CameraThing, "camera", &.{});
     camera.* = CameraThing.init() catch @panic("");
 
     const VisualiserThing = @import("things/VisualiserThing.zig");
-    const visualiser = g.thing_store.add_new_thing(VisualiserThing, "visualiser", &(.{
-        Things.Dependency{
-            .graph = .event,
-            .kind = .run_before,
-            .target = "gpu",
-        },
-    } ++ defaults));
+    const visualiser = g.thing_store.add_new_thing(VisualiserThing, "visualiser", &.{});
     visualiser.* = VisualiserThing.init() catch @panic("");
 
+    const VoxelThing = @import("things/VoxelThing.zig");
+    const voxel_thing = g.thing_store.add_new_thing(VoxelThing, "voxel manager", &.{});
+    voxel_thing.* = VoxelThing.init() catch @panic("");
+
     const MapThing = @import("things/MapThing.zig");
-    const map = g.thing_store.add_new_thing(MapThing, "map", &(.{
-        Things.Dependency{ // to push
-            .graph = .render,
-            .kind = .run_before,
-            .target = "gpu",
-        },
-    } ++ defaults));
-    map.* = MapThing.init(g.alloc) catch @panic("");
+    const map = g.thing_store.add_new_thing(MapThing, "map", &.{});
+    map.* = MapThing.init() catch @panic("");
 
     const GpuThing = @import("things/GpuThing.zig");
-    const gpu = g.thing_store.add_new_thing(GpuThing, "gpu", &(.{
-        Things.Dependency{
-            .graph = .render,
-            .kind = .run_before,
-            .target = "visualiser",
-        },
-    } ++ defaults));
+    const gpu = g.thing_store.add_new_thing(GpuThing, "gpu", &.{});
     gpu.* = GpuThing.init(map, g.alloc) catch @panic("");
+
+    g.thing_store.render_graph.add_dependency("globals", "start") catch @panic("");
+    g.thing_store.render_graph.add_dependency("end", "gui") catch @panic("");
+    g.thing_store.render_graph.add_dependency("start", "camera") catch @panic("");
+    g.thing_store.render_graph.add_dependency("camera", "voxel manager") catch @panic("");
+    g.thing_store.render_graph.add_dependency("voxel manager", "map") catch @panic("");
+    g.thing_store.render_graph.add_dependency("map", "gpu") catch @panic("");
+    g.thing_store.render_graph.add_dependency("gpu", "visualiser") catch @panic("");
+    g.thing_store.render_graph.add_dependency("visualiser", "end") catch @panic("");
+
+    g.thing_store.tick_graph.add_dependency("globals", "start") catch @panic("");
+    g.thing_store.tick_graph.add_dependency("start", "gui") catch @panic("");
+    g.thing_store.tick_graph.add_dependency("start", "camera") catch @panic("");
+    g.thing_store.tick_graph.add_dependency("start", "visualiser") catch @panic("");
+    g.thing_store.tick_graph.add_dependency("start", "voxel manager") catch @panic("");
+    g.thing_store.tick_graph.add_dependency("start", "map") catch @panic("");
+    g.thing_store.tick_graph.add_dependency("start", "gpu") catch @panic("");
+
+    g.thing_store.event_graph.add_dependency("globals", "start") catch @panic("");
+    g.thing_store.event_graph.add_dependency("start", "gui") catch @panic("");
+    g.thing_store.event_graph.add_dependency("start", "camera") catch @panic("");
+    g.thing_store.event_graph.add_dependency("start", "visualiser") catch @panic("");
+    g.thing_store.event_graph.add_dependency("start", "voxel manager") catch @panic("");
+    g.thing_store.event_graph.add_dependency("start", "map") catch @panic("");
+    g.thing_store.event_graph.add_dependency("start", "gpu") catch @panic("");
+
+    g.thing_store.event_graph.add_dependency("visualiser", "gpu") catch @panic("");
+    g.thing_store.event_graph.add_dependency("map", "gpu") catch @panic("");
 
     camera.gpu_thing = gpu;
     camera.map_thing = map;
     gpu.map_thing = map;
     gpu.visualiser = visualiser;
+    voxel_thing.map_thing = map;
+
+    _ = voxel_thing.add_voxel_provider(@import("voxel_providers/test.zig").to_provider());
 
     g.gui = gui;
 
     map.reconfigure(.{
-        .grid_dimensions = wgm.sub(wgm.div([_]usize{ 32, 32, 32 }, 1), 1),
+        //.grid_dimensions = wgm.sub(wgm.div([_]usize{ 16, 16, 16 }, 1), 1),
+        .grid_dimensions = .{ 21, 21, 21 },
         .no_brickmaps = 8192,
     }) catch @panic("map.reconfigure");
 
@@ -237,7 +210,7 @@ pub fn main() !void {
         g.queue.submit((&command_buffer)[0..1]);
         command_buffer.deinit();
 
-        g.surface.present();
+        g.surface.present() catch {};
 
         current_texture.texture.deinit();
     }

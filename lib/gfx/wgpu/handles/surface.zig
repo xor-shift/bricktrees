@@ -94,9 +94,10 @@ pub fn configure(self: Surface, config: Configuration) Error!void {
     c.wgpuSurfaceConfigure(self.handle, &c_config);
 }
 
-pub fn present(self: Surface) void {
-    const res = c.wgpuSurfacePresent(self.handle);
-    _ = res;
-    // wgpuSurfacePresent currently returns garbo:
-    // https://github.com/gfx-rs/wgpu-native/issues/458
+pub fn present(self: Surface) !void {
+    return switch (c.wgpuSurfacePresent(self.handle)) {
+        c.WGPUStatus_Success => {},
+        c.WGPUStatus_Error => Error.Error,
+        else => unreachable,
+    };
 }

@@ -10,3 +10,6 @@
 [submodule "thirdparty/mustache-zig"]
 	path = thirdparty/mustache-zig
 	url = https://github.com/batiati/mustache-zig
+[submodule "thirdparty/tracy"]
+	path = thirdparty/tracy
+	url = https://github.com/wolfpld/tracy

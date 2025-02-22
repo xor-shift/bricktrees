@@ -38,7 +38,7 @@ frame_no: usize = 0,
 
 frame_ra: RotatingArena(.{
     .no_pools = 1,
-    .bytes_per_pool = 16 * 1024 * 1024,
+    .bytes_per_pool = 32 * 1024 * 1024,
 }),
 frame_alloc: std.mem.Allocator = undefined,
 

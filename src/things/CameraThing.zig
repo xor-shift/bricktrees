@@ -10,133 +10,10 @@ const AnyThing = @import("../AnyThing.zig");
 const GPUThing = @import("GpuThing.zig");
 const MapThing = @import("MapThing.zig");
 
-const Brickmap = MapThing.Brickmap;
-
 const PackedVoxel = @import("../voxel.zig").PackedVoxel;
 const Voxel = @import("../voxel.zig").Voxel;
 
 const g = &@import("../main.zig").g;
-
-// Inter-tick chunk loading status
-// the heap and the bitset is allocated on g.alloc
-const LoadCycleStatus = struct {
-    bg_size: [3]usize,
-    origin: [3]isize,
-
-    heap: std.PriorityQueue([3]usize, [3]usize, compare_fun),
-    seen: std.DynamicBitSet,
-
-    fn compare_fun(bgl_size: [3]usize, lhs: [3]usize, rhs: [3]usize) std.math.Order {
-        const bgl_center = wgm.div(bgl_size, 2);
-
-        const weight: [3]isize = .{1, 2, 1};
-
-        const lv = wgm.sub(
-            wgm.mulew(wgm.cast(isize, lhs).?, weight),
-            wgm.mulew(wgm.cast(isize, bgl_center).?, weight),
-        );
-
-        const rv = wgm.sub(
-            wgm.mulew(wgm.cast(isize, rhs).?, weight),
-            wgm.mulew(wgm.cast(isize, bgl_center).?, weight),
-        );
-
-        const ldist = wgm.dot(lv, lv);
-        const rdist = wgm.dot(rv, rv);
-
-        return std.math.order(ldist, rdist);
-    }
-
-    fn init(bg_size: [3]usize, origin: [3]isize) !@This() {
-        var heap = std.PriorityQueue([3]usize, [3]usize, compare_fun).init(g.alloc, bg_size);
-        errdefer heap.deinit();
-
-        var seen = try std.DynamicBitSet.initEmpty(
-            g.alloc,
-            bg_size[0] * bg_size[1] * bg_size[2],
-        );
-        errdefer seen.deinit();
-
-        var ret: LoadCycleStatus = .{
-            .bg_size = bg_size,
-            .origin = origin,
-
-            .heap = heap,
-            .seen = seen,
-        };
-
-        const bgl_center = wgm.div(bg_size, 2);
-
-        try ret.heap.add(bgl_center);
-        ret.mark_seen(bgl_center);
-
-        return ret;
-    }
-
-    fn deinit(self: *@This()) void {
-        self.heap.deinit();
-        self.seen.deinit();
-    }
-
-    fn queue(self: *@This(), bgl_coords: [3]usize) !void {
-        try self.heap.add(bgl_coords);
-        self.mark_seen(bgl_coords);
-    }
-
-    fn mark_seen(self: *@This(), bgl_coords: [3]usize) void {
-        self.seen.set( //
-            bgl_coords[0] +
-            bgl_coords[1] * self.bg_size[0] +
-            bgl_coords[2] * (self.bg_size[0] * self.bg_size[1]));
-    }
-
-    fn is_seen(self: *@This(), bgl_coords: [3]usize) bool {
-        return self.seen.isSet( //
-            bgl_coords[0] +
-            bgl_coords[1] * self.bg_size[0] +
-            bgl_coords[2] * (self.bg_size[0] * self.bg_size[1]));
-    }
-
-    fn iterate(self: *@This()) !?[3]isize {
-        if (self.heap.items.len == 0) return null;
-
-        const bgl_cur = self.heap.remove();
-
-        const g_cur = wgm.add(wgm.cast(isize, bgl_cur).?, self.origin);
-
-        for (0..3) |z_offset| for (0..3) |y_offset| for (0..3) |x_offset| {
-            const offset = wgm.sub(wgm.cast(isize, [_]usize{ x_offset, y_offset, z_offset }).?, 1);
-            if (wgm.compare(.all, offset, .equal, [_]isize{ 0, 0, 0 })) continue;
-
-            const bgl_next = wgm.add(wgm.cast(isize, bgl_cur).?, offset);
-
-            const under_bounds = wgm.compare(
-                .some,
-                bgl_next,
-                .less_than,
-                [_]isize{ 0, 0, 0 },
-            );
-
-            if (under_bounds) continue;
-
-            const bgl_next_u = wgm.cast(usize, bgl_next).?;
-
-            const over_bounds = wgm.compare(
-                .some,
-                bgl_next_u,
-                .greater_than_equal,
-                self.bg_size,
-            );
-
-            if (under_bounds or over_bounds) continue;
-
-            if (self.is_seen(bgl_next_u)) continue;
-            try self.queue(bgl_next_u);
-        };
-
-        return g_cur;
-    }
-};
 
 const Self = @This();
 
@@ -201,6 +78,7 @@ input_state: InputState = std.mem.zeroes(InputState),
 mouse_delta: [2]f32 = .{ 0, 0 },
 fov: f64 = 45.0,
 
+global_origin: [3]f64 = .{0} ** 3,
 global_coords: [3]f64 = .{0, 40, 0},
 look: [3]f64 = .{0} ** 3,
 
@@ -272,68 +150,9 @@ pub fn on_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     // _ = sdl.c.SDL_SetWindowMouseGrab(g.window.handle, self.mouse_capture);
 }
 
-fn generate_chunk(bm_coords: [3]isize) !?Brickmap {
-    var ret = std.mem.zeroes(Brickmap);
-
-    const base_coords: [3]isize = wgm.mulew(
-        bm_coords,
-        Brickmap.side_length_i,
-    );
-
-    const sl = Brickmap.side_length;
-
-    for (0..sl) |bml_z| for (0..sl) |bml_x| {
-        const bml_xz = [2]usize{ bml_x, bml_z };
-        const g_xz = wgm.add(wgm.cast(isize, bml_xz).?, [_]isize{
-            base_coords[0],
-            base_coords[2],
-        });
-        const dist = wgm.length(wgm.lossy_cast(f64, g_xz));
-        const height: isize = @intFromFloat(20 + 10 * @sin(dist / 10));
-        const remaining_height: isize = height - base_coords[1];
-
-        if (remaining_height < 0) continue;
-
-        for (0..@min(sl, @as(usize, @intCast(remaining_height)))) |bml_y| {
-            ret.voxels[bml_z][bml_y][bml_x] = PackedVoxel{
-                .r = 0xFF,
-                .g = 0,
-                .b = 0xFF,
-                .i = 0x40,
-            };
-        }
-    };
-
-    return ret;
-}
-
 pub fn on_tick(self: *Self, delta_ns: u64) !void {
+    _ = self;
     _ = delta_ns;
-
-    // The tick thread will be used for loading stuff so it might get pretty
-    // laggy. We don't want to depend on the tickrate for movement.
-    //
-    // TODO: Add another tick function for movement. It will be handled in the
-    // render thread in the meanwhile.
-
-    // This is terrible
-    // While being loosey goosey with the value is fine, this wrong on so many levels
-    const bg_origin = self.map_thing.origin_brickmap;
-    const bg_size = self.map_thing.config.?.grid_dimensions;
-
-    var asd = try LoadCycleStatus.init(bg_size, bg_origin);
-    defer asd.deinit();
-    var generated_chunks: usize = 0;
-    while (try asd.iterate()) |g_coords| {
-        if (generated_chunks >= 1024) break;
-
-        const chunk = (try generate_chunk(g_coords)) orelse continue;
-
-        if (try self.map_thing.queue_brickmap(g_coords, &chunk)) {
-            generated_chunks += 1;
-        }
-        // std.log.debug("{any}", .{g_coords});
-    }
 }
 
 fn process_input(self: *Self, ns_elapsed: u64) void {
@@ -377,46 +196,16 @@ fn process_input(self: *Self, ns_elapsed: u64) void {
     }
 }
 
-/// Recenters the map (if necessary) and returns the brickgrid-local coordinates.
+/// Recenters the map (if necessary) and returns the centered coordinates
 fn recenter(self: *Self) [3]f64 {
-    const bgl_center = wgm.div(self.map_thing.config.?.grid_dimensions, @as(usize, 2));
-
-    const currently_centered_on = wgm.add(
-        self.map_thing.origin_brickmap,
-        wgm.cast(isize, bgl_center).?,
-    );
-
-    const current_brickmap = wgm.lossy_cast(isize, wgm.trunc(wgm.div(
-        self.global_coords,
-        wgm.lossy_cast(f64, MapThing.Brickmap.side_length),
-    )));
-
-    const delta_v = wgm.sub(current_brickmap, currently_centered_on);
-    const delta_sq = wgm.dot(delta_v, delta_v);
-
-    const should_recenter = delta_sq >= 10;
-
-    if (should_recenter and self.do_recenter) {
-        self.map_thing.origin_brickmap = wgm.sub(
-            current_brickmap,
-            wgm.cast(isize, bgl_center).?,
-        );
-
-        std.log.debug("recentering!! current center: {any}, at: {any}, new origin: {any}", .{
-            currently_centered_on,
-            current_brickmap,
-            self.map_thing.origin_brickmap,
-        });
+    const sq_dist_to_center = self.map_thing.sq_distance_to_center(self.global_coords);
+    //std.log.debug("{d}", .{sq_dist_to_center});
+    if (sq_dist_to_center >= 512) {
+        std.log.debug("recentering", .{});
+        self.global_origin = self.map_thing.recenter(self.global_coords);
     }
 
-    const origin_coords = wgm.mulew(
-        self.map_thing.origin_brickmap,
-        MapThing.Brickmap.side_length_i,
-    );
-
-    const bgl_coords = wgm.sub(self.global_coords, wgm.lossy_cast(f64, origin_coords));
-
-    return bgl_coords;
+    return wgm.sub(self.global_coords, self.global_origin);
 }
 
 pub fn render(self: *Self, delta_ns: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
