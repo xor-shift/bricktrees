@@ -29,7 +29,65 @@
     } else if (intersected) {
         let n = intersection_normal(intersection);
         let c = -dot(n, ray.direction);
-        textureStore(texture_radiance, pixel, vec4<f32>(abs(n) * c, 1));
+
+        let sq3 = 0.577350269;
+        let sq2 = 0.707106781;
+        /*var directions = array<vec3<f32>, 8>(
+            vec3<f32>(sq3, sq3, sq3),
+            vec3<f32>(0, sq2, sq2),
+            vec3<f32>(-sq3, sq3, sq3),
+            vec3<f32>(-sq2, 0, sq2),
+            vec3<f32>(-sq3, -sq3, sq3),
+            vec3<f32>(0, -sq2, sq2),
+            vec3<f32>(sq3, -sq3, sq3),
+            vec3<f32>(sq2, 0, sq2),
+        );*/
+
+        let tan26 = 0.4877325885658614;
+        let sec26 = 1.1126019404751888;
+        var directions = array<vec2<f32>, 8>(
+            vec2<f32>(0, 1),
+            vec2<f32>(1, 1 - tan26),
+            vec2<f32>(sec26 * 0.5, -1),
+            vec2<f32>(-sec26 * 0.5),
+            vec2<f32>(-1, 1 - tan26),
+
+            vec2<f32>(0, 1) / 3,
+            vec2<f32>(-1, -1) / 3,
+            vec2<f32>(1, -1) / 3,
+        );
+
+        let biggest_axis = select(
+            select(2, 1, abs(n).z < abs(n).y),
+            select(2, 0, abs(n).z < abs(n).x),
+            abs(n).y < abs(n).x,
+        );
+
+        let p = vec3<f32>(intersection.voxel_coords) + intersection.local_coords + n * 0.01;
+        var occlusion = 0u;
+        for (var i = 0u; i < 8u; i++) {
+            let direction_base = normalize(vec3<f32>(directions[i], 1));
+
+            let direction_rot = vec3<f32>(
+                select(direction_base.x, direction_base.z, biggest_axis == 0),
+                select(direction_base.y, direction_base.z, biggest_axis == 1),
+                direction_base[biggest_axis],
+            );
+
+            let direction = select(
+                direction_rot,
+                -direction_rot,
+                n[biggest_axis] < 0,
+            );
+
+            occlusion += hit_check_coarse(p, direction, 16u, 0.65);
+            //occlusion += dot(direction, n);
+        }
+
+        let mult = f32(occlusion) / (16 * 8);
+
+        textureStore(texture_radiance, pixel, vec4<f32>(vec3<f32>(0.2, 0.3, 0.4) * mult, 1));
+        // textureStore(texture_radiance, pixel, vec4<f32>(-n, 1));
     } else {
         textureStore(texture_radiance, pixel, vec4<f32>(0, 0, 0, 1));
     }

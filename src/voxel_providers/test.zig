@@ -23,7 +23,7 @@ pub fn to_provider() VoxelProvider {
 }
 
 pub fn foo(_: *anyopaque, range: [2][3]isize) bool {
-    return range[0][1] >= 10 and range[0][1] <= 30 or range[1][1] >= 10 and range[1][1] <= 30;
+    return range[0][1] >= 8 and range[0][1] <= 32 or range[1][1] >= 8 and range[1][1] <= 32;
 }
 
 pub fn draw(_: *anyopaque, range: [2][3]isize, storage: []PackedVoxel) void {

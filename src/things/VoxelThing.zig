@@ -151,6 +151,23 @@ fn find_slot(self: *Self, for_coords: [3]isize) ?usize {
     return null;
 }
 
+const Curve = struct {
+    iteration: usize = 0,
+    dims: [3]usize,
+
+    fn next(ctx: *Curve) ?[3]usize {
+        const z = ctx.iteration / (ctx.dims[1] * ctx.dims[0]);
+        const y = (ctx.iteration / ctx.dims[0]) % ctx.dims[1];
+        const x = ctx.iteration % ctx.dims[0];
+
+        if (z >= ctx.dims[2]) return null;
+
+        ctx.iteration += 1;
+
+        return .{ x, y, z };
+    }
+};
+
 fn render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
     const redraw_everything = if (!std.meta.eql(self.cached_config, self.map_thing.config)) blk: {
         try self.reconfigure(self.map_thing.config);
@@ -161,25 +178,6 @@ fn render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !voi
         self.recenter(self.map_thing.origin_brickmap)
     else
         self.map_thing.get_view_volume();
-
-    const Curve = struct {
-        const Curve = @This();
-
-        iteration: usize = 0,
-        dims: [3]usize,
-
-        fn next(ctx: *Curve) ?[3]usize {
-            const z = ctx.iteration / (ctx.dims[1] * ctx.dims[0]);
-            const y = (ctx.iteration / ctx.dims[0]) % ctx.dims[1];
-            const x = ctx.iteration % ctx.dims[0];
-
-            if (z >= ctx.dims[2]) return null;
-
-            ctx.iteration += 1;
-
-            return .{ x, y, z };
-        }
-    };
 
     for (self.voxel_providers.items) |v| if (v) |w| {
         w.provider.render_start(w.provider.provider);

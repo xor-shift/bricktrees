@@ -384,4 +384,38 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
     return iterator.material != 0u;
 }
 
+fn hit_check_coarse(
+    origin_arg: vec3<f32>,
+    direction: vec3<f32>,
+    no_iters: u32,
+    iter_step: f32,
+) -> u32 {
+    var origin = origin_arg;
+
+    let brickgrid_dims = vec3<i32>(textureDimensions(brickgrid));
+    let voxel_dims = vec3<i32>(brickmap_dims) * brickgrid_dims;
+
+    for (var i = 0u; i < no_iters; i++) {
+        let voxel_coords = vec3<i32>(trunc(origin + f32(i) * iter_step * direction));
+        if (any(voxel_coords < vec3<i32>(0)) || any(voxel_coords >= voxel_dims)) {
+            continue;
+        }
+
+        let brickmap_coords = voxel_coords / vec3<i32>(brickmap_dims);
+        let bml_voxel_coords = voxel_coords - brickmap_coords * vec3<i32>(brickmap_dims);
+
+        let brickmap = textureLoad(brickgrid, brickmap_coords, 0).r;
+        if (brickmap == sentinel_brickmap) {
+            continue;
+        }
+
+        let material = get_material(brickmap, vec3<u32>(bml_voxel_coords));
+        if (material != 0u) {
+            return i;
+        }
+    }
+
+    return no_iters;
+}
+
 {{/use_brickmaps}}
