@@ -109,10 +109,10 @@ pub fn WorkerPool(comptime Context: type, comptime Work: type, comptime Result: 
             comptime work_producer_fn: anytype,
             comptime worker_fn: anytype,
         ) !*Self {
-            const storage = try alloc.alloc(*Result, no_threads * 2);
+            const storage = try alloc.alloc(*Result, no_threads * 3);
             var managed_to_allocate: usize = 0;
             errdefer for (0..managed_to_allocate) |i| alloc.destroy(storage[i]);
-            for (0..no_threads * 2) |i| {
+            for (0..no_threads * 3) |i| {
                 storage[i] = try alloc.create(Result);
                 managed_to_allocate += 1;
             }
@@ -181,7 +181,7 @@ pub fn WorkerPool(comptime Context: type, comptime Work: type, comptime Result: 
             while (true) {
                 const work = self.chan_work.recv() orelse return;
 
-                const result_ptr = self.result_storage[no * 2 + counter % 2];
+                const result_ptr = self.result_storage[no * 3 + counter % 3];
                 @call(.auto, worker_fn, .{
                     self.context.?,
                     result_ptr,
@@ -210,8 +210,8 @@ pub fn WorkerPool(comptime Context: type, comptime Work: type, comptime Result: 
         } {
             const res_info = self.chan_result.recv() orelse return null;
 
-            const base_offset = res_info.by_worker * 2;
-            const swap_offset = res_info.counter_during % 2;
+            const base_offset = res_info.by_worker * 3;
+            const swap_offset = res_info.counter_during % 3;
             const result_ptr = self.result_storage[base_offset + swap_offset];
 
             return .{
@@ -231,6 +231,7 @@ pub fn WorkerPool(comptime Context: type, comptime Work: type, comptime Result: 
                 var prev = @call(.auto, producer, .{ctx}) orelse {
                     self.context = null;
                     self.producing_work = false;
+                    self.chan_result.close();
                     continue;
                 };
 
@@ -300,7 +301,7 @@ test WorkerPool {
                     values[7] = c;
                 }
 
-                std.time.sleep(1 * std.time.ns_per_s);
+                std.time.sleep(50 * std.time.ns_per_ms);
 
                 out_result.* = .{
                     .values = values,
