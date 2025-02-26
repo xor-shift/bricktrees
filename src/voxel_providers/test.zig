@@ -47,7 +47,7 @@ pub fn draw(_: *anyopaque, range: [2][3]isize, storage: []PackedVoxel) void {
             base_coords[2],
         });
         const dist = wgm.length(wgm.lossy_cast(f64, g_xz));
-        const height: isize = @intFromFloat(20 + 10 * @sin(dist / 10 + t));
+        const height: isize = @intFromFloat(20 + 10 * @sin(dist / 10 - t));
         const remaining_height: isize = height - base_coords[1];
 
         if (remaining_height < 0) continue;

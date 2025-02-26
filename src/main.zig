@@ -86,7 +86,7 @@ fn initialize_things(alloc: std.mem.Allocator) void {
 
     map.reconfigure(.{
         //.grid_dimensions = wgm.sub(wgm.div([_]usize{ 16, 16, 16 }, 1), 1),
-        .grid_dimensions = .{ 21, 21, 21 },
+        .grid_dimensions = .{ 17, 17, 17 },
         .no_brickmaps = 8192,
     }) catch @panic("map.reconfigure");
 
@@ -223,6 +223,7 @@ test {
     std.testing.refAllDecls(@import("bricktree/u8.zig"));
     std.testing.refAllDecls(@import("bricktree/u64.zig"));
     std.testing.refAllDecls(@import("bricktree/curves.zig"));
+    std.testing.refAllDecls(@import("worker_pool.zig"));
 
     std.testing.refAllDecls(@import("DependencyGraph.zig"));
 }
