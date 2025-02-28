@@ -10,6 +10,7 @@ const PackedVoxel = @import("../voxel.zig").PackedVoxel;
 const Voxel = @import("../voxel.zig").Voxel;
 
 const MapThing = @import("MapThing.zig");
+const CameraThing = @import("CameraThing.zig");
 
 const AnyThing = @import("../AnyThing.zig");
 const VoxelProvider = @import("../VoxelProvider.zig");
@@ -70,15 +71,18 @@ brickgrid_memo: []?usize = &.{},
 brickmap_gen_pool: *Pool,
 
 map_thing: *MapThing = undefined,
+camera_thing: *CameraThing = undefined,
 
 pub fn init() !Self {
     return .{
         .voxel_providers = std.ArrayList(?VoxelProviderEntry).init(g.alloc),
-        .brickmap_gen_pool = try Pool.init(@min(std.Thread.getCpuCount() catch 1, 8), g.alloc, Self.pool_producer_fn, Self.pool_worker_fn),
+        .brickmap_gen_pool = try Pool.init(@min(std.Thread.getCpuCount() catch 1, 14), g.alloc, Self.pool_producer_fn, Self.pool_worker_fn),
     };
 }
 
 pub fn deinit(self: *Self) void {
+    self.brickmap_gen_pool.deinit();
+    g.alloc.destroy(self.brickmap_gen_pool);
     self.voxel_providers.deinit();
     self.reconfigure(null) catch {};
 }
@@ -243,6 +247,33 @@ const PoolResult = struct {
 
 const Pool = worker_pool.WorkerPool(PoolContext, PoolWork, PoolResult);
 
+fn should_draw(ctx: *PoolContext, range: [2][3]isize) bool {
+    const should_draw_from_scratch = //
+        ctx.redraw_everything or //
+        wgm.compare(.some, range[0], .less_than, ctx.already_drawn_range[0]) or //
+        wgm.compare(.some, range[1], .greater_than, ctx.already_drawn_range[1]);
+
+    const someone_wants_to_draw = if (should_draw_from_scratch) blk: {
+        for (ctx.self.voxel_providers.items) |maybe_p| if (maybe_p) |p| {
+            if (p.provider.should_draw(p.provider.provider, range)) {
+                break :blk true;
+            }
+        };
+        break :blk false;
+    } else false;
+
+    const someone_wants_to_redraw = if (!should_draw_from_scratch) blk: {
+        for (ctx.self.voxel_providers.items) |maybe_p| if (maybe_p) |p| {
+            if (p.provider.should_redraw(p.provider.provider, range)) {
+                break :blk true;
+            }
+        };
+        break :blk false;
+    } else false;
+
+    return someone_wants_to_redraw or someone_wants_to_draw;
+}
+
 fn pool_producer_fn(ctx: *PoolContext) ?PoolWork {
     while (true) {
         const vv_local_coords = ctx.curve.next() orelse return null;
@@ -254,23 +285,7 @@ fn pool_producer_fn(ctx: *PoolContext) ?PoolWork {
             wgm.add(voxel_coords, MapThing.Brickmap.side_length_i),
         };
 
-        const should_redaw_anyway = //
-            ctx.redraw_everything or //
-            wgm.compare(.some, range[0], .less_than, ctx.already_drawn_range[0]) or //
-            wgm.compare(.some, range[1], .greater_than, ctx.already_drawn_range[1]);
-
-        const someone_wants_to_redraw = if (!should_redaw_anyway) blk: {
-            for (ctx.self.voxel_providers.items) |maybe_p| if (maybe_p) |p| {
-                if (p.provider.should_redraw(p.provider.provider, range)) {
-                    break :blk true;
-                }
-            };
-            break :blk false;
-        } else false;
-
-        const should_redaw = someone_wants_to_redraw or should_redaw_anyway;
-
-        if (!should_redaw) {
+        if (!should_draw(ctx, range)) {
             continue;
         }
 

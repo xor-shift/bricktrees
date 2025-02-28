@@ -154,6 +154,8 @@ struct Iterator {
     current_brickmap: u32,
 
     stack: array<StackFrame, iteration_depth>,
+
+    stats: Statistics,
 };
 
 fn new_iterator(ray_arg: Ray, out_iterator: ptr<function, Iterator>) -> bool {
@@ -195,6 +197,7 @@ fn new_iterator(ray_arg: Ray, out_iterator: ptr<function, Iterator>) -> bool {
         /* mat */ 0u,
         /* bm  */ sentinel_brickmap,
         /* stk */ stack,
+        /* sts */ Statistics(0, 0, 0),
     );
 
     return true;
@@ -290,6 +293,13 @@ fn iterator_iterate(it: ptr<function, Iterator>, i: u32) -> bool {
 
     let props = get_level_props((*it).level);
 
+    if (true) {
+        let lv = (*it).level;
+        if      (lv == 0)           { (*it).stats.brickgrid_iterations += 1u; }
+        else if (lv == voxel_level) { (*it).stats.voxel_iterations += 1u;     }
+        else                        { (*it).stats.bricktree_iterations += 1u; }
+    }
+
     var first_time_on_level = !(*it).stack[(*it).level].iterate_first;
     if (!first_time_on_level) {
         let frame = (*it).stack[(*it).level];
@@ -378,7 +388,7 @@ fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
         iterator.ray.origin - vec3<f32>(iterator.stack[iterator.level].coords),
         length(ray_arg.origin - iterator.ray.origin),
         iterator.material,
-        Statistics(),
+        iterator.stats,
     );
 
     return iterator.material != 0u;

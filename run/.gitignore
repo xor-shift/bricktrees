@@ -1,3 +1,4 @@
 *
 !.gitignore
-
+!merge_shaders.nu
+!sphere.qoi

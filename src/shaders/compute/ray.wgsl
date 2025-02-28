@@ -8,7 +8,7 @@ struct Ray {
 struct Statistics {
     brickgrid_iterations: u32,
     bricktree_iterations: u32,
-    brickmap_iterations: u32,
+    voxel_iterations: u32,
 }
 
 struct Intersection {

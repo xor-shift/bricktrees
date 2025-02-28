@@ -65,6 +65,8 @@ pub const Any = struct {
 
 // Be careful: the vecN<T> of WGSL and the [N]T of C/Zig may not have the same alignment!
 const Uniforms = extern struct {
+    random_seed: [8]u32 = .{0} ** 8,
+
     transform: [4][4]f32 = wgm.identity(f32, 4),
     inverse_transform: [4][4]f32 = wgm.identity(f32, 4),
 
@@ -81,6 +83,7 @@ const Uniforms = extern struct {
 
 compute_shader: wgpu.ShaderModule,
 
+rand: std.Random.Xoshiro256,
 uniforms: Uniforms = .{
     .dims = .{
         @floatFromInt(@TypeOf(g.*).default_resolution[0]),
@@ -219,9 +222,12 @@ pub fn init(map: *MapThing, alloc: std.mem.Allocator) !Self {
     });
     errdefer compute_pipeline.deinit();
 
+    const rand = std.Random.Xoshiro256.init(std.crypto.random.int(u64));
+
     var ret: Self = .{
         .compute_shader = compute_shader,
 
+        .rand = rand,
         .uniform_bgl = uniform_bgl,
         .uniform_bg = uniform_bg,
         .uniform_buffer = uniform_buffer,
@@ -236,7 +242,6 @@ pub fn init(map: *MapThing, alloc: std.mem.Allocator) !Self {
 
     return ret;
 }
-
 pub fn deinit(self: *Self) void {
     self.compute_pipeline.deinit();
     self.compute_pipeline_layout.deinit();
@@ -292,6 +297,9 @@ pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.Text
     _ = onto;
 
     const dims = g.window.get_size() catch @panic("g.window.get_size()");
+
+    self.rand.fill(std.mem.asBytes(&self.uniforms.random_seed));
+
     g.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&self.uniforms));
 
     {

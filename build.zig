@@ -111,6 +111,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const qov = b.addModule("qov", .{
+        .root_source_file = b.path("lib/qov/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const qoi = b.addModule("qoi", .{
         .root_source_file = b.path("lib/qoi/root.zig"),
         .target = target,
@@ -196,6 +202,7 @@ pub fn build(b: *std.Build) void {
         exe.root_module.addImport("tracy", tracy);
         exe.root_module.addImport("core", core);
         exe.root_module.addImport("qoi", qoi);
+        exe.root_module.addImport("qov", qov);
         exe.root_module.addImport("wgm", wgm);
         exe.root_module.addImport("imgui", imgui);
         exe.root_module.addImport("gfx", gfx);
@@ -245,7 +252,7 @@ pub fn build(b: *std.Build) void {
     }
 
     // basic tests
-    inline for (.{ "core", "wgm", "qoi", "imgui" }) |lib_name| {
+    inline for (.{ "core", "wgm", "qoi", "qov", "imgui" }) |lib_name| {
         const tests = b.addTest(.{
             .root_source_file = b.path(std.fmt.comptimePrint("lib/{s}/root.zig", .{lib_name})),
             .test_runner = if (!std.mem.eql(u8, lib_name, "core")) b.path("test_runner.zig") else null,

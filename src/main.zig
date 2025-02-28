@@ -79,15 +79,22 @@ fn initialize_things(alloc: std.mem.Allocator) void {
     gpu.map_thing = map;
     gpu.visualiser = visualiser;
     voxel_thing.map_thing = map;
+    voxel_thing.camera_thing = camera;
+
+    const QOIProvider = @import("voxel_providers/test2.zig");
+    const test_provider = g.alloc.create(QOIProvider) catch @panic("OOM");
+    test_provider.* = QOIProvider.from_file("sphere.qoi", 8) catch @panic("qoi");
 
     _ = voxel_thing.add_voxel_provider(@import("voxel_providers/test.zig").to_provider());
+    _ = voxel_thing.add_voxel_provider(test_provider.to_provider());
 
     g.gui = gui;
 
     map.reconfigure(.{
-        //.grid_dimensions = wgm.sub(wgm.div([_]usize{ 16, 16, 16 }, 1), 1),
-        .grid_dimensions = .{ 17, 17, 17 },
-        .no_brickmaps = 8192,
+        // .grid_dimensions = .{ 209, 3, 209 },
+        // .no_brickmaps = 65535 * 2 - 27,
+        .grid_dimensions = .{ 19, 15, 19 },
+        .no_brickmaps = 31 * 15 * 31,
     }) catch @panic("map.reconfigure");
 
     g.resize(Globals.default_resolution) catch @panic("g.resize");

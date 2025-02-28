@@ -1,3 +1,5 @@
+const M_PI: f32 = 3.1415926535897932384626433;
+
 /* fn all_bits_are_right_leaning_8(val: u32) -> bool {
     let rs1 = (val >> 1) | val;
     let rs2 = (rs1 >> 2) | rs1;

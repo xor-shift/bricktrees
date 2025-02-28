@@ -134,7 +134,8 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
         .required_limits = .{
             // .max_sampled_textures_per_shader_stage = 32768 + 64,
             // .max_storage_buffers_per_shader_stage = 32768 + 64,
-            .max_buffer_size = 1 * 1024 * 1024 * 1024,
+            .max_buffer_size = 2 * 1024 * 1024 * 1024,
+            .max_storage_buffer_binding_size = 2 * 1024 * 1024 * 1024,
         },
     });
     errdefer device.deinit();
@@ -228,8 +229,8 @@ fn resize_impl(self: *Self, dims: [2]usize) !void {
         .view_formats = &.{.BGRA8UnormSrgb},
         .width = @intCast(dims[0]),
         .height = @intCast(dims[1]),
-        .present_mode = .Immediate,
-        // .present_mode = .Fifo,
+        // .present_mode = .Immediate,
+        .present_mode = .Fifo,
     });
 }
 

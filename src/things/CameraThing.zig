@@ -72,6 +72,8 @@ const InputState = packed struct(u32) {
     _reserved: u25 = undefined,
 };
 
+speed_slow: f64 = 4.0,
+speed_fast: f64 = 40.0,
 do_recenter: bool = true,
 mouse_capture: bool = false,
 input_state: InputState = std.mem.zeroes(InputState),
@@ -79,7 +81,7 @@ mouse_delta: [2]f32 = .{ 0, 0 },
 fov: f64 = 45.0,
 
 global_origin: [3]f64 = .{0} ** 3,
-global_coords: [3]f64 = .{0, 40, 0},
+global_coords: [3]f64 = .{ 0, 10, 0 },
 look: [3]f64 = .{0} ** 3,
 
 map_thing: *MapThing = undefined,
@@ -158,8 +160,6 @@ pub fn on_tick(self: *Self, delta_ns: u64) !void {
 fn process_input(self: *Self, ns_elapsed: u64) void {
     const secs_elapsed = @as(f64, @floatFromInt(ns_elapsed)) / std.time.ns_per_s;
 
-    const speed_slow: f64 = 4.0; // units/sec
-    const speed_fast: f64 = 40.0; // units/sec
     const rotation_speed = 0.01; // radians/pixel
 
     const radian_delta = wgm.mulew(wgm.lossy_cast(f64, self.mouse_delta), rotation_speed);
@@ -186,7 +186,7 @@ fn process_input(self: *Self, ns_elapsed: u64) void {
         const rotation = wgm.rotate_y_3d(f64, self.look[0]);
         const movement_f = wgm.mulew(
             wgm.mulmm(rotation, wgm.normalized(wgm.lossy_cast(f64, movement))),
-            secs_elapsed * if (input_state.fast) speed_fast else speed_slow,
+            secs_elapsed * if (input_state.fast) self.speed_fast else self.speed_slow,
         );
 
         self.global_coords = wgm.add(
@@ -200,7 +200,7 @@ fn process_input(self: *Self, ns_elapsed: u64) void {
 fn recenter(self: *Self) [3]f64 {
     const sq_dist_to_center = self.map_thing.sq_distance_to_center(self.global_coords);
     //std.log.debug("{d}", .{sq_dist_to_center});
-    if (sq_dist_to_center >= 512) {
+    if (sq_dist_to_center >= 512 and self.do_recenter) {
         std.log.debug("recentering", .{});
         self.global_origin = self.map_thing.recenter(self.global_coords);
     }
@@ -261,6 +261,9 @@ pub fn do_gui(self: *Self) !void {
         _ = imgui.input_slider(f64, "fov", &self.fov, 0, 90);
 
         _ = imgui.c.igCheckbox("enable recentering", &self.do_recenter);
+
+        _ = imgui.input_slider(f64, "slow speed", &self.speed_slow, 0.0, 10.0);
+        _ = imgui.input_slider(f64, "fast speed", &self.speed_fast, 10.0, 400.0);
     }
     imgui.end();
 }

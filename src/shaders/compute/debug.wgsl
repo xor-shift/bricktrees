@@ -13,7 +13,7 @@ fn get_debug_color(v: u32) -> vec3<f32> {
     return colors[v % 7];
 }
 
-const do_debug: bool = true;
+const do_debug: bool = false;
 var<private> debug_out: vec3<f32>;
 var<private> did_debug: bool = false;
 
