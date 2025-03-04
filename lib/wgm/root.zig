@@ -3,10 +3,12 @@ const std = @import("std");
 const determinant = @import("determinant.zig");
 const invert = @import("invert.zig");
 const special = @import("special_matrices.zig");
+const swizzle = @import("swizzle.zig");
 
 pub usingnamespace determinant;
 pub usingnamespace invert;
 pub usingnamespace special;
+pub usingnamespace swizzle;
 
 const do_simd = true;
 
@@ -14,6 +16,7 @@ test {
     std.testing.refAllDecls(determinant);
     std.testing.refAllDecls(invert);
     std.testing.refAllDecls(special);
+    std.testing.refAllDecls(swizzle);
     std.testing.refAllDecls(@import("test.zig"));
 }
 
@@ -289,6 +292,7 @@ fn bop(comptime Op: type, lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(l
     const scalar = if (l_scalar) lhs else rhs;
     const vector = if (l_scalar) rhs else lhs;
 
+    // TODO: bopvs does not respect the order and always divides *by* the scalar
     return bopvs(Op, H, vector, @as(H.T, scalar));
 }
 
@@ -309,6 +313,10 @@ pub fn mulew(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(
 /// division.
 pub fn div(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
     return bop(binary_ops.div, lhs, rhs);
+}
+
+test div {
+    // try std.testing.expectEqual([3]usize{ 1, 2, 3 }, div(@as(usize, 6), [3]usize{ 6, 3, 2 }));
 }
 
 pub fn mulmm(lhs: anytype, rhs: anytype) Matrix(He(@TypeOf(lhs)).T, He(@TypeOf(lhs)).rows, He(@TypeOf(rhs)).cols) {

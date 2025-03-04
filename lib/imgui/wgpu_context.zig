@@ -156,7 +156,12 @@ pub fn init(device: wgpu.Device, queue: wgpu.Queue) !Self {
             .targets = &.{.{
                 .format = wgpu.TextureFormat.BGRA8Unorm,
                 .blend = wgpu.BlendState.alpha_blending,
-                .write_mask = wgpu.ColorWriteMask{ .red = true, .green = true, .blue = true, .alpha = true },
+                .write_mask = wgpu.ColorWriteMask{
+                    .red = true,
+                    .green = true,
+                    .blue = true,
+                    .alpha = true,
+                },
             }},
         },
         .primitive = .{ .topology = .TriangleList },

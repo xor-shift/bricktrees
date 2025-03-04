@@ -2,43 +2,15 @@ const std = @import("std");
 
 const wgpu = @import("gfx").wgpu;
 
-const TextureAndView = @import("gpu/TextureAndView.zig");
-
 const AnyThing = @import("../AnyThing.zig");
+
+const TextureAndView = @import("gpu/TextureAndView.zig");
 
 const g = &@import("../main.zig").g;
 
 const Self = @This();
 
-pub const Any = struct {
-    fn init(self: *Self) AnyThing {
-        return .{
-            .thing = @ptrCast(self),
-
-            .deinit = Any.deinit,
-            .destroy = Any.destroy,
-            .on_resize = Any.on_resize,
-
-            .render = Any.render,
-        };
-    }
-
-    pub fn deinit(self_arg: *anyopaque) void {
-        @as(*Self, @ptrCast(@alignCast(self_arg))).deinit();
-    }
-
-    pub fn destroy(self_arg: *anyopaque, on_alloc: std.mem.Allocator) void {
-        on_alloc.destroy(@as(*Self, @ptrCast(@alignCast(self_arg))));
-    }
-
-    pub fn on_resize(self_arg: *anyopaque, dims: [2]usize) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).on_resize(dims);
-    }
-
-    pub fn render(self_arg: *anyopaque, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).render(delta_ns, encoder, onto);
-    }
-};
+vtable_thing: AnyThing = AnyThing.mk_vtable(Self),
 
 shader: wgpu.ShaderModule,
 
@@ -126,7 +98,7 @@ pub fn init() !Self {
         .visualisation_pipeline = visualisation_pipeline,
     };
 
-    try ret.on_resize(@TypeOf(g.*).default_resolution);
+    try ret.impl_thing_resize(@TypeOf(g.*).default_resolution);
 
     return ret;
 }
@@ -143,11 +115,15 @@ pub fn deinit(self: *Self) void {
     self.shader.deinit();
 }
 
-pub fn to_any(self: *Self) AnyThing {
-    return Self.Any.init(self);
+pub fn impl_thing_deinit(self: *Self) void {
+    return self.deinit();
 }
 
-pub fn on_resize(self: *Self, dims: [2]usize) !void {
+pub fn impl_thing_destroy(self: *Self, alloc: std.mem.Allocator) void {
+    alloc.destroy(self);
+}
+
+pub fn impl_thing_resize(self: *Self, dims: [2]usize) !void {
     const visualisation_texture = try TextureAndView.init(g.device, .{
         .label = "visualisation texture",
         .usage = .{ .texture_binding = true, .storage_binding = true },
@@ -187,7 +163,7 @@ pub fn on_resize(self: *Self, dims: [2]usize) !void {
     self.visualisation_texture_bg = visualisation_texture_bg;
 }
 
-pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+pub fn impl_thing_render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
     const render_pass = try encoder.begin_render_pass(wgpu.RenderPass.Descriptor{
         .label = "render pass",
         .color_attachments = &.{

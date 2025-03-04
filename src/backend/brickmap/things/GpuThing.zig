@@ -7,61 +7,20 @@ const imgui = @import("imgui");
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
-const AnyThing = @import("../AnyThing.zig");
+const AnyThing = @import("../../../AnyThing.zig");
 
-const MapThing = @import("MapThing.zig");
-const VisualiserThing = @import("VisualiserThing.zig");
-
-const TextureAndView = @import("gpu/TextureAndView.zig");
+const CameraThing = @import("../../../things/CameraThing.zig");
+const MapThing = @import("./MapThing.zig");
+const VisualiserThing = @import("../../../things/VisualiserThing.zig");
 
 const Brickmap = MapThing.Brickmap;
 
-const PackedVoxel = @import("../voxel.zig").PackedVoxel;
-const Voxel = @import("../voxel.zig").Voxel;
+const PackedVoxel = @import("../../../voxel.zig").PackedVoxel;
+const Voxel = @import("../../../voxel.zig").Voxel;
 
-const g = &@import("../main.zig").g;
+const g = &@import("../../../main.zig").g;
 
 const Self = @This();
-
-pub const Any = struct {
-    fn init(self: *Self) AnyThing {
-        return .{
-            .thing = @ptrCast(self),
-
-            .deinit = Any.deinit,
-            .destroy = Any.destroy,
-            .on_resize = Any.on_resize,
-            .on_raw_event = Any.on_raw_event,
-
-            .do_gui = Any.do_gui,
-            .render = Any.render,
-        };
-    }
-
-    pub fn deinit(self_arg: *anyopaque) void {
-        @as(*Self, @ptrCast(@alignCast(self_arg))).deinit();
-    }
-
-    pub fn destroy(self_arg: *anyopaque, on_alloc: std.mem.Allocator) void {
-        on_alloc.destroy(@as(*Self, @ptrCast(@alignCast(self_arg))));
-    }
-
-    pub fn on_resize(self_arg: *anyopaque, dims: [2]usize) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).on_resize(dims);
-    }
-
-    pub fn on_raw_event(self_arg: *anyopaque, ev: sdl.c.SDL_Event) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).on_raw_event(ev);
-    }
-
-    pub fn do_gui(self_arg: *anyopaque) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).do_gui();
-    }
-
-    pub fn render(self_arg: *anyopaque, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).render(delta_ns, encoder, onto);
-    }
-};
 
 // Be careful: the vecN<T> of WGSL and the [N]T of C/Zig may not have the same alignment!
 const Uniforms = extern struct {
@@ -70,16 +29,20 @@ const Uniforms = extern struct {
     transform: [4][4]f32 = wgm.identity(f32, 4),
     inverse_transform: [4][4]f32 = wgm.identity(f32, 4),
 
-    dims: [2]f32,
+    brickgrid_origin: [3]i32 = .{0} ** 3,
+    _padding_0: u32 = undefined,
+
+    dims: [2]f32 = .{ 0, 0 },
+    _padding_1: u32 = undefined,
+    _padding_2: u32 = undefined,
+
+    debug_variable_0: u32 = 0,
+    debug_variable_1: u32 = 0,
     debug_mode: u32 = 0,
     debug_level: u32 = 0,
-
-    pos: [3]f32 = .{ 0, 0, 0 }, // redundant
-    debug_variable_0: u32 = 0,
-
-    brickgrid_origin: [3]i32 = .{0} ** 3,
-    debug_variable_1: u32 = 0,
 };
+
+vtable_thing: AnyThing = AnyThing.mk_vtable(Self),
 
 compute_shader: wgpu.ShaderModule,
 
@@ -100,6 +63,7 @@ compute_textures_bg: wgpu.BindGroup,
 compute_pipeline_layout: wgpu.PipelineLayout,
 compute_pipeline: wgpu.ComputePipeline,
 
+camera_thing: *CameraThing = undefined,
 map_thing: *MapThing = undefined,
 visualiser: *VisualiserThing = undefined,
 
@@ -125,7 +89,6 @@ fn make_shader(alloc: std.mem.Allocator) !wgpu.ShaderModule {
         .success => |v| v,
     };
 
-    std.log.debug("{any}", .{res});
     defer res.deinit(alloc);
 
     var out = std.ArrayList(u8).init(alloc);
@@ -141,8 +104,8 @@ fn make_shader(alloc: std.mem.Allocator) !wgpu.ShaderModule {
     return shader;
 }
 
-pub fn init(map: *MapThing, alloc: std.mem.Allocator) !Self {
-    const compute_shader = try make_shader(alloc);
+pub fn init(map: *MapThing) !Self {
+    const compute_shader = try make_shader(g.alloc);
 
     //const compute_shader = try g.device.create_shader_module_wgsl_from_file("compute shader", "shaders/compute.wgsl", alloc);
     errdefer compute_shader.deinit();
@@ -242,6 +205,7 @@ pub fn init(map: *MapThing, alloc: std.mem.Allocator) !Self {
 
     return ret;
 }
+
 pub fn deinit(self: *Self) void {
     self.compute_pipeline.deinit();
     self.compute_pipeline_layout.deinit();
@@ -250,11 +214,15 @@ pub fn deinit(self: *Self) void {
     self.compute_textures_bgl.deinit();
 }
 
-pub fn to_any(self: *Self) AnyThing {
-    return Self.Any.init(self);
+pub fn impl_thing_deinit(self: *Self) void {
+    return self.deinit();
 }
 
-pub fn on_resize(self: *Self, dims: [2]usize) !void {
+pub fn impl_thing_destroy(self: *Self, alloc: std.mem.Allocator) void {
+    alloc.destroy(self);
+}
+
+pub fn impl_thing_resize(self: *Self, dims: [2]usize) !void {
     self.uniforms.dims = .{
         @floatFromInt(dims[0]),
         @floatFromInt(dims[1]),
@@ -276,12 +244,7 @@ pub fn on_resize(self: *Self, dims: [2]usize) !void {
     self.compute_textures_bg = compute_textures_bg;
 }
 
-pub fn on_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
-    _ = self;
-    _ = ev;
-}
-
-pub fn do_gui(self: *Self) !void {
+pub fn impl_thing_gui(self: *Self) !void {
     if (imgui.begin("asd", null, .{})) {
         _ = imgui.button("asdf", null);
 
@@ -293,12 +256,14 @@ pub fn do_gui(self: *Self) !void {
     imgui.end();
 }
 
-pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+pub fn impl_thing_render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
     _ = onto;
 
     const dims = g.window.get_size() catch @panic("g.window.get_size()");
 
     self.rand.fill(std.mem.asBytes(&self.uniforms.random_seed));
+    self.uniforms.transform = wgm.lossy_cast(f32, self.camera_thing.cached_transform);
+    self.uniforms.inverse_transform = wgm.lossy_cast(f32, self.camera_thing.cached_transform_inverse);
 
     g.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&self.uniforms));
 

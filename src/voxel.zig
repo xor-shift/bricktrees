@@ -1,3 +1,5 @@
+const wgm = @import("wgm");
+
 fn pack_ior(ior: f64) u6 {
     const v = @min(@max(ior, 1.0), 3.25);
 
@@ -21,35 +23,43 @@ fn unpack_ior(ior: u6) f64 {
 }
 
 pub const Voxel = union(enum) {
-    Air: struct {}, // -8 -8 -8 00------
+    Air: struct {},
 
     Normal: struct {
-        roughness: u6,
-
-        r: u8,
-        g: u8,
-        b: u8,
+        rgb: [3]f64,
+        rougness: f64,
     },
 
     Emissive: struct {
-        multiplier: u6,
-
-        r: u8,
-        g: u8,
-        b: u8,
+        rgb: [3]f64,
     },
 
     Transparent: struct {
-        ior: u6,
-
-        r: u8,
-        g: u8,
-        b: u8,
+        absorption: [3]f64,
+        ior: f64,
     },
 
     pub fn pack(self: Voxel) PackedVoxel {
-        _ = self;
-        return undefined;
+        return switch (self) {
+            .Air => .{ .r = 0, .g = 0, .b = 0, .i = 0 },
+            .Normal => |v| .{
+                .r = @intFromFloat(@trunc(@max(@min(v.rgb[0] * 255, 255), 0))),
+                .g = @intFromFloat(@trunc(@max(@min(v.rgb[1] * 255, 255), 0))),
+                .b = @intFromFloat(@trunc(@max(@min(v.rgb[2] * 255, 255), 0))),
+                .i = @intFromFloat(@trunc(@max(@min(v.rougness * 63, 63), 0))),
+            },
+            .Emissive => |v| blk: {
+                const length = wgm.length(v.rgb);
+                const norm = wgm.div(v.rgb, length);
+                break :blk .{
+                    .r = @intFromFloat(@trunc(@max(@min(norm[0] * 255, 255), 0))),
+                    .g = @intFromFloat(@trunc(@max(@min(norm[1] * 255, 255), 0))),
+                    .b = @intFromFloat(@trunc(@max(@min(norm[2] * 255, 255), 0))),
+                    .i = @intFromFloat(@trunc(@max(@min(length, 0), 63))),
+                };
+            },
+            .Transparent => undefined,
+        };
     }
 };
 
@@ -83,6 +93,9 @@ pub const Voxel = union(enum) {
 /// )
 /// ```
 pub const PackedVoxel = packed struct {
+    pub const air: PackedVoxel = .{ .r = 0, .g = 0, .b = 0, .i = 0 };
+    pub const white: PackedVoxel = .{ .r = 255, .g = 255, .b = 255, .i = 255 };
+
     r: u8,
     g: u8,
     b: u8,

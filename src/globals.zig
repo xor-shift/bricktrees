@@ -14,11 +14,14 @@ const DependencyGraph = @import("DependencyGraph.zig");
 const Things = @import("Things.zig");
 
 const AnyThing = @import("AnyThing.zig");
+
 const GuiThing = @import("things/GuiThing.zig");
 
 const RotatingArena = core.RotatingArena;
 
 pub const default_resolution: [2]usize = .{ 1280, 720 };
+
+vtable_thing: AnyThing = AnyThing.mk_vtable(Self),
 
 clock_mutex: std.Thread.Mutex,
 clock: std.time.Timer,
@@ -59,34 +62,6 @@ thing_store: Things,
 // Normally, you should store pointers to other `Thing`s you want inside your
 // own `Thing` but this is the one exception as every`Thing` needs it.
 gui: *GuiThing = undefined,
-
-const Any = struct {
-    fn init(self: *Self) AnyThing {
-        _ = self;
-
-        return .{
-            .thing = undefined,
-
-            .on_ready = Self.Any.on_ready,
-            .on_shutdown = Self.Any.on_shutdown,
-            .on_resize = Self.Any.on_resize,
-
-            .do_gui = Self.Any.do_gui,
-        };
-    }
-
-    pub fn on_ready(_: *anyopaque) anyerror!void {}
-
-    pub fn on_shutdown(_: *anyopaque) anyerror!void {}
-
-    pub fn on_resize(_: *anyopaque, new: [2]usize) anyerror!void {
-        try g.resize_impl(new);
-    }
-
-    pub fn do_gui(_: *anyopaque) anyerror!void {
-        try g.do_gui();
-    }
-};
 
 const Self = @This();
 
@@ -134,8 +109,8 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
         .required_limits = .{
             // .max_sampled_textures_per_shader_stage = 32768 + 64,
             // .max_storage_buffers_per_shader_stage = 32768 + 64,
-            .max_buffer_size = 2 * 1024 * 1024 * 1024,
-            .max_storage_buffer_binding_size = 2 * 1024 * 1024 * 1024,
+            .max_buffer_size = 2 * 1024 * 1024 * 1024 - 1,
+            .max_storage_buffer_binding_size = 2 * 1024 * 1024 * 1024 - 1,
         },
     });
     errdefer device.deinit();
@@ -180,10 +155,6 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
     };
 }
 
-pub fn to_any(self: *Self) AnyThing {
-    return Self.Any.init(self);
-}
-
 pub fn deinit(self: *Self) void {
     defer self.* = undefined;
 
@@ -221,7 +192,19 @@ pub fn new_frame(self: *Self) void {
     self.biframe_alloc = self.biframe_ra.rotate();
 }
 
-fn resize_impl(self: *Self, dims: [2]usize) !void {
+pub fn resize(self: *Self, dims: [2]usize) !void {
+    self.thing_store.process_graph("event_graph", "resize", .{dims});
+}
+
+pub fn event(self: *Self, ev: sdl.c.SDL_Event) void {
+    self.thing_store.event(ev);
+}
+
+pub fn impl_thing_deinit(_: *Self) void {}
+
+pub fn impl_thing_destroy(_: *Self, _: std.mem.Allocator) void {}
+
+pub fn impl_thing_resize(self: *Self, dims: [2]usize) !void {
     try self.surface.configure(.{
         .device = self.device,
         .format = .BGRA8Unorm,
@@ -234,16 +217,8 @@ fn resize_impl(self: *Self, dims: [2]usize) !void {
     });
 }
 
-fn do_gui(self: *Self) !void {
+pub fn impl_thing_gui(self: *Self) !void {
     _ = self;
 
     imgui.c.igShowMetricsWindow(null);
-}
-
-pub fn resize(self: *Self, dims: [2]usize) !void {
-    self.thing_store.process_graph("event_graph", "on_resize", .{dims});
-}
-
-pub fn event(self: *Self, ev: sdl.c.SDL_Event) void {
-    self.thing_store.event(ev);
 }

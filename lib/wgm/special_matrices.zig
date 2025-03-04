@@ -36,6 +36,10 @@ pub fn from_homogenous(vec: anytype) Vector(He(@TypeOf(vec)).T, He(@TypeOf(vec))
     return wgm.div(ret, H.get(&vec, H.rows - 1, 0));
 }
 
+test from_homogenous {
+    try std.testing.expectEqual([3]usize{ 1, 2, 3 }, from_homogenous([4]usize{ 2, 4, 6, 2 }));
+}
+
 pub fn pad_affine(mat: anytype) Matrix(He(@TypeOf(mat)).T, He(@TypeOf(mat)).rows + 1, He(@TypeOf(mat)).cols + 1) {
     const H = He(@TypeOf(mat));
     const Ret = Matrix(H.T, H.rows + 1, H.cols + 1);

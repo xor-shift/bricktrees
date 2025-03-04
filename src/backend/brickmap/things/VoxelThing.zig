@@ -1,56 +1,28 @@
 const std = @import("std");
 
+const tracy = @import("tracy");
 const wgm = @import("wgm");
 const wgpu = @import("gfx").wgpu;
 
 const curves = @import("../bricktree/curves.zig");
-const worker_pool = @import("../worker_pool.zig");
+const worker_pool = @import("../../../worker_pool.zig");
 
-const PackedVoxel = @import("../voxel.zig").PackedVoxel;
-const Voxel = @import("../voxel.zig").Voxel;
+const AnyThing = @import("../../../AnyThing.zig");
+
+const PackedVoxel = @import("../../../voxel.zig").PackedVoxel;
+const Voxel = @import("../../../voxel.zig").Voxel;
 
 const MapThing = @import("MapThing.zig");
-const CameraThing = @import("CameraThing.zig");
+const CameraThing = @import("../../../things/CameraThing.zig");
 
-const AnyThing = @import("../AnyThing.zig");
-const VoxelProvider = @import("../VoxelProvider.zig");
+const VoxelProvider = @import("../../../VoxelProvider.zig");
 
-const g = &@import("../main.zig").g;
+const g = &@import("../../../main.zig").g;
 
 const Self = @This();
 
-pub const Any = struct {
-    fn init(self: *Self) AnyThing {
-        return .{
-            .thing = @ptrCast(self),
-
-            .deinit = Any.deinit,
-            .destroy = Any.destroy,
-
-            .on_tick = Any.on_tick,
-            .render = Any.render,
-        };
-    }
-
-    pub fn deinit(self_arg: *anyopaque) void {
-        @as(*Self, @ptrCast(@alignCast(self_arg))).deinit();
-    }
-
-    pub fn destroy(self_arg: *anyopaque, on_alloc: std.mem.Allocator) void {
-        on_alloc.destroy(@as(*Self, @ptrCast(@alignCast(self_arg))));
-    }
-
-    pub fn on_tick(self_arg: *anyopaque, delta_ns: u64) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).on_tick(delta_ns);
-    }
-
-    pub fn render(self_arg: *anyopaque, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).render(delta_ns, encoder, onto);
-    }
-};
-
 const VoxelProviderEntry = struct {
-    provider: VoxelProvider,
+    provider: *VoxelProvider,
     last_acknowledged_update: u64,
 };
 
@@ -61,6 +33,8 @@ const BrickgridEntry = struct {
 const BrickmapEntry = struct {
     coords: [3]isize,
 };
+
+vtable_thing: AnyThing = AnyThing.mk_vtable(Self),
 
 voxel_providers: std.ArrayList(?VoxelProviderEntry),
 
@@ -87,11 +61,7 @@ pub fn deinit(self: *Self) void {
     self.reconfigure(null) catch {};
 }
 
-pub fn to_any(self: *Self) AnyThing {
-    return Self.Any.init(self);
-}
-
-pub fn add_voxel_provider(self: *Self, provider: VoxelProvider) usize {
+pub fn add_voxel_provider(self: *Self, provider: *VoxelProvider) usize {
     const to_add: VoxelProviderEntry = .{
         .provider = provider,
         .last_acknowledged_update = 0,
@@ -255,7 +225,7 @@ fn should_draw(ctx: *PoolContext, range: [2][3]isize) bool {
 
     const someone_wants_to_draw = if (should_draw_from_scratch) blk: {
         for (ctx.self.voxel_providers.items) |maybe_p| if (maybe_p) |p| {
-            if (p.provider.should_draw(p.provider.provider, range)) {
+            if (p.provider.should_draw(p.provider, range)) {
                 break :blk true;
             }
         };
@@ -264,7 +234,7 @@ fn should_draw(ctx: *PoolContext, range: [2][3]isize) bool {
 
     const someone_wants_to_redraw = if (!should_draw_from_scratch) blk: {
         for (ctx.self.voxel_providers.items) |maybe_p| if (maybe_p) |p| {
-            if (p.provider.should_redraw(p.provider.provider, range)) {
+            if (p.provider.should_redraw(p.provider, range)) {
                 break :blk true;
             }
         };
@@ -301,7 +271,7 @@ fn pool_worker_fn(ctx: *PoolContext, out_result: *PoolResult, work: PoolWork) vo
     @memset(voxel_storage, std.mem.zeroes(PackedVoxel));
 
     for (ctx.self.voxel_providers.items) |maybe_p| if (maybe_p) |p| {
-        p.provider.draw(p.provider.provider, work.range, voxel_storage);
+        p.provider.draw(p.provider, work.range, voxel_storage);
     };
 
     const as_brickmap: *MapThing.Brickmap = @ptrCast(voxel_storage.ptr);
@@ -322,7 +292,15 @@ fn pool_worker_fn(ctx: *PoolContext, out_result: *PoolResult, work: PoolWork) vo
     out_result.is_empty = is_empty;
 }
 
-fn render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
+pub fn impl_thing_deinit(self: *Self) void {
+    return self.deinit();
+}
+
+pub fn impl_thing_destroy(self: *Self, alloc: std.mem.Allocator) void {
+    alloc.destroy(self);
+}
+
+pub fn impl_thing_render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
     const redraw_everything = if (!std.meta.eql(self.cached_config, self.map_thing.config)) blk: {
         try self.reconfigure(self.map_thing.config);
         break :blk true;
@@ -334,11 +312,11 @@ fn render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !voi
         self.map_thing.get_view_volume();
 
     for (self.voxel_providers.items) |v| if (v) |w| {
-        w.provider.render_start(w.provider.provider);
+        w.provider.render_start(w.provider);
     };
 
     defer for (self.voxel_providers.items) |v| if (v) |w| {
-        w.provider.render_end(w.provider.provider);
+        w.provider.render_end(w.provider);
     };
 
     var context: PoolContext = .{
@@ -351,7 +329,6 @@ fn render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !voi
     };
     self.brickmap_gen_pool.begin_work(&context);
 
-    var ct: usize = 0;
     while (self.brickmap_gen_pool.get_result()) |info| {
         const result = info.result;
         const absolute_bm_coords = info.for_work.brickmap_coords;
@@ -368,8 +345,6 @@ fn render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !voi
             self.map_thing.upload_brickmap(slot, brickmap, bricktree);
             self.map_thing.brickmap_tracker[slot] = absolute_bm_coords;
             _ = self.set_memo(absolute_bm_coords, slot);
-            ct += 1;
         }
     }
-    std.log.debug("{d}", .{ct});
 }

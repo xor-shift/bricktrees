@@ -11,31 +11,14 @@ const g = &@import("../main.zig").g;
 
 const Self = @This();
 
-pub fn to_provider() VoxelProvider {
-    return .{
-        .provider = undefined,
+vtable_voxel_provider: VoxelProvider = VoxelProvider.mk_vtable(Self),
 
-        .should_draw = VoxelProvider.always_draw,
-        .should_redraw = foo,
-
-        .draw = Self.draw,
-    };
-}
-
-pub fn foo(_: *anyopaque, range: [2][3]isize) bool {
+pub fn impl_voxel_provider_should_redraw(_: *Self, range: [2][3]isize) bool {
     if (true) return false;
     return range[0][1] >= 10 and range[0][1] <= 30 or range[1][1] >= 10 and range[1][1] <= 30;
 }
 
-pub fn draw(_: *anyopaque, range: [2][3]isize, storage: []PackedVoxel) void {
-    const dummy = PackedVoxel{
-        .r = 0xFF,
-        .g = 0,
-        .b = 0xFF,
-        .i = 0x40,
-    };
-    //@memset(storage, dummy);
-
+pub fn impl_voxel_provider_draw(_: *Self, range: [2][3]isize, storage: []PackedVoxel) void {
     const volume = wgm.cast(usize, wgm.sub(range[1], range[0])).?;
     const base_coords = range[0];
 
@@ -59,7 +42,12 @@ pub fn draw(_: *anyopaque, range: [2][3]isize, storage: []PackedVoxel) void {
                 bml_x //
                 + bml_y * volume[0] //
                 + bml_z * volume[0] * volume[1]
-            ] = dummy;
+            ] = (Voxel{
+                .Normal = .{
+                    .rougness = 1.0,
+                    .rgb = .{ 0.1, 0.2, 0.3 },
+                },
+            }).pack();
         }
     };
 }

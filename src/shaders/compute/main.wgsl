@@ -119,6 +119,7 @@ fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32) -> f32 {
         return;
     }
 
+    let mat_color = unpack4x8unorm(intersection.material).rgb;
     let n = intersection_normal(intersection);
     let c = -dot(n, ray.direction);
     let p = vec3<f32>(intersection.voxel_coords) + intersection.local_coords + n * 0.01;
@@ -126,7 +127,7 @@ fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32) -> f32 {
     //let mult = quasi_ao(p, n);
     let mult = stochastic_ao(p, n, 5u);
 
-    textureStore(texture_radiance, pixel, vec4<f32>(vec3<f32>(0.2, 0.3, 0.4) * mult, 1));
+    textureStore(texture_radiance, pixel, vec4<f32>(mat_color * mult, 1));
     // textureStore(texture_radiance, pixel, vec4<f32>(-n, 1));
 }
 

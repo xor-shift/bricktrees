@@ -10,7 +10,7 @@ const Self = @This();
 
 alloc: std.mem.Allocator,
 
-things: std.StringHashMapUnmanaged(AnyThing),
+things: std.StringHashMapUnmanaged(*AnyThing),
 
 event_graph: DependencyGraph,
 render_graph: DependencyGraph,
@@ -31,8 +31,8 @@ pub fn init(alloc: std.mem.Allocator) !Self {
 pub fn deinit(self: *Self) void {
     var iter = self.things.iterator();
     while (iter.next()) |entry| {
-        entry.value_ptr.deinit(entry.value_ptr.thing);
-        entry.value_ptr.destroy(entry.value_ptr.thing, self.alloc);
+        entry.value_ptr.*.deinit(entry.value_ptr.*);
+        entry.value_ptr.*.destroy(entry.value_ptr.*, self.alloc);
         self.alloc.free(entry.key_ptr.*);
     }
 
@@ -70,7 +70,7 @@ pub const ThingConfig = struct {
 
 pub fn add_thing(
     self: *Self,
-    thing: AnyThing,
+    thing: *AnyThing,
     name: []const u8,
     dependencies: []const Dependency,
 ) void {
@@ -101,10 +101,12 @@ pub fn add_new_thing(
     self: *Self,
     comptime T: type,
     name: []const u8,
-    dependencies: []const Dependency,
+    args: anytype,
 ) *T {
-    var thing = self.alloc.create(T) catch @panic("OOM");
-    self.add_thing(thing.to_any(), name, dependencies);
+    const thing = self.alloc.create(T) catch @panic("OOM");
+    thing.* = @call(.auto, T.init, args) catch @panic("init");
+
+    self.add_thing(&thing.vtable_thing, name, &.{});
 
     return thing;
 }
@@ -119,14 +121,14 @@ pub fn call_on_every_thing(self: *Self, comptime fun_str: []const u8, args: anyt
         // std.log.debug("calling \"{s}\" on {s} (@ {p})", .{
         //     fun_str,
         //     name,
-        //     thing.thing,
+        //     @as(*anyopaque, @ptrCast(thing)),
         // });
 
         const fun = @field(thing, fun_str);
-        @call(.auto, fun, .{thing.thing} ++ args) catch |e| {
+        @call(.auto, fun, .{thing} ++ args) catch |e| {
             std.log.err("error calling " ++ fun_str ++ " on AnyThing named \"{s}\" @ {p}: {any}", .{
                 name,
-                thing.thing,
+                @as(*anyopaque, @ptrCast(thing)),
                 e,
             });
         };
@@ -158,14 +160,14 @@ pub fn process_graph(
             // std.log.debug("calling \"{s}\" on {s} (@ {p})", .{
             //     fun_name,
             //     name,
-            //     thing.thing,
+            //     @as(*anyopaque, @ptrCast(thing)),
             // });
 
-            @call(.auto, @field(thing, fun_name), .{thing.thing} ++ args) catch |e| {
+            @call(.auto, @field(thing, fun_name), .{thing} ++ args) catch |e| {
                 std.log.err("failed to call \"{s}\" on the Thing named \"{s}\" @ {p}: {s}", .{
                     fun_name,
                     name,
-                    thing.thing,
+                    @as(*anyopaque, @ptrCast(thing)),
                     @errorName(e),
                 });
             };
@@ -194,18 +196,18 @@ pub fn render(self: *Self, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wg
 }
 
 pub fn tick(self: *Self, delta_ns: u64) void {
-    self.process_graph("tick_graph", "on_tick", .{delta_ns});
+    self.process_graph("tick_graph", "tick", .{delta_ns});
 }
 
 pub fn event(self: *Self, ev: sdl.c.SDL_Event) void {
-    self.process_graph("event_graph", "on_raw_event", .{ev});
+    self.process_graph("event_graph", "raw_event", .{ev});
 
     switch (ev.common.type) {
         sdl.c.SDL_EVENT_WINDOW_RESIZED => {
             const evw = ev.window;
             const dims: [2]usize = .{ @intCast(evw.data1), @intCast(evw.data2) };
 
-            self.process_graph("event_graph", "on_resize", .{dims});
+            self.process_graph("event_graph", "resize", .{dims});
         },
         else => {
             // std.log.debug("unknown event", .{});

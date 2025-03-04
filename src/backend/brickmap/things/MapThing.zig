@@ -5,45 +5,16 @@ const wgpu = @import("gfx").wgpu;
 
 const curves = @import("../bricktree/curves.zig");
 
-const PackedVoxel = @import("../voxel.zig").PackedVoxel;
-const Voxel = @import("../voxel.zig").Voxel;
+const AnyThing = @import("../../../AnyThing.zig");
 
-const AnyThing = @import("../AnyThing.zig");
-const VoxelProvider = @import("../VoxelProvider.zig");
+const PackedVoxel = @import("../../../voxel.zig").PackedVoxel;
+const Voxel = @import("../../../voxel.zig").Voxel;
 
-const g = &@import("../main.zig").g;
+const VoxelProvider = @import("../../../VoxelProvider.zig");
+
+const g = &@import("../../../main.zig").g;
 
 const Self = @This();
-
-pub const Any = struct {
-    fn init(self: *Self) AnyThing {
-        return .{
-            .thing = @ptrCast(self),
-
-            .deinit = Any.deinit,
-            .destroy = Any.destroy,
-
-            .on_tick = Any.on_tick,
-            .render = Any.render,
-        };
-    }
-
-    pub fn deinit(self_arg: *anyopaque) void {
-        @as(*Self, @ptrCast(@alignCast(self_arg))).deinit();
-    }
-
-    pub fn destroy(self_arg: *anyopaque, on_alloc: std.mem.Allocator) void {
-        on_alloc.destroy(@as(*Self, @ptrCast(@alignCast(self_arg))));
-    }
-
-    pub fn on_tick(self_arg: *anyopaque, delta_ns: u64) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).on_tick(delta_ns);
-    }
-
-    pub fn render(self_arg: *anyopaque, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) anyerror!void {
-        try @as(*Self, @ptrCast(@alignCast(self_arg))).render(delta_ns, encoder, onto);
-    }
-};
 
 pub const Brickmap = switch (@import("scene_config").scene_config) {
     .brickmap => |config| @import("../brickmap.zig").Brickmap(config.bml_coordinate_bits),
@@ -97,6 +68,8 @@ const QueueDirective = union(enum) {
         coords: [3]isize,
     },
 };
+
+vtable_thing: AnyThing = AnyThing.mk_vtable(Self),
 
 // TODO: accesses to this are a little racy
 //
@@ -164,10 +137,6 @@ pub fn deinit(self: *Self) void {
     self.map_bgl.deinit();
 
     self.reconfigure(null) catch unreachable;
-}
-
-pub fn to_any(self: *Self) AnyThing {
-    return Any.init(self);
 }
 
 /// Guaranteed to not throw if `config == null`
@@ -398,7 +367,52 @@ pub fn upload_brickmap(self: *Self, slot: usize, map: *const Brickmap, tree: *co
     }
 }
 
-fn render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
+pub fn get_view_volume_for(origin_brickmap: [3]isize, grid_dimensions: [3]usize) [2][3]isize {
+    return wgm.mulew([_][3]isize{
+        wgm.cast(isize, origin_brickmap).?,
+        wgm.add(origin_brickmap, wgm.cast(isize, grid_dimensions).?),
+    }, Brickmap.side_length_i);
+}
+
+/// Returns the minimum and the maximum global-voxel-coordinate of the view volume
+pub fn get_view_volume(self: Self) [2][3]isize {
+    return get_view_volume_for(self.origin_brickmap, self.config.?.grid_dimensions);
+}
+
+pub fn sq_distance_to_center(self: Self, pt: [3]f64) f64 {
+    const volume = wgm.lossy_cast(f64, self.get_view_volume());
+    const center = wgm.div(wgm.add(volume[1], volume[0]), 2);
+    const delta = wgm.sub(center, pt);
+    return wgm.dot(delta, delta);
+}
+
+/// Tries to have it be so that the given point becomes the center of the view
+/// volume. The actual origin of the view volume is returned.
+pub fn recenter(self: *Self, desired_center: [3]f64) [3]f64 {
+    const center_brickmap = wgm.lossy_cast(isize, wgm.trunc(wgm.div(
+        desired_center,
+        wgm.lossy_cast(f64, Brickmap.side_length),
+    )));
+
+    const origin = wgm.sub(
+        center_brickmap,
+        wgm.div(wgm.cast(isize, self.config.?.grid_dimensions).?, 2),
+    );
+
+    self.origin_brickmap = origin;
+
+    return wgm.lossy_cast(f64, wgm.mulew(origin, Brickmap.side_length_i));
+}
+
+pub fn impl_thing_deinit(self: *Self) void {
+    return self.deinit();
+}
+
+pub fn impl_thing_destroy(self: *Self, alloc: std.mem.Allocator) void {
+    alloc.destroy(self);
+}
+
+pub fn impl_thing_render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
     const previous_queue = blk: {
         self.queue_mutex.lock();
         defer self.queue_mutex.unlock();
@@ -442,43 +456,3 @@ fn render(self: *Self, _: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !voi
     );
 }
 
-pub fn get_view_volume_for(origin_brickmap: [3]isize, grid_dimensions: [3]usize) [2][3]isize {
-    return wgm.mulew([_][3]isize{
-        wgm.cast(isize, origin_brickmap).?,
-        wgm.add(origin_brickmap, wgm.cast(isize, grid_dimensions).?),
-    }, Brickmap.side_length_i);
-}
-
-/// Returns the minimum and the maximum global-voxel-coordinate of the view volume
-pub fn get_view_volume(self: Self) [2][3]isize {
-    return get_view_volume_for(self.origin_brickmap, self.config.?.grid_dimensions);
-}
-
-pub fn sq_distance_to_center(self: Self, pt: [3]f64) f64 {
-    const volume = wgm.lossy_cast(f64, self.get_view_volume());
-    const center = wgm.div(wgm.add(volume[1], volume[0]), 2);
-    const delta = wgm.sub(center, pt);
-    return wgm.dot(delta, delta);
-}
-
-/// Tries to have it be so that the given point becomes the center of the view
-/// volume. The actual origin of the view volume is returned.
-pub fn recenter(self: *Self, desired_center: [3]f64) [3]f64 {
-    const center_brickmap = wgm.lossy_cast(isize, wgm.trunc(wgm.div(
-        desired_center,
-        wgm.lossy_cast(f64, Brickmap.side_length),
-    )));
-
-    const origin = wgm.sub(
-        center_brickmap,
-        wgm.div(wgm.cast(isize, self.config.?.grid_dimensions).?, 2),
-    );
-
-    self.origin_brickmap = origin;
-
-    return wgm.lossy_cast(f64, wgm.mulew(origin, Brickmap.side_length_i));
-}
-
-fn on_tick(self: *Self, _: u64) !void {
-    _ = self;
-}

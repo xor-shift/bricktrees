@@ -39,11 +39,13 @@ pub fn run(
     thread_config: std.Thread.SpawnConfig,
     comptime function: anytype,
     args: anytype,
+    comptime init_fn: anytype,
+    init_args: anytype,
 ) !void {
     self.thread = try std.Thread.spawn(
         thread_config,
         worker,
-        .{ self, function, args },
+        .{ self, function, args, init_fn, init_args },
     );
 }
 
@@ -79,8 +81,12 @@ pub fn worker(
     self: *Self,
     comptime function: anytype,
     args: anytype,
+    comptime init_fn: anytype,
+    init_args: anytype,
 ) void {
     self.next_tick_at = self.get_time() + self.config.ns_per_tick;
+
+    @call(.auto, init_fn, init_args);
 
     while (true) {
         if (self.wait() == .quitting) break;

@@ -88,6 +88,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("lib/tracy/root.zig"),
             .target = target,
             .optimize = optimize,
+            .sanitize_c = false, // tracy stores bad enum values
         });
 
         ret.addCSourceFiles(.{
@@ -97,6 +98,7 @@ pub fn build(b: *std.Build) void {
             },
             .flags = &.{
                 "-DTRACY_ENABLE",
+                // "-DTRACY_SYMBOL_OFFLINE_RESOLVE",
             },
         });
 
