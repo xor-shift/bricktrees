@@ -1,13 +1,15 @@
 const std = @import("std");
 
+const dyn = @import("dyn");
+const wgm = @import("wgm");
+
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
-const wgm = @import("wgm");
 
 const rt = @import("../rt/ray.zig");
 
-const AnyThing = @import("../AnyThing.zig");
-const VoxelProvider = @import("../VoxelProvider.zig");
+const IThing = @import("../IThing.zig");
+const IVoxelProvider = @import("../IVoxelProvider.zig");
 
 const CameraThing = @import("CameraThing.zig");
 
@@ -49,8 +51,7 @@ const GizmoVertex = extern struct {
     }
 };
 
-vtable_thing: AnyThing = AnyThing.mk_vtable(Self),
-vtable_voxel_provider: VoxelProvider = VoxelProvider.mk_vtable(Self),
+pub const DynStatic = dyn.ConcreteStuff(@This(), .{ IThing, IVoxelProvider });
 
 gizmo_pipeline_layout: wgpu.PipelineLayout,
 gizmo_pipeline: wgpu.RenderPipeline,
@@ -167,6 +168,11 @@ pub fn init() !Self {
 pub fn deinit(self: Self) void {
     self.gizmo_pipeline_layout.deinit();
     self.gizmo_pipeline.deinit();
+    g.alloc.free(self.voxels);
+}
+
+pub fn destroy(self: *Self, alloc: std.mem.Allocator) void {
+    alloc.destroy(self);
 }
 
 fn intersect(self: Self, pixel: [2]f32) ?Intersection {
@@ -187,7 +193,7 @@ fn intersect(self: Self, pixel: [2]f32) ?Intersection {
     return undefined;
 }
 
-pub fn impl_thing_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
+pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     switch (ev.common.type) {
         sdl.c.SDL_EVENT_MOUSE_BUTTON_DOWN => {
             const event = ev.button;
@@ -199,11 +205,7 @@ pub fn impl_thing_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     }
 }
 
-pub fn impl_thing_destroy(self: *Self, alloc: std.mem.Allocator) void {
-    alloc.destroy(self);
-}
-
-pub fn impl_thing_render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
     const uniforms: Uniforms = .{
         .transform = wgm.lossy_cast(f32, self.camera.cached_global_transform),
     };
@@ -278,8 +280,8 @@ pub fn impl_thing_render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto
     });
 }
 
-pub fn impl_voxel_provider_draw(self: *Self, range: [2][3]isize, storage: []PackedVoxel) void {
-    const info = VoxelProvider.overlap_info(range, .{
+pub fn draw_voxels(self: *Self, range: [2][3]isize, storage: []PackedVoxel) void {
+    const info = IVoxelProvider.overlap_info(range, .{
         self.origin,
         wgm.add(self.origin, [3]isize{ 64, 64, 64 }),
     }) orelse return;

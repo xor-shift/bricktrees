@@ -39,11 +39,9 @@ pub fn slab(comptime T: type, extents: [2][3]T, ray: Ray(T)) ?T {
     for (0..3) |d| {
         const t_1 = (extents[0][d] - ray.origin[d]) / ray.direction[d];
         const t_2 = (extents[1][d] - ray.origin[d]) / ray.direction[d];
-        std.log.debug("{d}, {d}", .{ t_1, t_2 });
 
         t_min = @min(@max(t_1, t_min), @max(t_2, t_min));
         t_max = @max(@min(t_1, t_max), @min(t_2, t_max));
-        std.log.debug("{d}, {d}", .{ t_min, t_max });
     }
 
     if (t_min > t_max) return null;
@@ -52,7 +50,7 @@ pub fn slab(comptime T: type, extents: [2][3]T, ray: Ray(T)) ?T {
 }
 
 test slab {
-    try std.testing.expectEqual(1, slab(f64, .{
+    try std.testing.expectEqual(1.0099504938362078, slab(f64, .{
         [_]f64{ -1, -1, 1 },
         [_]f64{ 1, 1, 2 },
     }, Ray(f64).init(

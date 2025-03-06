@@ -83,6 +83,11 @@ fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32) -> f32 {
     let pixel = global_id.xy;
     init_random(pixel);
 
+    if (false) {
+        textureStore(texture_radiance, pixel, vec4<f32>(0.1, 0.2, 0.3, 1));
+        return;
+    }
+
     let ray = generate_ray(pixel);
     var intersection: Intersection;
     let intersected = trace(ray, &intersection);

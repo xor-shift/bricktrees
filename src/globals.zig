@@ -1,10 +1,12 @@
 const std = @import("std");
 
 const core = @import("core");
+const dyn = @import("dyn");
 const imgui = @import("imgui");
 const qoi = @import("qoi");
-const sdl = @import("gfx").sdl;
 const wgm = @import("wgm");
+
+const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
 const g = &@import("main.zig").g;
@@ -13,7 +15,8 @@ const DependencyGraph = @import("DependencyGraph.zig");
 
 const Things = @import("Things.zig");
 
-const AnyThing = @import("AnyThing.zig");
+const IThing = @import("IThing.zig");
+const IBackend = @import("backend/IBackend.zig");
 
 const GuiThing = @import("things/GuiThing.zig");
 
@@ -21,7 +24,7 @@ const RotatingArena = core.RotatingArena;
 
 pub const default_resolution: [2]usize = .{ 1280, 720 };
 
-vtable_thing: AnyThing = AnyThing.mk_vtable(Self),
+pub const DynStatic = dyn.ConcreteStuff(@This(), .{IThing});
 
 clock_mutex: std.Thread.Mutex,
 clock: std.time.Timer,
@@ -58,10 +61,6 @@ tick_ra: RotatingArena(.{
 tick_alloc: std.mem.Allocator = undefined,
 
 thing_store: Things,
-
-// Normally, you should store pointers to other `Thing`s you want inside your
-// own `Thing` but this is the one exception as every`Thing` needs it.
-gui: *GuiThing = undefined,
 
 const Self = @This();
 
@@ -155,7 +154,10 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
     };
 }
 
-pub fn deinit(self: *Self) void {
+/// Stub for IThing
+pub fn deinit(_: *Self) void {}
+
+pub fn do_deinit(self: *Self) void {
     defer self.* = undefined;
 
     self.thing_store.deinit();
@@ -177,6 +179,9 @@ pub fn deinit(self: *Self) void {
     self.tick_ra.deinit();
 }
 
+// Stub for IThing
+pub fn destroy(_: *Self, _: std.mem.Allocator) void {}
+
 /// Returns the number of nanoseconds that passed since the start of the program.
 pub fn time(self: *Self) u64 {
     self.clock_mutex.lock();
@@ -192,19 +197,30 @@ pub fn new_frame(self: *Self) void {
     self.biframe_alloc = self.biframe_ra.rotate();
 }
 
-pub fn resize(self: *Self, dims: [2]usize) !void {
+pub fn do_resize(self: *Self, dims: [2]usize) !void {
     self.thing_store.process_graph("event_graph", "resize", .{dims});
 }
 
-pub fn event(self: *Self, ev: sdl.c.SDL_Event) void {
+pub fn submit_event(self: *Self, ev: sdl.c.SDL_Event) void {
     self.thing_store.event(ev);
 }
 
-pub fn impl_thing_deinit(_: *Self) void {}
+pub fn get_thing(self: *Self, thing_name: []const u8) ?dyn.Fat(*IThing) {
+    return self.thing_store.things.get(thing_name);
+}
 
-pub fn impl_thing_destroy(_: *Self, _: std.mem.Allocator) void {}
+pub fn gui(self: *Self) *GuiThing {
+    return self.get_thing("gui").?.get_concrete(GuiThing);
+}
 
-pub fn impl_thing_resize(self: *Self, dims: [2]usize) !void {
+pub fn backend(self: *Self) ?dyn.Fat(*IBackend) {
+    const backend_thing = self.get_thing("backend") orelse return null;
+    return backend_thing.sideways_cast(IBackend).?;
+}
+
+/// From IThing
+/// DO NOT CALL DIRECTLY
+pub fn resize(self: *Self, dims: [2]usize) !void {
     try self.surface.configure(.{
         .device = self.device,
         .format = .BGRA8Unorm,
@@ -217,8 +233,14 @@ pub fn impl_thing_resize(self: *Self, dims: [2]usize) !void {
     });
 }
 
-pub fn impl_thing_gui(self: *Self) !void {
-    _ = self;
-
+/// From IThing
+/// DO NOT CALL DIRECTLY
+pub fn do_gui(self: *Self) !void {
     imgui.c.igShowMetricsWindow(null);
+
+    if (imgui.begin("backend", null, .{})) {
+        _ = self;
+        // if (self.backend) |backend| backend.options_ui(backend);
+    }
+    imgui.end();
 }

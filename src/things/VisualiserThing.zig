@@ -1,8 +1,11 @@
 const std = @import("std");
 
+const dyn = @import("dyn");
+
+const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
-const AnyThing = @import("../AnyThing.zig");
+const IThing = @import("../IThing.zig");
 
 const TextureAndView = @import("gpu/TextureAndView.zig");
 
@@ -10,7 +13,7 @@ const g = &@import("../main.zig").g;
 
 const Self = @This();
 
-vtable_thing: AnyThing = AnyThing.mk_vtable(Self),
+pub const DynStatic = dyn.ConcreteStuff(@This(), .{IThing});
 
 shader: wgpu.ShaderModule,
 
@@ -98,7 +101,7 @@ pub fn init() !Self {
         .visualisation_pipeline = visualisation_pipeline,
     };
 
-    try ret.impl_thing_resize(@TypeOf(g.*).default_resolution);
+    try ret.resize(@TypeOf(g.*).default_resolution);
 
     return ret;
 }
@@ -115,15 +118,13 @@ pub fn deinit(self: *Self) void {
     self.shader.deinit();
 }
 
-pub fn impl_thing_deinit(self: *Self) void {
-    return self.deinit();
-}
-
-pub fn impl_thing_destroy(self: *Self, alloc: std.mem.Allocator) void {
+/// From IThing
+pub fn destroy(self: *Self, alloc: std.mem.Allocator) void {
     alloc.destroy(self);
 }
 
-pub fn impl_thing_resize(self: *Self, dims: [2]usize) !void {
+/// From IThing
+pub fn resize(self: *Self, dims: [2]usize) !void {
     const visualisation_texture = try TextureAndView.init(g.device, .{
         .label = "visualisation texture",
         .usage = .{ .texture_binding = true, .storage_binding = true },
@@ -163,7 +164,8 @@ pub fn impl_thing_resize(self: *Self, dims: [2]usize) !void {
     self.visualisation_texture_bg = visualisation_texture_bg;
 }
 
-pub fn impl_thing_render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+/// From IThing
+pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
     const render_pass = try encoder.begin_render_pass(wgpu.RenderPass.Descriptor{
         .label = "render pass",
         .color_attachments = &.{

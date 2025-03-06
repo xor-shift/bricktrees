@@ -1,16 +1,18 @@
 const std = @import("std");
 
+const dyn = @import("dyn");
 const imgui = @import("imgui");
+
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
-const AnyThing = @import("../AnyThing.zig");
+const IThing = @import("../IThing.zig");
 
 const g = &@import("../main.zig").g;
 
 const Self = @This();
 
-vtable_thing: AnyThing = AnyThing.mk_vtable(Self),
+pub const DynStatic = dyn.ConcreteStuff(@This(), .{IThing});
 
 context: imgui.WGPUContext,
 
@@ -25,6 +27,11 @@ pub fn init() !Self {
 
 pub fn deinit(self: *Self) void {
     self.context.deinit();
+}
+
+/// From IThing
+pub fn destroy(self: *Self, alloc: std.mem.Allocator) void {
+    alloc.destroy(self);
 }
 
 pub fn c(self: *Self) *imgui.c.ImGuiContext {
@@ -43,19 +50,19 @@ pub fn new_frame(self: *Self, delta_ns: u64) void {
     imgui.c.igNewFrame();
 }
 
-pub fn impl_thing_deinit(self: *Self) void {
-    return self.deinit();
-}
+/// Stub for IThing
+pub fn ready(_: *Self) void {}
 
-pub fn impl_thing_destroy(self: *Self, alloc: std.mem.Allocator) void {
-    alloc.destroy(self);
-}
+/// Stub for IThing
+pub fn shutdown(_: *Self) void {}
 
-pub fn impl_thing_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
+/// From IThing
+pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     imgui.sdl_event.translate_event(self.c(), ev);
 }
 
-pub fn impl_thing_resize(self: *Self, dims: [2]usize) !void {
+/// From IThing
+pub fn resize(self: *Self, dims: [2]usize) !void {
     const _ctx_guard = self.ctx_guard();
     defer _ctx_guard.deinit();
 
@@ -66,6 +73,13 @@ pub fn impl_thing_resize(self: *Self, dims: [2]usize) !void {
     };
 }
 
-pub fn impl_thing_render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+/// Stub for IThing
+pub fn process_tick(_: *Self, _: u64) anyerror!void {}
+
+/// Stub for IThing
+pub fn do_gui(_: *Self) !void {}
+
+/// From IThing
+pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
     try self.context.render(encoder, onto);
 }

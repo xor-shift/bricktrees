@@ -1,13 +1,13 @@
 const std = @import("std");
 
-const wgm = @import("wgm");
+const dyn = @import("dyn");
 const imgui = @import("imgui");
+const wgm = @import("wgm");
+
 const sdl = @import("gfx").sdl;
 const wgpu = @import("gfx").wgpu;
 
-const AnyThing = @import("../AnyThing.zig");
-
-const MapThing = @import("../backend/brickmap/things/MapThing.zig");
+const IThing = @import("../IThing.zig");
 
 const PackedVoxel = @import("../voxel.zig").PackedVoxel;
 const Voxel = @import("../voxel.zig").Voxel;
@@ -31,7 +31,7 @@ const InputState = packed struct(u32) {
     _reserved: u25 = undefined,
 };
 
-vtable_thing: AnyThing = AnyThing.mk_vtable(Self),
+pub const DynStatic = dyn.ConcreteStuff(@This(), .{IThing});
 
 speed_slow: f64 = 4.0,
 speed_fast: f64 = 40.0,
@@ -48,8 +48,6 @@ look: [3]f64 = .{0} ** 3,
 cached_global_transform: wgm.Matrix(f64, 4, 4) = undefined,
 cached_transform: wgm.Matrix(f64, 4, 4) = undefined,
 cached_transform_inverse: wgm.Matrix(f64, 4, 4) = undefined,
-
-map_thing: *MapThing = undefined,
 
 pub fn init() !Self {
     return .{};
@@ -100,12 +98,12 @@ fn process_input(self: *Self, ns_elapsed: u64) void {
 
 /// Recenters the map (if necessary) and returns the centered coordinates
 fn recenter(self: *Self) [3]f64 {
-    const sq_dist_to_center = self.map_thing.sq_distance_to_center(self.global_coords);
-    //std.log.debug("{d}", .{sq_dist_to_center});
-    if (sq_dist_to_center >= 512 and self.do_recenter) {
-        std.log.debug("recentering", .{});
-        self.global_origin = self.map_thing.recenter(self.global_coords);
-    }
+    // const sq_dist_to_center = g.backend.sq_distance_to_center(g.backend, self.global_coords);
+    // //std.log.debug("{d}", .{sq_dist_to_center});
+    // if (sq_dist_to_center >= 512 and self.do_recenter) {
+    //     std.log.debug("recentering", .{});
+    //     self.global_origin = self.map_thing.recenter(self.global_coords);
+    // }
 
     return wgm.sub(self.global_coords, self.global_origin);
 }
@@ -136,15 +134,11 @@ pub fn create_ray_for_pixel(self: Self, pixel: [2]f64, dims: [2]f64) Ray {
     return Ray.init(near, direction);
 }
 
-pub fn impl_thing_deinit(self: *Self) void {
-    return self.deinit();
-}
-
-pub fn impl_thing_destroy(self: *Self, alloc: std.mem.Allocator) void {
+pub fn destroy(self: *Self, alloc: std.mem.Allocator) void {
     alloc.destroy(self);
 }
 
-pub fn impl_thing_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
+pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     var input_state = self.input_state;
     defer @atomicStore(
         u32,
@@ -197,7 +191,7 @@ pub fn impl_thing_raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     // _ = sdl.c.SDL_SetWindowMouseGrab(g.window.handle, self.mouse_capture);
 }
 
-pub fn impl_thing_render(self: *Self, delta_ns: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
+pub fn render(self: *Self, delta_ns: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
     const dims = try g.window.get_size();
 
     self.process_input(delta_ns);
@@ -231,7 +225,7 @@ pub fn impl_thing_render(self: *Self, delta_ns: u64, _: wgpu.CommandEncoder, _: 
     );
 }
 
-pub fn impl_thing_gui(self: *Self) !void {
+pub fn do_gui(self: *Self) !void {
     if (imgui.begin("camera", null, .{})) {
         imgui.cformat("pos: %f, %f, %f", .{
             self.global_coords[0],
