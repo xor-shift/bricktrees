@@ -62,6 +62,12 @@ tick_alloc: std.mem.Allocator = undefined,
 
 thing_store: Things,
 
+backend_config: IBackend.BackendConfig = .{
+    .desied_view_volume_size = .{ 1024, 192, 1024 },
+},
+selected_backend: usize = std.math.maxInt(usize),
+queued_backend_selection: usize = 2,
+
 const Self = @This();
 
 /// Initializes just the WebGPU stuff.
@@ -154,9 +160,6 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
     };
 }
 
-/// Stub for IThing
-pub fn deinit(_: *Self) void {}
-
 pub fn do_deinit(self: *Self) void {
     defer self.* = undefined;
 
@@ -179,9 +182,6 @@ pub fn do_deinit(self: *Self) void {
     self.tick_ra.deinit();
 }
 
-// Stub for IThing
-pub fn destroy(_: *Self, _: std.mem.Allocator) void {}
-
 /// Returns the number of nanoseconds that passed since the start of the program.
 pub fn time(self: *Self) u64 {
     self.clock_mutex.lock();
@@ -192,6 +192,12 @@ pub fn time(self: *Self) u64 {
 
 pub fn new_frame(self: *Self) void {
     defer self.frame_no += 1;
+
+    if (self.queued_backend_selection != self.selected_backend) {
+        self.selected_backend = self.queued_backend_selection;
+        self.set_backend(self.queued_backend_selection);
+        self.backend().?.d("configure", .{self.backend_config}) catch @panic("");
+    }
 
     self.frame_alloc = self.frame_ra.rotate();
     self.biframe_alloc = self.biframe_ra.rotate();
@@ -218,6 +224,107 @@ pub fn backend(self: *Self) ?dyn.Fat(*IBackend) {
     return backend_thing.sideways_cast(IBackend).?;
 }
 
+const backend_names: []const [:0]const u8 = &.{
+    "3bpa brickmap",
+    "4bpa brickmap",
+    "5bpa brickmap",
+    "6bpa brickmap",
+
+    "2-layered raster 8-bricktree (3bpa)",
+    "3-layered raster 8-bricktree (4bpa)",
+    "4-layered raster 8-bricktree (5bpa)",
+    "5-layered raster 8-bricktree (6bpa)",
+
+    "2-layered llm1 8-bricktree (3 bpa, no manual caching)",
+    "3-layered llm1 8-bricktree (4 bpa, no manual caching)",
+    "4-layered llm1 8-bricktree (5 bpa, no manual caching)",
+    "5-layered llm1 8-bricktree (6 bpa, no manual caching)",
+    "2-layered llm1 8-bricktree (3 bpa, with manual caching)",
+    "3-layered llm1 8-bricktree (4 bpa, with manual caching)",
+    "4-layered llm1 8-bricktree (5 bpa, with manual caching)",
+    "5-layered llm1 8-bricktree (6 bpa, with manual caching)",
+
+    "1-layered raster 64-bricktree (4 bpa)",
+    "2-layered raster 64-bricktree (6 bpa)",
+    "3-layered raster 64-bricktree (8 bpa)",
+    "1-layered llm1 64-bricktree (4 bpa)",
+    "2-layered llm1 64-bricktree (6 bpa)",
+    "3-layered llm1 64-bricktree (8 bpa)",
+
+    "1-layered llm2 64-bricktree (4 bpa, no manual caching)",
+    "2-layered llm2 64-bricktree (6 bpa, no manual caching)",
+    "3-layered llm2 64-bricktree (8 bpa, no manual caching)",
+    "1-layered llm2 64-bricktree (4 bpa, with manual caching)",
+    "2-layered llm2 64-bricktree (6 bpa, with manual caching)",
+    "3-layered llm2 64-bricktree (8 bpa, with manual caching)",
+};
+
+fn set_backend(self: *Self, no: usize) void {
+    if (self.get_thing("backend")) |v| {
+        std.debug.assert(self.thing_store.things.remove("backend"));
+        v.d("deinit", .{});
+        v.d("destroy", .{self.alloc});
+    }
+
+    const bmbm = @import("backend/brickmap/backend.zig");
+
+    const mk_vanilla = struct {
+        fn aufruf(comptime bpa: usize) dyn.Fat(*IThing) {
+            return dyn.Fat(*IThing).init(bmbm.Backend(bmbm.Config2(.{ .Vanilla = .{
+                .bits_per_axis = bpa,
+            } })).init() catch @panic(""));
+        }
+    }.aufruf;
+
+    const mk_tree = struct {
+        fn aufruf(
+            comptime Node: type,
+            comptime bpa: usize,
+            comptime curve: bmbm.ConfigArgs.CurveKind,
+            comptime cache: bool,
+        ) dyn.Fat(*IThing) {
+            return dyn.Fat(*IThing).init(bmbm.Backend(bmbm.Config2(.{ .Bricktree = .{
+                .bits_per_axis = bpa,
+                .tree_node = Node,
+                .curve_kind = curve,
+                .manual_cache = cache,
+            } })).init() catch @panic(""));
+        }
+    }.aufruf;
+
+    const the_backend = switch (no) {
+        0 => mk_vanilla(3),
+        1 => mk_vanilla(4),
+        2 => mk_vanilla(5),
+        3 => mk_vanilla(6),
+
+        4 => mk_tree(u8, 3, .raster, false),
+        5 => mk_tree(u8, 4, .raster, false),
+        6 => mk_tree(u8, 5, .raster, false),
+        7 => mk_tree(u8, 6, .raster, false),
+
+        8 => mk_tree(u8, 3, .llm1, false),
+        9 => mk_tree(u8, 4, .llm1, false),
+        10 => mk_tree(u8, 5, .llm1, false),
+        11 => mk_tree(u8, 6, .llm1, false),
+        12 => mk_tree(u8, 3, .llm1, true),
+        13 => mk_tree(u8, 4, .llm1, true),
+        14 => mk_tree(u8, 5, .llm1, true),
+        15 => mk_tree(u8, 6, .llm1, true),
+
+        16 => mk_tree(u64, 4, .raster, false),
+        17 => mk_tree(u64, 6, .raster, false),
+        18 => mk_tree(u64, 8, .raster, false),
+        19 => mk_tree(u64, 4, .llm1, false),
+        20 => mk_tree(u64, 6, .llm1, false),
+        21 => mk_tree(u64, 8, .llm1, false),
+
+        else => @panic(""),
+    };
+
+    g.thing_store.add_thing(the_backend, "backend", &.{});
+}
+
 /// From IThing
 /// DO NOT CALL DIRECTLY
 pub fn resize(self: *Self, dims: [2]usize) !void {
@@ -228,19 +335,29 @@ pub fn resize(self: *Self, dims: [2]usize) !void {
         .view_formats = &.{.BGRA8UnormSrgb},
         .width = @intCast(dims[0]),
         .height = @intCast(dims[1]),
-        // .present_mode = .Immediate,
-        .present_mode = .Fifo,
+        .present_mode = .Immediate,
+        // .present_mode = .Fifo,
     });
 }
 
-/// From IThing
-/// DO NOT CALL DIRECTLY
 pub fn do_gui(self: *Self) !void {
     imgui.c.igShowMetricsWindow(null);
 
     if (imgui.begin("backend", null, .{})) {
-        _ = self;
-        // if (self.backend) |backend| backend.options_ui(backend);
+        if (imgui.c.igBeginCombo("backend selector", backend_names[self.selected_backend], 0)) {
+            for (backend_names, 0..) |backend_name, i| {
+                if (!imgui.c.igSelectable_Bool(
+                    backend_name,
+                    self.selected_backend == i,
+                    0,
+                    .{ .x = 0, .y = 0 },
+                )) continue;
+
+                self.queued_backend_selection = i;
+                imgui.c.igSetItemDefaultFocus();
+            }
+            imgui.c.igEndCombo();
+        }
     }
     imgui.end();
 }

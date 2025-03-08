@@ -249,7 +249,7 @@ pub fn ConcreteStuff(comptime Concrete: type, comptime interfaces: anytype) type
             break :blk acc + 1;
         };
 
-        const vtable: [vtable_len]VTableEntry = blk: {
+        pub const vtable: [vtable_len]VTableEntry = blk: {
             var ret: [vtable_len]VTableEntry = undefined;
 
             ret[0] = .{ .NoInterfaces = implemented_interfaces.len };

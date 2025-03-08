@@ -29,7 +29,6 @@ pub fn deinit(self: *Self) void {
     self.context.deinit();
 }
 
-/// From IThing
 pub fn destroy(self: *Self, alloc: std.mem.Allocator) void {
     alloc.destroy(self);
 }
@@ -42,6 +41,12 @@ pub fn ctx_guard(self: *Self) imgui.ContextGuard {
     return imgui.ContextGuard.init(self.c());
 }
 
+pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
+    imgui.sdl_event.translate_event(self.c(), ev);
+    const capture = imgui.c.igGetIO().*.WantCaptureKeyboard or imgui.c.igGetIO().*.WantCaptureMouse;
+    _ = capture;
+}
+
 pub fn new_frame(self: *Self, delta_ns: u64) void {
     const _guard = self.ctx_guard();
     defer _guard.deinit();
@@ -50,18 +55,6 @@ pub fn new_frame(self: *Self, delta_ns: u64) void {
     imgui.c.igNewFrame();
 }
 
-/// Stub for IThing
-pub fn ready(_: *Self) void {}
-
-/// Stub for IThing
-pub fn shutdown(_: *Self) void {}
-
-/// From IThing
-pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
-    imgui.sdl_event.translate_event(self.c(), ev);
-}
-
-/// From IThing
 pub fn resize(self: *Self, dims: [2]usize) !void {
     const _ctx_guard = self.ctx_guard();
     defer _ctx_guard.deinit();
@@ -73,13 +66,6 @@ pub fn resize(self: *Self, dims: [2]usize) !void {
     };
 }
 
-/// Stub for IThing
-pub fn process_tick(_: *Self, _: u64) anyerror!void {}
-
-/// Stub for IThing
-pub fn do_gui(_: *Self) !void {}
-
-/// From IThing
 pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
     try self.context.render(encoder, onto);
 }

@@ -534,6 +534,15 @@ pub fn negate(m: anytype) @TypeOf(m) {
     return ret;
 }
 
+pub fn round(m: anytype) @TypeOf(m) {
+    const H = He(@TypeOf(m));
+
+    var ret: @TypeOf(m) = undefined;
+    for (0..H.rows * H.cols) |i| H.fp(&ret)[i] = std.math.round(H.cfp(&m)[i]);
+
+    return ret;
+}
+
 pub fn trunc(m: anytype) @TypeOf(m) {
     const H = He(@TypeOf(m));
 

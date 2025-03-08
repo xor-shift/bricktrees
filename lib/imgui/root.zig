@@ -209,3 +209,4 @@ pub fn input_slider(comptime T: type, label: [:0]const u8, v: *T, min: T, max: T
 pub fn cformat(fmt: [:0]const u8, args: anytype) void {
     @call(.auto, c.igText, .{fmt} ++ args);
 }
+

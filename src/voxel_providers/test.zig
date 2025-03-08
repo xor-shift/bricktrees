@@ -20,7 +20,7 @@ pub fn init() !Self {
 }
 
 pub fn should_redraw_voxels(_: *Self, range: [2][3]isize) bool {
-    // if (true) return false;
+    if (true) return false;
     return range[0][1] >= 10 and range[0][1] <= 30 or range[1][1] >= 10 and range[1][1] <= 30;
 }
 
@@ -28,8 +28,8 @@ pub fn draw_voxels(_: *Self, range: [2][3]isize, storage: []PackedVoxel) void {
     const volume = wgm.cast(usize, wgm.sub(range[1], range[0])).?;
     const base_coords = range[0];
 
-    const t = @as(f64, @floatFromInt(g.time())) / std.time.ns_per_s;
-    // const t: f64 = 1.0;
+    // const t = @as(f64, @floatFromInt(g.time())) / std.time.ns_per_s;
+    const t: f64 = 1.0;
 
     for (0..volume[2]) |bml_z| for (0..volume[0]) |bml_x| {
         const bml_xz = [2]usize{ bml_x, bml_z };

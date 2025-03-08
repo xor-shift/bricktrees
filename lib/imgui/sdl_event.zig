@@ -16,6 +16,7 @@ fn translate_button(sdl_button: u8) ?c.ImGuiMouseButton {
 }
 
 fn translate_key(sdl_key: sdl.c.SDL_Scancode) ?c.ImGuiKey {
+    std.log.debug("{any}", .{sdl_key});
     // zig fmt: off
     return switch (sdl_key) {
         sdl.c.SDL_SCANCODE_A => c.ImGuiKey_A, sdl.c.SDL_SCANCODE_B => c.ImGuiKey_B, sdl.c.SDL_SCANCODE_C => c.ImGuiKey_C,
@@ -80,8 +81,8 @@ pub fn translate_event(context: *c.ImGuiContext, ev: sdl.c.SDL_Event) void {
         sdl.c.SDL_EVENT_MOUSE_WHEEL => c.ImGuiIO_AddMouseWheelEvent(io, ev.wheel.x, ev.wheel.y),
         sdl.c.SDL_EVENT_MOUSE_BUTTON_DOWN => if (translate_button(ev.button.button)) |b| c.ImGuiIO_AddMouseButtonEvent(io, b, true),
         sdl.c.SDL_EVENT_MOUSE_BUTTON_UP => if (translate_button(ev.button.button)) |b| c.ImGuiIO_AddMouseButtonEvent(io, b, false),
-        sdl.c.SDL_EVENT_KEY_DOWN => if(translate_key(ev.key.scancode)) |k| c.ImGuiIO_AddKeyEvent(io, k, true),
-        sdl.c.SDL_EVENT_KEY_UP => if(translate_key(ev.key.scancode)) |k| c.ImGuiIO_AddKeyEvent(io, k, false),
+        sdl.c.SDL_EVENT_KEY_DOWN => if (translate_key(ev.key.scancode)) |k| c.ImGuiIO_AddKeyEvent(io, k, true),
+        sdl.c.SDL_EVENT_KEY_UP => if (translate_key(ev.key.scancode)) |k| c.ImGuiIO_AddKeyEvent(io, k, false),
 
         else => {},
     }

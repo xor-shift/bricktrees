@@ -77,12 +77,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const scene_config_module = b.addModule("scene_config", .{
-        .root_source_file = b.path("config.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
     const tracy = blk: {
         const ret = b.addModule("tracy", .{
             .root_source_file = b.path("lib/tracy/root.zig"),
@@ -219,8 +213,6 @@ pub fn build(b: *std.Build) void {
 
         exe.root_module.addImport("mustache", mustache_module);
 
-        exe.root_module.addImport("scene_config", scene_config_module);
-
         add_include_paths_for_zls(b, exe);
 
         b.installArtifact(exe);
@@ -256,8 +248,6 @@ pub fn build(b: *std.Build) void {
         // link_to_wgpu_and_sdl(b, exe_tests);
 
         exe_tests.root_module.addImport("mustache", mustache_module);
-
-        exe_tests.root_module.addImport("scene_config", scene_config_module);
 
         var run_exe_tests = b.addRunArtifact(exe_tests);
         run_exe_tests.has_side_effects = true;

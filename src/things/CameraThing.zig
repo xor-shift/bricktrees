@@ -96,18 +96,6 @@ fn process_input(self: *Self, ns_elapsed: u64) void {
     }
 }
 
-/// Recenters the map (if necessary) and returns the centered coordinates
-fn recenter(self: *Self) [3]f64 {
-    // const sq_dist_to_center = g.backend.sq_distance_to_center(g.backend, self.global_coords);
-    // //std.log.debug("{d}", .{sq_dist_to_center});
-    // if (sq_dist_to_center >= 512 and self.do_recenter) {
-    //     std.log.debug("recentering", .{});
-    //     self.global_origin = self.map_thing.recenter(self.global_coords);
-    // }
-
-    return wgm.sub(self.global_coords, self.global_origin);
-}
-
 pub fn create_ray_for_pixel(self: Self, pixel: [2]f64, dims: [2]f64) Ray {
     const ndc_xy = blk: {
         const flipped = wgm.div(wgm.lossy_cast(f64, pixel), dims);
@@ -193,9 +181,14 @@ pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
 
 pub fn render(self: *Self, delta_ns: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
     const dims = try g.window.get_size();
+    const backend = g.backend() orelse return;
 
     self.process_input(delta_ns);
-    const real_coords = self.recenter();
+    if (self.do_recenter) {
+        backend.d("recenter", .{self.global_coords});
+    }
+    const global_origin = backend.d("get_origin", .{});
+    const real_coords = wgm.sub(self.global_coords, global_origin);
 
     const transform_base = wgm.mulmm(
         wgm.perspective_fov(

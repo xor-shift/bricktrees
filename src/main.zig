@@ -34,9 +34,10 @@ fn initialize_things(alloc: std.mem.Allocator) void {
     const VisualiserThing = @import("things/VisualiserThing.zig");
     _ = g.thing_store.add_new_thing(VisualiserThing, "visualiser", .{});
 
-    const Backend = @import("backend/brickmap/Backend.zig");
-    const backend = g.thing_store.add_new_thing(Backend, "backend", .{});
-    _ = backend;
+    // const backend_module = @import("backend/brickmap/backend.zig");
+    // const Backend = backend_module.Backend(backend_module.Config.from_scene_config());
+    // const backend = Backend.init() catch @panic("");
+    // g.thing_store.add_thing(dyn.Fat(*IThing).init(backend), "backend", &.{});
 
     const EditorThing = @import("things/EditorThing.zig");
     _ = g.thing_store.add_new_thing(EditorThing, "editor", .{});
