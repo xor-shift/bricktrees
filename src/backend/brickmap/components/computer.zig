@@ -40,6 +40,8 @@ fn make_shader(alloc: std.mem.Allocator, comptime Cfg: type) !wgpu.ShaderModule 
     try mustache.render(res, Cfg.to_mustache(), out.writer());
     defer out.deinit();
 
+    //
+
     const shader_code = try out.toOwnedSliceSentinel(0);
     defer alloc.free(shader_code);
 

@@ -1,6 +1,6 @@
 {{#use_bricktrees}}
 
-@group(2) @binding(2) var<storage, read> bricktrees: array<u32>;
+@group(2) @binding(3) var<storage, read> bricktrees: array<u32>;
 
 const bricktree_level_depth = {{bricktree_width_log2}}u / 3u;
 
@@ -53,7 +53,7 @@ fn tree_check(
     bml_voxel_coords: vec3<u32>,
     first_time_on_level: bool
 ) -> bool {
-    if (uniforms.debug_variable_1 == 1u) { return true; }
+    // if (uniforms.debug_variable_1 == 1u) { return true; }
 
     let ll_bo = curve_forward(level, bml_voxel_coords);
 

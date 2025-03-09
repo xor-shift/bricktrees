@@ -19,12 +19,18 @@ pub fn init() !Self {
     return .{};
 }
 
+pub fn should_draw_voxels(_: *Self, range: [2][3]isize) bool {
+    _ = range;
+    return true;
+}
+
 pub fn should_redraw_voxels(_: *Self, range: [2][3]isize) bool {
     if (true) return false;
     return range[0][1] >= 10 and range[0][1] <= 30 or range[1][1] >= 10 and range[1][1] <= 30;
 }
 
 pub fn draw_voxels(_: *Self, range: [2][3]isize, storage: []PackedVoxel) void {
+    // if (true) return;
     const volume = wgm.cast(usize, wgm.sub(range[1], range[0])).?;
     const base_coords = range[0];
 

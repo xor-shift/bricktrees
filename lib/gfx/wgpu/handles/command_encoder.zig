@@ -55,3 +55,20 @@ pub fn finish(self: CommandEncoder, descriptor: ?CommandBuffer.Descriptor) Error
         .handle = buffer orelse return Error.UnexpectedNull,
     };
 }
+
+pub fn copy_buffer_to_buffer(
+    self: CommandEncoder,
+    dst: wgpu.Buffer,
+    dst_offset: usize,
+    src: wgpu.Buffer,
+    slice: [2]usize,
+) void {
+    c.wgpuCommandEncoderCopyBufferToBuffer(
+        self.handle,
+        src.handle,
+        slice[0],
+        dst.handle,
+        dst_offset,
+        slice[1] - slice[0],
+    );
+}

@@ -63,10 +63,10 @@ tick_alloc: std.mem.Allocator = undefined,
 thing_store: Things,
 
 backend_config: IBackend.BackendConfig = .{
-    .desied_view_volume_size = .{ 1024, 192, 1024 },
+    .desied_view_volume_size = .{ 512, 192, 512 },
 },
 selected_backend: usize = std.math.maxInt(usize),
-queued_backend_selection: usize = 2,
+queued_backend_selection: usize = 17,
 
 const Self = @This();
 
@@ -110,6 +110,7 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
             wgpu.FeatureName.ShaderI16,
 
             wgpu.FeatureName.BGRA8UnormStorage,
+            wgpu.FeatureName.TextureAdapterSpecificFormatFeatures,
         },
         .required_limits = .{
             // .max_sampled_textures_per_shader_stage = 32768 + 64,
@@ -225,16 +226,19 @@ pub fn backend(self: *Self) ?dyn.Fat(*IBackend) {
 }
 
 const backend_names: []const [:0]const u8 = &.{
+    // 0
     "3bpa brickmap",
     "4bpa brickmap",
     "5bpa brickmap",
     "6bpa brickmap",
 
+    // 4
     "2-layered raster 8-bricktree (3bpa)",
     "3-layered raster 8-bricktree (4bpa)",
     "4-layered raster 8-bricktree (5bpa)",
     "5-layered raster 8-bricktree (6bpa)",
 
+    // 8
     "2-layered llm1 8-bricktree (3 bpa, no manual caching)",
     "3-layered llm1 8-bricktree (4 bpa, no manual caching)",
     "4-layered llm1 8-bricktree (5 bpa, no manual caching)",
@@ -244,6 +248,7 @@ const backend_names: []const [:0]const u8 = &.{
     "4-layered llm1 8-bricktree (5 bpa, with manual caching)",
     "5-layered llm1 8-bricktree (6 bpa, with manual caching)",
 
+    // 16
     "1-layered raster 64-bricktree (4 bpa)",
     "2-layered raster 64-bricktree (6 bpa)",
     "3-layered raster 64-bricktree (8 bpa)",

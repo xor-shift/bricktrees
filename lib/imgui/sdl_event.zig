@@ -16,7 +16,6 @@ fn translate_button(sdl_button: u8) ?c.ImGuiMouseButton {
 }
 
 fn translate_key(sdl_key: sdl.c.SDL_Scancode) ?c.ImGuiKey {
-    std.log.debug("{any}", .{sdl_key});
     // zig fmt: off
     return switch (sdl_key) {
         sdl.c.SDL_SCANCODE_A => c.ImGuiKey_A, sdl.c.SDL_SCANCODE_B => c.ImGuiKey_B, sdl.c.SDL_SCANCODE_C => c.ImGuiKey_C,

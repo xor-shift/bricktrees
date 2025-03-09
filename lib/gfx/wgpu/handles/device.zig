@@ -173,3 +173,7 @@ pub fn create_sampler(self: Device, descriptor: Sampler.Descriptor) Error!Sample
         .handle = c.wgpuDeviceCreateSampler(self.handle, &descriptor.get()) orelse return Error.UnexpectedNull,
     };
 }
+
+pub fn poll(self: Device, wait: bool) void {
+    _ = c.wgpuDevicePoll(self.handle, @intFromBool(wait), null);
+}

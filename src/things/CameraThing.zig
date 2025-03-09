@@ -126,7 +126,7 @@ pub fn destroy(self: *Self, alloc: std.mem.Allocator) void {
     alloc.destroy(self);
 }
 
-pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
+pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !bool {
     var input_state = self.input_state;
     defer @atomicStore(
         u32,
@@ -177,6 +177,8 @@ pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
     }
 
     // _ = sdl.c.SDL_SetWindowMouseGrab(g.window.handle, self.mouse_capture);
+
+    return false;
 }
 
 pub fn render(self: *Self, delta_ns: u64, _: wgpu.CommandEncoder, _: wgpu.TextureView) !void {

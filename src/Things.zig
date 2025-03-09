@@ -154,7 +154,7 @@ pub fn process_graph(
     var stage: Stage = .pre_start;
 
     // std.log.debug("-- began --", .{});
-    while (true) {
+    outer: while (true) {
         while (iter.next()) |name| {
             const thing = self.things.get(name) orelse continue;
 
@@ -164,14 +164,20 @@ pub fn process_graph(
             //     @as(*anyopaque, @ptrCast(thing)),
             // });
 
-            thing.d(fun_name, args) catch |e| {
+            const do_capture = thing.d(fun_name, args) catch |e| {
                 std.log.err("failed to call \"{s}\" on the Thing named \"{s}\" @ {p}: {s}", .{
                     fun_name,
                     name,
                     thing.this_ptr,
                     @errorName(e),
                 });
+                continue;
             };
+
+            if (@TypeOf(do_capture) == bool) {
+                if (do_capture) break :outer;
+            }
+
             iter.done(name) catch @panic("");
         }
 
@@ -194,6 +200,7 @@ pub fn process_graph(
 
 pub fn render(self: *Self, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) void {
     self.process_graph("render_graph", "render", .{ delta_ns, encoder, onto });
+    self.process_graph("render_graph", "post_render", .{});
 }
 
 pub fn tick(self: *Self, delta_ns: u64) void {

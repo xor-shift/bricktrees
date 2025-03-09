@@ -30,8 +30,10 @@ pub fn resize(_: dyn.Fat(*Self), dims: [2]usize) anyerror!void {
 
 /// If, for example, a resize event is received, both this function and `on_resize` will be called.
 /// It is also possble for `on_resize` to be called but not `on_raw_event`
-pub fn raw_event(_: dyn.Fat(*Self), ev: sdl.c.SDL_Event) anyerror!void {
+pub fn raw_event(_: dyn.Fat(*Self), ev: sdl.c.SDL_Event) anyerror!bool {
     _ = ev;
+
+    return false;
 }
 
 pub fn process_tick(_: dyn.Fat(*Self), delta_ns: u64) anyerror!void {
@@ -46,3 +48,4 @@ pub fn render(_: dyn.Fat(*Self), delta_ns: u64, encoder: wgpu.CommandEncoder, on
     _ = onto;
 }
 
+pub fn post_render(_: dyn.Fat(*Self)) anyerror!void {}

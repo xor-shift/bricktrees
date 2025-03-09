@@ -26,6 +26,7 @@
       "name": "feature_name",
       "doc": "TODO\n",
       "entries": [
+          { "name": "NativeUndefined", "doc": "TODO\n" },
           { "name": "PushConstants", "doc": "TODO\n" },
           { "name": "TextureAdapterSpecificFormatFeatures", "doc": "TODO\n" },
           { "name": "MultiDrawIndirect", "doc": "TODO\n" },

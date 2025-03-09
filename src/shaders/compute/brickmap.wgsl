@@ -1,7 +1,13 @@
 {{#use_brickmaps}}
 
+struct FeedbackData {
+    next_index: atomic<u32>,
+    data: array<vec4<u32>>,
+};
+
 @group(2) @binding(0) var brickgrid: texture_3d<u32>;
-@group(2) @binding(1) var<storage, read> brickmaps: array<u32>;
+@group(2) @binding(1) var<storage, read_write> feedback_buffer: FeedbackData;
+@group(2) @binding(2) var<storage, read> brickmaps: array<u32>;
 
 // X_dims can index into an array X
 // X_size is a real quantity representing X_dims * X_element_size
@@ -24,6 +30,12 @@ const brickmap_size = vec3<f32>(brickmap_dims); // * voxel_size
 const brickmap_words: u32 = 1u << (3u * brickmap_depth);
 
 const nudge_factor = 1.00001;
+
+const k_bm_not_loaded: u32 = 0xFFFFFFFFu;
+const k_bm_unoccupied: u32 = 0xFFFFFFFEu;
+const k_bm_want_load: u32 = 0xFFFFFFFDu;
+
+var<private> g_give_feedback: bool = true;
 
 fn get_material(brickmap: u32, bl_coords: vec3<u32>) -> u32 {
     let g_offset = brickmap * brickmap_words;
@@ -63,12 +75,12 @@ fn iterate_box(
     let delta = vec3<f32>(box_sidelength) - ray_relative_box_local_pt;
     let tv = delta * abs(ray.direction_reciprocals);
 
-    debug_vec(debug_offset + 0u, iteration, abs(delta) / f32(box_sidelength));
-    debug_vec(debug_offset + 1u, iteration, abs(delta) * vec3<f32>(1, 1, 0) / f32(box_sidelength));
-    debug_vec(debug_offset + 2u, iteration, tv / 64);
-    debug_jet(debug_offset + 3u, iteration, tv.x / 64);
-    debug_jet(debug_offset + 4u, iteration, tv.y / 64);
-    debug_jet(debug_offset + 5u, iteration, tv.z / 64);
+    // debug_vec(debug_offset + 0u, iteration, abs(delta) / f32(box_sidelength));
+    // debug_vec(debug_offset + 1u, iteration, abs(delta) * vec3<f32>(1, 1, 0) / f32(box_sidelength));
+    // debug_vec(debug_offset + 2u, iteration, tv / 64);
+    // debug_jet(debug_offset + 3u, iteration, tv.x / 64);
+    // debug_jet(debug_offset + 4u, iteration, tv.y / 64);
+    // debug_jet(debug_offset + 5u, iteration, tv.z / 64);
 
     let shortest_axis = select(
         select(2u, 1u, tv.y < tv.z),
@@ -87,7 +99,7 @@ fn iterate_box(
     }
     shortest_axis_vector *= ray.iter_direction;
 
-    debug_vec(
+    /*debug_vec(
         debug_offset + 6u,
         iteration,
         vec3<f32>(select(
@@ -95,7 +107,7 @@ fn iterate_box(
             shortest_axis_vector + vec3<i32>(2),
             shortest_axis_vector == vec3<i32>(-1)
         )) / 2, // -1 0 1 -> 1 0 2
-    );
+    );*/
 
     return BoxIteration(
         shortest_axis_vector,
@@ -117,8 +129,6 @@ struct StackFrame {
     // being irrelevant.
     iterate_first: bool,
 };
-
-const sentinel_brickmap: u32 = 0xFFFFFFFFu;
 
 struct LevelProps {
     sidelength: i32,
@@ -178,8 +188,8 @@ fn new_iterator(ray_arg: Ray, out_iterator: ptr<function, Iterator>) -> bool {
             &distance_to_the_brickgrid,
         );
 
-        debug_bool(0u, 1u, is_intersecting_the_brickgrid);
-        debug_jet(1u, 1u, select(0., sqrt(distance_to_the_brickgrid) / 5, is_intersecting_the_brickgrid));
+        // debug_bool(0u, 1u, is_intersecting_the_brickgrid);
+        // debug_jet(1u, 1u, select(0., sqrt(distance_to_the_brickgrid) / 5, is_intersecting_the_brickgrid));
 
         if (!is_intersecting_the_brickgrid) {
             return false;
@@ -195,7 +205,7 @@ fn new_iterator(ray_arg: Ray, out_iterator: ptr<function, Iterator>) -> bool {
         /* ray */ ray,
         /* lvl */ 0u,
         /* mat */ 0u,
-        /* bm  */ sentinel_brickmap,
+        /* bm  */ k_bm_not_loaded,
         /* stk */ stack,
         /* sts */ Statistics(0, 0, 0),
     );
@@ -243,7 +253,19 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level:
 
     if ((*it).level == 0u) {
         let brickmap = textureLoad(brickgrid, frame.coords, 0).r;
-        if (brickmap == sentinel_brickmap) { return false; }
+
+        if (brickmap >= k_bm_want_load) {
+            if (brickmap == k_bm_want_load) {
+                g_give_feedback = false; // don't want to overwhelm the host
+            } else if (brickmap == k_bm_not_loaded && g_give_feedback) {
+                let idx = atomicAdd(&feedback_buffer.next_index, 1u);
+                if (idx < 256) {
+                    feedback_buffer.data[idx] = vec4<u32>(vec3<u32>(frame.coords), 0xB1FF3D17u);
+                }
+                g_give_feedback = false;
+            }
+            return false;
+        }
 
         (*it).current_brickmap = brickmap;
         return true;
@@ -253,8 +275,8 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level:
         let brickmap_coords = frame.coords / vec3<i32>(brickmap_dims);
         let bml_voxel_coords = frame.coords - brickmap_coords * vec3<i32>(brickmap_dims);
 
-        debug_vec(4u, i, vec3<f32>(brickmap_coords) / vec3<f32>(brickgrid_dims));
-        debug_vec(5u, i, vec3<f32>(bml_voxel_coords) / vec3<f32>(brickmap_dims));
+        // debug_vec(4u, i, vec3<f32>(brickmap_coords) / vec3<f32>(brickgrid_dims));
+        // debug_vec(5u, i, vec3<f32>(bml_voxel_coords) / vec3<f32>(brickmap_dims));
 
         let material = get_material((*it).current_brickmap, vec3<u32>(bml_voxel_coords));
         if (material == 0u) { return false; }
@@ -284,12 +306,12 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level:
 
 /// Returns whether to continue iterating
 fn iterator_iterate(it: ptr<function, Iterator>, i: u32) -> bool {
-    debug_u32(0u, i + 1, i);
+    // debug_u32(0u, i + 1, i);
 
-    if (i >= 256) {
-        debug_vec(1u, i, vec3<f32>(1, 0, 0));
-        return false;
-    }
+    // if (i >= 256) {
+    //     debug_vec(1u, i, vec3<f32>(1, 0, 0));
+    //     return false;
+    // }
 
     let props = get_level_props((*it).level);
 
@@ -315,7 +337,7 @@ fn iterator_iterate(it: ptr<function, Iterator>, i: u32) -> bool {
         (*it).stack[(*it).level].coords += bit.next_box_offset;
         (*it).stack[(*it).level].iterate_first = false;
 
-        debug_vec(1u, i, vec3<f32>(0, 1, 0));
+        // debug_vec(1u, i, vec3<f32>(0, 1, 0));
     }
 
     let frame = (*it).stack[(*it).level];
@@ -323,21 +345,21 @@ fn iterator_iterate(it: ptr<function, Iterator>, i: u32) -> bool {
     let bound_check_res = iterator_check_oob(it);
 
     if (bound_check_res == 2u) {
-        debug_vec(1u, i, vec3<f32>(1, 0, 1));
+        // debug_vec(1u, i, vec3<f32>(1, 0, 1));
         return false;
     }
 
     if (bound_check_res == 1u) {
-        debug_vec(1u, i, vec3<f32>(0, 0, 0.6));
+        // debug_vec(1u, i, vec3<f32>(0, 0, 0.6));
         (*it).level -= 1u;
         return true;
     }
 
     let have_hit = iterator_detect_hit(it, i, first_time_on_level);
-    debug_bool(1u, i, have_hit);
+    // debug_bool(1u, i, have_hit);
 
-    debug_u32(2u, i, (*it).level);
-    debug_u32(3u, i, (*it).current_brickmap);
+    // debug_u32(2u, i, (*it).level);
+    // debug_u32(3u, i, (*it).current_brickmap);
 
     if (!have_hit) {
         (*it).stack[(*it).level].iterate_first = true;
@@ -415,7 +437,7 @@ fn hit_check_coarse(
         let bml_voxel_coords = voxel_coords - brickmap_coords * vec3<i32>(brickmap_dims);
 
         let brickmap = textureLoad(brickgrid, brickmap_coords, 0).r;
-        if (brickmap == sentinel_brickmap) {
+        if (brickmap >= k_bm_want_load) {
             continue;
         }
 

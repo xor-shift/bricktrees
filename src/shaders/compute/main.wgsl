@@ -94,9 +94,9 @@ fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32) -> f32 {
 
     // debug_vec(0u, 0u, intersection.local_coords);
     // debug_bool(0u, 0u, intersected);
-    debug_vec(1u, 0u, vec3<f32>(intersection.distance / 5, 0, 0));
+    // debug_vec(1u, 0u, vec3<f32>(intersection.distance / 5, 0, 0));
 
-    debug_jet(2u, 0u, f32(pixel.x) / uniforms.dims[0]);
+    // debug_jet(2u, 0u, f32(pixel.x) / uniforms.dims[0]);
 
     let stat_div = vec3<f32>(64, 192, 96);
     let stats = vec3<f32>(vec3<u32>(
@@ -106,18 +106,18 @@ fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32) -> f32 {
     ));
     let ds = stats / stat_div;
 
-    debug_vec(3u, 0u, ray.origin / 32);
-    debug_vec(4u, 0u, ray.direction);
-    debug_vec(5u, 0u, vec3<f32>(ray.iter_direction + vec3<i32>(1)) / 2);
-    debug_jet(6u, 0u, ds.x);
-    debug_jet(7u, 0u, ds.y);
-    debug_jet(8u, 0u, ds.z);
-    debug_jet(9u, 0u, (ds.x + ds.y + ds.z) / 3);
+    // debug_vec(3u, 0u, ray.origin / 32);
+    // debug_vec(4u, 0u, ray.direction);
+    // debug_vec(5u, 0u, vec3<f32>(ray.iter_direction + vec3<i32>(1)) / 2);
+    // debug_jet(6u, 0u, ds.x);
+    // debug_jet(7u, 0u, ds.y);
+    // debug_jet(8u, 0u, ds.z);
+    // debug_jet(9u, 0u, (ds.x + ds.y + ds.z) / 3);
 
-    if (did_debug) {
-        textureStore(texture_radiance, pixel, vec4<f32>(debug_out, 1));
-        return;
-    }
+    // if (did_debug) {
+    //     textureStore(texture_radiance, pixel, vec4<f32>(debug_out, 1));
+    //     return;
+    // }
 
     if (!intersected) {
         textureStore(texture_radiance, pixel, vec4<f32>(0, 0, 0, 1));

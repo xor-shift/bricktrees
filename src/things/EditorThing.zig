@@ -60,12 +60,11 @@ gizmo_vbo: wgpu.Buffer,
 gizmo_uniform_bg: wgpu.BindGroup,
 gizmo_uniform_buffer: wgpu.Buffer,
 
+dims: [3]usize,
 origin: [3]isize = .{ 1, 30, 3 },
 voxels: []PackedVoxel,
 
-camera: *CameraThing = undefined,
-
-pub fn init() !Self {
+pub fn init(dims: [3]usize) !Self {
     const shader_code = @embedFile("../shaders/gizmo.wgsl");
 
     const shader_module = try g.device.create_shader_module_wgsl("gizmo sahder", shader_code);
@@ -120,7 +119,7 @@ pub fn init() !Self {
         .usage = .{
             .vertex = true,
             .copy_dst = true,
-            .map_read = true,
+            // .map_read = true,
         },
     });
     errdefer gizmo_vbo.deinit();
@@ -131,7 +130,7 @@ pub fn init() !Self {
         .usage = .{
             .uniform = true,
             .copy_dst = true,
-            .map_read = true,
+            // .map_read = true,
         },
     });
     errdefer gizmo_uniform_buffer.deinit();
@@ -149,9 +148,9 @@ pub fn init() !Self {
     });
     errdefer gizmo_uniform_bg.deinit();
 
-    const voxels = try g.alloc.alloc(PackedVoxel, 64 * 64 * 64);
+    const voxels = try g.alloc.alloc(PackedVoxel, dims[0] * dims[1] * dims[2]);
     @memset(voxels, PackedVoxel.air);
-    voxels[32 * 64 * 64 + 32 * 64 + 32] = PackedVoxel.white;
+    voxels[32 * dims[1] * dims[0] + 32 * dims[0] + 32] = PackedVoxel.white;
 
     return .{
         .gizmo_pipeline_layout = gizmo_pipeline_layout,
@@ -161,6 +160,7 @@ pub fn init() !Self {
         .gizmo_uniform_bg = gizmo_uniform_bg,
         .gizmo_uniform_buffer = gizmo_uniform_buffer,
 
+        .dims = dims,
         .voxels = voxels,
     };
 }
@@ -176,16 +176,18 @@ pub fn destroy(self: *Self, alloc: std.mem.Allocator) void {
 }
 
 fn intersect(self: Self, pixel: [2]f32) ?Intersection {
+    const camera = g.get_thing("camera").?.get_concrete(CameraThing);
+
     const dims = wgm.lossy_cast(f64, g.window.get_size() catch unreachable);
     const ray = blk: {
-        var tmp = self.camera.create_ray_for_pixel(wgm.lossy_cast(f64, pixel), dims);
-        tmp.origin = wgm.lossy_cast(f64, self.camera.global_coords);
+        var tmp = camera.create_ray_for_pixel(wgm.lossy_cast(f64, pixel), dims);
+        tmp.origin = wgm.lossy_cast(f64, camera.global_coords);
         break :blk tmp;
     };
 
     const slab_res = rt.slab(f64, [2][3]f64{
         wgm.lossy_cast(f64, self.origin),
-        wgm.add(wgm.lossy_cast(f64, self.origin), [_]f64{ 64, 64, 64 }),
+        wgm.add(wgm.lossy_cast(f64, self.origin), wgm.lossy_cast(f64, self.dims)),
     }, ray);
     std.log.debug("slab res: {any}", .{slab_res});
     std.log.debug("ray: {any}", .{ray});
@@ -193,7 +195,7 @@ fn intersect(self: Self, pixel: [2]f32) ?Intersection {
     return undefined;
 }
 
-pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
+pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !bool {
     switch (ev.common.type) {
         sdl.c.SDL_EVENT_MOUSE_BUTTON_DOWN => {
             const event = ev.button;
@@ -203,11 +205,14 @@ pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
         },
         else => {},
     }
+    return false;
 }
 
 pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+    const camera = g.get_thing("camera").?.get_concrete(CameraThing);
+
     const uniforms: Uniforms = .{
-        .transform = wgm.lossy_cast(f32, self.camera.cached_global_transform),
+        .transform = wgm.lossy_cast(f32, camera.cached_global_transform),
     };
     g.queue.write_buffer(self.gizmo_uniform_buffer, 0, std.mem.asBytes(&uniforms));
 
@@ -283,7 +288,7 @@ pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.Text
 pub fn draw_voxels(self: *Self, range: [2][3]isize, storage: []PackedVoxel) void {
     const info = IVoxelProvider.overlap_info(range, .{
         self.origin,
-        wgm.add(self.origin, [3]isize{ 64, 64, 64 }),
+        wgm.add(self.origin, wgm.cast(isize, self.dims).?),
     }) orelse return;
 
     for (0..info.overlap_size[2]) |z| for (0..info.overlap_size[1]) |y| for (0..info.overlap_size[0]) |x| {
@@ -291,8 +296,8 @@ pub fn draw_voxels(self: *Self, range: [2][3]isize, storage: []PackedVoxel) void
 
         const ml_coords = wgm.add(info.model_origin, offset);
         const sample = self.voxels[ //
-            ml_coords[2] * 64 * 64 //
-            + ml_coords[1] * 64 //
+            ml_coords[2] * self.dims[1] * self.dims[0] //
+            + ml_coords[1] * self.dims[0] //
             + ml_coords[0]
         ];
 

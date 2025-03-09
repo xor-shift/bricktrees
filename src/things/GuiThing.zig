@@ -41,10 +41,10 @@ pub fn ctx_guard(self: *Self) imgui.ContextGuard {
     return imgui.ContextGuard.init(self.c());
 }
 
-pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !void {
+pub fn raw_event(self: *Self, ev: sdl.c.SDL_Event) !bool {
     imgui.sdl_event.translate_event(self.c(), ev);
     const capture = imgui.c.igGetIO().*.WantCaptureKeyboard or imgui.c.igGetIO().*.WantCaptureMouse;
-    _ = capture;
+    return capture;
 }
 
 pub fn new_frame(self: *Self, delta_ns: u64) void {

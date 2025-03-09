@@ -21,9 +21,44 @@ const IVoxelProvider = @import("../../IVoxelProvider.zig");
 
 const g = &@import("../../main.zig").g;
 
+pub const BrickgridEntry = union(enum) {
+    NotChecked: void,
+    WantLoad: void,
+
+    Unoccupied: void,
+    Occupied: usize,
+
+    pub fn pack(self: BrickgridEntry) u32 {
+        return switch (self) {
+            .Occupied => |v| @intCast(v),
+            .NotChecked => 0xFFFF_FFFF,
+            .Unoccupied => 0xFFFF_FFFE,
+            .WantLoad => 0xFFFF_FFFD,
+        };
+    }
+
+    pub fn unpack(self: u32) BrickgridEntry {
+        switch (self) {
+            0xFFFF_FFFF => .{ .NotChecked = {} },
+            0xFFFF_FFFE => .{ .Unoccupied = {} },
+            0xFFFF_FFFD => .{ .WantLoad = {} },
+            else => {},
+        }
+    }
+};
+
+pub fn FeedbackBuffer(comptime no_entries: usize) type {
+    return extern struct {
+        next_idx: u32 = 0,
+        data: [no_entries][4]u32,
+    };
+}
+
 pub fn Backend(comptime Cfg: type) type {
     return struct {
         const Self = @This();
+
+        pub const FBuffer = FeedbackBuffer(128);
 
         const Painter = @import("components/painter.zig").Painter(Cfg);
         const Storage = @import("components/storage.zig").Storage(Cfg);
@@ -50,17 +85,44 @@ pub fn Backend(comptime Cfg: type) type {
         origin_brickmap: [3]isize = .{ 0, 0, 0 },
 
         config: ?MapConfig = null,
-        brickmap_tracker: []?[3]isize = &.{},
+        brickmaps: []?[3]isize = &.{},
+        brickgrid: []BrickgridEntry = &.{},
+        feedback_buffer: FBuffer = std.mem.zeroes(FBuffer),
 
         map_bgl: wgpu.BindGroupLayout,
         map_bg: wgpu.BindGroup = .{},
         brickgrid_texture: wgpu.Texture = .{},
         brickgrid_texture_view: wgpu.TextureView = .{},
+        brickgrid_feedback_buffer: wgpu.Buffer,
+        brickgrid_feedback_read_buffer: wgpu.Buffer,
         bricktree_buffer: wgpu.Buffer = .{},
         brickmap_buffer: wgpu.Buffer = .{},
 
         pub fn init() !*Self {
             const self = try g.alloc.create(Self);
+
+            const brickgrid_feedback_buffer = try g.device.create_buffer(.{
+                .label = "brickgrid feedback buffer",
+                .usage = .{
+                    .copy_dst = true,
+                    .copy_src = true,
+                    .storage = true,
+                },
+                .size = @sizeOf(FBuffer),
+                .mapped_at_creation = false,
+            });
+            errdefer brickgrid_feedback_buffer.deinit();
+
+            const brickgrid_feedback_read_buffer = try g.device.create_buffer(.{
+                .label = "brickgrid feedback read-buffer",
+                .usage = .{
+                    .copy_dst = true,
+                    .map_read = true,
+                },
+                .size = @sizeOf(FBuffer),
+                .mapped_at_creation = false,
+            });
+            errdefer brickgrid_feedback_read_buffer.deinit();
 
             const map_bgl = try g.device.create_bind_group_layout(wgpu.BindGroupLayout.Descriptor{
                 .label = "map bgl",
@@ -77,7 +139,7 @@ pub fn Backend(comptime Cfg: type) type {
                         .binding = 1,
                         .visibility = .{ .compute = true },
                         .layout = .{ .Buffer = .{
-                            .type = .ReadOnlyStorage,
+                            .type = .Storage,
                         } },
                     },
                     wgpu.BindGroupLayout.Entry{
@@ -87,7 +149,14 @@ pub fn Backend(comptime Cfg: type) type {
                             .type = .ReadOnlyStorage,
                         } },
                     },
-                })[0..if (!@hasDecl(Cfg, "bricktree")) 2 else 3],
+                    wgpu.BindGroupLayout.Entry{
+                        .binding = 3,
+                        .visibility = .{ .compute = true },
+                        .layout = .{ .Buffer = .{
+                            .type = .ReadOnlyStorage,
+                        } },
+                    },
+                })[0..if (Cfg.has_tree) 4 else 3],
             });
             errdefer map_bgl.deinit();
 
@@ -124,6 +193,9 @@ pub fn Backend(comptime Cfg: type) type {
                 .computer = computer,
 
                 .map_bgl = map_bgl,
+
+                .brickgrid_feedback_buffer = brickgrid_feedback_buffer,
+                .brickgrid_feedback_read_buffer = brickgrid_feedback_read_buffer,
             };
             errdefer self.deinit();
 
@@ -165,6 +237,34 @@ pub fn Backend(comptime Cfg: type) type {
             on_alloc.destroy(self);
         }
 
+        fn get_view_volume_for(origin_brickmap: [3]isize, grid_dimensions: [3]usize) [2][3]isize {
+            return wgm.mulew([_][3]isize{
+                wgm.cast(isize, origin_brickmap).?,
+                wgm.add(origin_brickmap, wgm.cast(isize, grid_dimensions).?),
+            }, Cfg.Brickmap.side_length_i);
+        }
+
+        /// Returns the minimum and the maximum global-voxel-coordinate of the view volume
+        pub fn get_view_volume(self: Self) [2][3]isize {
+            return get_view_volume_for(self.origin_brickmap, self.config.?.grid_dimensions);
+        }
+
+        pub fn sq_distance_to_center(self: Self, pt: [3]f64) f64 {
+            const volume = wgm.lossy_cast(f64, self.get_view_volume());
+            const center = wgm.div(wgm.add(volume[1], volume[0]), 2);
+            const delta = wgm.sub(center, pt);
+            return wgm.dot(delta, delta);
+        }
+
+        fn rememo_brickgrid(self: *Self) void {
+            @memset(self.brickgrid, .{ .NotChecked = {} });
+            for (self.brickmaps, 0..) |maybe_g_bm_coords, bm_idx| if (maybe_g_bm_coords) |g_bm_coords| {
+                const bgl_bm_coords = self.bm_coords_to_bgl_bm_coords(g_bm_coords).?;
+                const bg_idx = self.bgl_bm_coords_to_bg_idx(bgl_bm_coords);
+                self.brickgrid[bg_idx] = .{ .Occupied = bm_idx };
+            };
+        }
+
         pub fn recenter(self: *Self, desired_center: [3]f64) void {
             const center_brickmap = wgm.lossy_cast(isize, wgm.trunc(wgm.div(
                 desired_center,
@@ -176,11 +276,123 @@ pub fn Backend(comptime Cfg: type) type {
                 wgm.div(wgm.cast(isize, self.config.?.grid_dimensions).?, 2),
             );
 
+            if (std.meta.eql(origin, self.origin_brickmap)) return;
+            std.log.debug("recentering to {any} (origin bm: {any})", .{ desired_center, origin });
+
+            const old_volume = self.get_view_volume();
+            const volume = get_view_volume_for(origin, self.config.?.grid_dimensions);
+
+            for (self.brickmaps) |v| if (v) |w| {
+                const v_w = wgm.mulew(w, Cfg.Brickmap.side_length_i);
+                if (wgm.compare(.all, v_w, .greater_than_equal, volume[0]) and //
+                    wgm.compare(.all, v_w, .less_than, volume[1]))
+                {
+                    continue;
+                }
+
+                _ = self.remove_brickmap(w);
+            };
+
             self.origin_brickmap = origin;
+            self.rememo_brickgrid();
+
+            const already_drawn = .{
+                .{
+                    @max(old_volume[0][0], volume[0][0]),
+                    @max(old_volume[0][1], volume[0][1]),
+                    @max(old_volume[0][2], volume[0][2]),
+                },
+                .{
+                    @min(old_volume[1][0], volume[1][0]),
+                    @min(old_volume[1][1], volume[1][1]),
+                    @min(old_volume[1][2], volume[1][2]),
+                },
+            };
+
+            if (self.painter.already_drawn) |_| {
+                // TODO: this can be handled with more grace
+                self.painter.already_drawn = .{.{0} ** 3} ** 2;
+            } else {
+                self.painter.already_drawn = already_drawn;
+            }
         }
 
         pub fn get_origin(self: Self) [3]f64 {
             return wgm.lossy_cast(f64, wgm.mulew(self.origin_brickmap, Cfg.Brickmap.side_length_i));
+        }
+
+        /// Converts _brickmap indices_ into _global brickmap coordinates_
+        pub fn bm_idx_to_bm_coords(self: Self, bm_idx: usize) ?[3]isize {
+            return self.brickmaps[bm_idx];
+        }
+
+        /// Converts _global brickmap coordinates_ into
+        pub fn bm_coords_to_bgl_bm_coords(self: Self, g_bm_coords: [3]isize) ?[3]usize {
+            const relative = wgm.cast(usize, wgm.sub(
+                g_bm_coords,
+                self.origin_brickmap,
+            )) orelse return null;
+
+            if (wgm.compare(.some, relative, .greater_than_equal, self.config.?.grid_dimensions)) {
+                return null;
+            }
+
+            return relative;
+        }
+
+        /// Converts _brickgrid-local brickmap coordinates_ into flat brickgrid indices.
+        fn bgl_bm_coords_to_bg_idx(self: Self, bgl_bm_coords: [3]usize) usize {
+            return bgl_bm_coords[0] //
+            + bgl_bm_coords[1] * self.config.?.grid_dimensions[0] //
+            + bgl_bm_coords[2] * self.config.?.grid_dimensions[0] * self.config.?.grid_dimensions[1];
+        }
+
+        /// Converts _brickgrid-local brickmap coordinates_ into _brickmap indices_
+        pub fn bgl_bm_coords_to_bm_entry(self: Self, bgl_bm_coords: [3]usize) BrickgridEntry {
+            return self.brickgrid[self.bgl_bm_coords_to_bg_idx(bgl_bm_coords)];
+        }
+
+        /// Converts _global brickmap coordinates_ into _brickmap indices_
+        pub fn bm_coords_to_bm_idx(self: Self, g_bm_coords: [3]isize) ?usize {
+            const bgl_bm_coords = self.bm_coords_to_bgl_bm_coords(g_bm_coords) orelse return null;
+
+            return switch (self.bgl_bm_coords_to_bm_entry(bgl_bm_coords)) {
+                .Occupied => |v| v,
+                else => null,
+            };
+        }
+
+        /// If there exists a brickmap at the given _global brickmap coordinates_, returns the index thereof. Otherwise, if there's an empty brickmap slot, returns the index of said sot. Otherwise, returns null.
+        pub fn find_bm_idx_for_bm_coords(self: Self, g_bm_coords: [3]isize) ?usize {
+            if (self.bm_coords_to_bm_idx(g_bm_coords)) |v| return v;
+
+            for (self.brickmaps, 0..) |v, i| if (v == null) return i;
+
+            return null;
+        }
+
+        /// Tries to remove the brickmap at the given _global brickmap
+        /// coordinates_ and returns true. If there exists no such brickmap,
+        /// returns false.
+        pub fn remove_brickmap(self: Self, g_bm_coords: [3]isize) bool {
+            const bgl_bm_coords = if (self.bm_coords_to_bgl_bm_coords(g_bm_coords)) |v| v else return false;
+
+            const bg_idx = self.bgl_bm_coords_to_bg_idx(bgl_bm_coords);
+
+            switch (self.brickgrid[bg_idx]) {
+                .Occupied => |bm_idx| {
+                    std.debug.assert(self.brickmaps[bm_idx] != null);
+                    std.debug.assert(std.meta.eql(self.brickmaps[bm_idx].?, g_bm_coords));
+
+                    self.brickmaps[bm_idx] = null;
+
+                    return true;
+                },
+                else => {},
+            }
+
+            self.brickgrid[bg_idx] = .{ .NotChecked = {} };
+            return false;
         }
 
         /// For IBackend
@@ -198,6 +410,24 @@ pub fn Backend(comptime Cfg: type) type {
             });
         }
 
+        pub fn check_desync(self: Self) void {
+            for (self.brickmaps, 0..) |maybe_g_bm_coords, bm_idx| {
+                if (maybe_g_bm_coords) |g_bm_coords| {
+                    const bgl_bm_coords = self.bm_coords_to_bgl_bm_coords(g_bm_coords).?;
+                    const bg_idx = self.bgl_bm_coords_to_bg_idx(bgl_bm_coords);
+                    switch (self.brickgrid[bg_idx]) {
+                        .Occupied => |v| std.debug.assert(v == bm_idx),
+                        else => @panic("expected an occupied bg entry"),
+                    }
+                } else {
+                    for (self.brickgrid) |entry| switch (entry) {
+                        .Occupied => |v| std.debug.assert(v != bm_idx),
+                        else => {},
+                    };
+                }
+            }
+        }
+
         /// Guaranteed to not throw if `config == null`
         fn reconfigure(self: *Self, config: ?MapConfig) !void {
             const old_config = self.config;
@@ -205,21 +435,30 @@ pub fn Backend(comptime Cfg: type) type {
                 self.reconfigure(old_config) catch @panic("failed to roll back the config");
             }
 
-            self.map_bg.deinit();
-            self.brickgrid_texture_view.deinit();
-            self.brickgrid_texture.deinit();
-            self.brickmap_buffer.destroy();
-            self.brickmap_buffer.deinit();
-            if (Cfg.has_tree) {
-                self.bricktree_buffer.destroy();
-                self.bricktree_buffer.deinit();
+            if (old_config != null) {
+                self.map_bg.deinit();
+                self.brickgrid_texture_view.deinit();
+                self.brickgrid_texture.deinit();
+                // self.brickgrid_feedback_texture_view.deinit();
+                // self.brickgrid_feedback_texture.deinit();
+                self.brickmap_buffer.destroy();
+                self.brickmap_buffer.deinit();
+                if (Cfg.has_tree) {
+                    self.bricktree_buffer.destroy();
+                    self.bricktree_buffer.deinit();
+                }
+                g.alloc.free(self.brickmaps);
+                g.alloc.free(self.brickgrid);
             }
-            g.alloc.free(self.brickmap_tracker);
 
             if (config) |cfg| {
-                const brickmap_tracker = try g.alloc.alloc(?[3]isize, cfg.no_brickmaps);
-                errdefer g.alloc.free(brickmap_tracker);
-                @memset(brickmap_tracker, null);
+                const brickmaps = try g.alloc.alloc(?[3]isize, cfg.no_brickmaps);
+                errdefer g.alloc.free(brickmaps);
+                @memset(brickmaps, null);
+
+                const brickgrid = try g.alloc.alloc(BrickgridEntry, cfg.grid_size());
+                errdefer g.alloc.free(brickgrid);
+                @memset(brickgrid, .{ .NotChecked = {} });
 
                 const bricktree_buffer_size: ?usize = if (!@hasDecl(Cfg, "bricktree")) null else Cfg.bytes_per_bricktree_buffer * cfg.no_brickmaps;
 
@@ -245,7 +484,7 @@ pub fn Backend(comptime Cfg: type) type {
                 });
                 errdefer brickmap_buffer.deinit();
 
-                const brickgrid_texture = try g.device.create_texture(wgpu.Texture.Descriptor{
+                const brickgrid_texture_desc = wgpu.Texture.Descriptor{
                     .label = "brickgrid texture",
                     .size = .{
                         .width = @intCast(cfg.grid_dimensions[0]),
@@ -261,7 +500,9 @@ pub fn Backend(comptime Cfg: type) type {
                     .sampleCount = 1,
                     .mipLevelCount = 1,
                     .view_formats = &.{},
-                });
+                };
+
+                const brickgrid_texture = try g.device.create_texture(brickgrid_texture_desc);
                 errdefer brickgrid_texture.deinit();
 
                 const brickgrid_texture_view = try brickgrid_texture.create_view(null);
@@ -278,22 +519,31 @@ pub fn Backend(comptime Cfg: type) type {
                         wgpu.BindGroup.Entry{
                             .binding = 1,
                             .resource = .{ .Buffer = .{
-                                .buffer = brickmap_buffer,
+                                .buffer = self.brickgrid_feedback_buffer,
                             } },
                         },
                         wgpu.BindGroup.Entry{
                             .binding = 2,
                             .resource = .{ .Buffer = .{
+                                .buffer = brickmap_buffer,
+                            } },
+                        },
+                        wgpu.BindGroup.Entry{
+                            .binding = 3,
+                            .resource = .{ .Buffer = .{
                                 .buffer = bricktree_buffer,
                             } },
                         },
-                    })[0..if (Cfg.has_tree) 3 else 2],
+                    })[0..if (Cfg.has_tree) 4 else 3],
                 });
                 errdefer map_bg.deinit();
 
                 self.config = cfg;
 
-                self.brickmap_tracker = brickmap_tracker;
+                self.brickmaps = brickmaps;
+                self.brickgrid = brickgrid;
+
+                self.painter.already_drawn = .{.{0} ** 3} ** 2;
 
                 self.brickgrid_texture = brickgrid_texture;
                 self.brickgrid_texture_view = brickgrid_texture_view;
@@ -325,24 +575,12 @@ pub fn Backend(comptime Cfg: type) type {
             return wgm.cast(usize, bgl_brickmap_coords).?;
         }
 
-        fn generate_brickgrid(self: *Self, local_brickgrid: []u32) void {
-            @memset(local_brickgrid, std.math.maxInt(u32));
+        pub fn upload_brickmap(self: *Self, g_bm_coords: [3]isize, map: *const Cfg.Brickmap, tree: *const Cfg.BricktreeStorage) bool {
+            const bgl_bm_coords = self.bm_coords_to_bgl_bm_coords(g_bm_coords) orelse return false;
+            const slot = if (self.find_bm_idx_for_bm_coords(g_bm_coords)) |v| v else return false;
+            self.brickmaps[slot] = g_bm_coords;
+            self.brickgrid[self.bgl_bm_coords_to_bg_idx(bgl_bm_coords)] = .{ .Occupied = slot };
 
-            for (self.brickmap_tracker, 0..) |v, i| if (v) |coords| {
-                const bgl_brickmap_coords = self.bgl_coords_of(coords) orelse continue;
-
-                // std.log.debug("{any} = {d}", .{bgl_brickmap_coords, i});
-
-                const blc = wgm.cast(usize, bgl_brickmap_coords).?;
-                const idx = blc[0] +
-                    blc[1] * self.config.?.grid_dimensions[0] +
-                    blc[2] * (self.config.?.grid_dimensions[0] * self.config.?.grid_dimensions[1]);
-
-                local_brickgrid[idx] = @intCast(i);
-            };
-        }
-
-        pub fn upload_brickmap(self: *Self, slot: usize, map: *const Cfg.Brickmap, tree: *const Cfg.BricktreeStorage) void {
             const brickmap_offset = (Cfg.Brickmap.volume * 4) * slot;
             g.queue.write_buffer(self.brickmap_buffer, brickmap_offset, std.mem.asBytes(map.c_flat()[0..]));
 
@@ -360,14 +598,26 @@ pub fn Backend(comptime Cfg: type) type {
                 },
                 else => unreachable,
             };
+
+            return true;
+        }
+
+        fn translate_brickgrid(self: Self, local_brickgrid: []u32) void {
+            @memset(local_brickgrid, std.math.maxInt(u32));
+
+            for (self.brickgrid, 0..) |entry, i| {
+                local_brickgrid[i] = entry.pack();
+            }
         }
 
         pub fn render(self: *Self, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
-            try self.painter.render();
+            g.queue.write_buffer(self.brickgrid_feedback_buffer, 0, std.mem.asBytes(&std.mem.zeroes(FBuffer)));
+
+            try self.painter.render(self.feedback_buffer);
 
             const local_brickgrid = g.frame_alloc.alloc(u32, self.config.?.grid_size()) catch @panic("OOM");
 
-            self.generate_brickgrid(local_brickgrid);
+            self.translate_brickgrid(local_brickgrid);
             g.queue.write_texture(
                 wgpu.ImageCopyTexture{
                     .texture = self.brickgrid_texture,
@@ -386,6 +636,51 @@ pub fn Backend(comptime Cfg: type) type {
             );
 
             try self.computer.render(delta_ns, encoder, onto);
+
+            encoder.copy_buffer_to_buffer(
+                self.brickgrid_feedback_read_buffer,
+                0,
+                self.brickgrid_feedback_buffer,
+                .{ 0, @sizeOf(FBuffer) },
+            );
+        }
+
+        pub fn post_render(self: *Self) !void {
+            const Context = struct {
+                self: *Self,
+                result_mutex: std.Thread.Mutex = .{},
+                result_cv: std.Thread.Condition = .{},
+                result_ready: bool = false,
+            };
+
+            var context: Context = .{ .self = self };
+            self.brickgrid_feedback_read_buffer.map_async(
+                .{ 0, @sizeOf(FBuffer) },
+                .{ .read = true },
+                struct {
+                    pub fn aufruf(ctx_erased: *anyopaque, result: wgpu.Buffer.MapResult) void {
+                        _ = result;
+                        const _context: *Context = @ptrCast(@alignCast(ctx_erased));
+                        _context.result_mutex.lock();
+                        _context.result_ready = true;
+                        _context.result_cv.signal();
+                        _context.result_mutex.unlock();
+                    }
+                }.aufruf,
+                @ptrCast(&context),
+            );
+
+            g.device.poll(true);
+
+            // context.result_mutex.lock();
+            // while (!context.result_ready) {
+            //     context.result_cv.wait(&context.result_mutex);
+            // }
+            // context.result_mutex.unlock();
+
+            const mapped_range = self.brickgrid_feedback_read_buffer.const_mapped_range(.{ 0, @sizeOf(FBuffer) });
+            @memcpy(std.mem.asBytes(&self.feedback_buffer), mapped_range);
+            self.brickgrid_feedback_read_buffer.unmap();
         }
 
         test {
