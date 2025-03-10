@@ -105,15 +105,22 @@ pub fn Computer(comptime Cfg: type) type {
 
         pub fn init(map_bgl: wgpu.BindGroupLayout) !Self {
             const scratch_reset_shader_code: [:0]const u8 =
+                \\ @group(2) @binding(0)
+                \\ var brickgrid: texture_3d<u32>;
                 \\ @group(2) @binding(2)
                 \\ var<storage, read_write> feedback_scratch: array<u32>;
                 \\
                 \\ @compute
-                \\ @workgroup_size(64, 1, 1)
+                \\ @workgroup_size(4, 4, 4)
                 \\ fn cs_main(
                 \\     @builtin(global_invocation_id) global_id: vec3<u32>,
                 \\ ) {
-                \\     feedback_scratch[global_id.x] = 0u;
+                \\     let brickgrid_dims = textureDimensions(brickgrid);
+                \\     let idx =
+                \\         global_id.x +
+                \\         global_id.y * brickgrid_dims.x +
+                \\         global_id.z * brickgrid_dims.x * brickgrid_dims.y;
+                \\     feedback_scratch[idx] = 0u;
                 \\ }
             ;
 
@@ -295,12 +302,12 @@ pub fn Computer(comptime Cfg: type) type {
                 scratch_reset_pass.set_bind_group(1, self.compute_textures_bg, null);
                 scratch_reset_pass.set_bind_group(2, self.backend.map_bg, null);
 
-                const gs = self.backend.config.?.grid_size();
-                const wg_sz = 64;
-                const wg_ct: [3]u32 = .{
-                    @intCast((gs + wg_sz - 1) / wg_sz),
-                    1,
-                    1,
+                const gd = wgm.cast(u32, self.backend.config.?.grid_dimensions).?;
+                const wg_sz = [_]u32{4} ** 3;
+                const wg_ct = .{
+                    (gd[0] + wg_sz[0] - 1) / wg_sz[0],
+                    (gd[1] + wg_sz[1] - 1) / wg_sz[1],
+                    (gd[2] + wg_sz[2] - 1) / wg_sz[2],
                 };
                 // std.log.debug("{any}, {d}", .{wg_ct, gs});
                 scratch_reset_pass.dispatch_workgroups(wg_ct);

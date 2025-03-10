@@ -30,7 +30,7 @@ pub fn should_redraw_voxels(_: *Self, range: [2][3]isize) bool {
 }
 
 pub fn draw_voxels(_: *Self, range: [2][3]isize, storage: []PackedVoxel) void {
-    // if (true) return;
+    if (true) return;
     const volume = wgm.cast(usize, wgm.sub(range[1], range[0])).?;
     const base_coords = range[0];
 

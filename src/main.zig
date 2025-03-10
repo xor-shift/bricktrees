@@ -37,8 +37,8 @@ fn initialize_things(alloc: std.mem.Allocator) void {
 
     const EditorThing = @import("things/EditorThing.zig");
     const editor = g.thing_store.add_new_thing(EditorThing, "editor", .{.{ 768, 768, 768 }});
-    _ = editor;
-    // foo(g.alloc, editor.voxels, editor.dims) catch @panic("");
+    // _ = editor;
+    foo(g.alloc, editor.voxels, editor.dims) catch @panic("");
 
     const DemoProvider = @import("voxel_providers/test.zig");
     _ = g.thing_store.add_new_thing(DemoProvider, "test voxel provider", .{});

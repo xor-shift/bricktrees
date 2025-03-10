@@ -63,7 +63,7 @@ tick_alloc: std.mem.Allocator = undefined,
 thing_store: Things,
 
 backend_config: IBackend.BackendConfig = .{
-    .desied_view_volume_size = .{ 512, 192, 512 },
+    .desied_view_volume_size = .{ 2048, 2048, 2048 },
 },
 selected_backend: usize = std.math.maxInt(usize),
 queued_backend_selection: usize = 17,
@@ -340,8 +340,8 @@ pub fn resize(self: *Self, dims: [2]usize) !void {
         .view_formats = &.{.BGRA8UnormSrgb},
         .width = @intCast(dims[0]),
         .height = @intCast(dims[1]),
-        // .present_mode = .Immediate,
-        .present_mode = .Fifo,
+        .present_mode = .Immediate,
+        // .present_mode = .Fifo,
     });
 }
 
