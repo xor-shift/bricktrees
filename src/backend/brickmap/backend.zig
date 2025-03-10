@@ -9,6 +9,8 @@ const dyn = @import("dyn");
 const wgm = @import("wgm");
 const imgui = @import("imgui");
 
+const CameraThing = @import("../../things/CameraThing.zig");
+
 const PackedVoxel = @import("../../voxel.zig").PackedVoxel;
 const Voxel = @import("../../voxel.zig").Voxel;
 
@@ -84,6 +86,7 @@ pub fn Backend(comptime Cfg: type) type {
         config: ?MapConfig = null,
         brickmaps: []?[3]isize = &.{},
         brickgrid: []BrickgridEntry = &.{},
+        gpu_brickgrid: []u32 = &.{},
         feedback_buffer: FBuffer = std.mem.zeroes(FBuffer),
 
         map_bgl: wgpu.BindGroupLayout,
@@ -92,6 +95,7 @@ pub fn Backend(comptime Cfg: type) type {
         brickgrid_texture_view: wgpu.TextureView = .{},
         brickgrid_feedback_buffer: wgpu.Buffer,
         brickgrid_feedback_read_buffer: wgpu.Buffer,
+        brickgrid_feedback_scratch_buffer: wgpu.Buffer = .{},
         bricktree_buffer: wgpu.Buffer = .{},
         brickmap_buffer: wgpu.Buffer = .{},
 
@@ -124,7 +128,7 @@ pub fn Backend(comptime Cfg: type) type {
             const map_bgl = try g.device.create_bind_group_layout(wgpu.BindGroupLayout.Descriptor{
                 .label = "map bgl",
                 .entries = ([_]wgpu.BindGroupLayout.Entry{
-                    wgpu.BindGroupLayout.Entry{
+                    wgpu.BindGroupLayout.Entry{ // brickgrid
                         .binding = 0,
                         .visibility = .{ .compute = true },
                         .layout = .{ .Texture = .{
@@ -132,28 +136,35 @@ pub fn Backend(comptime Cfg: type) type {
                             .view_dimension = .D3,
                         } },
                     },
-                    wgpu.BindGroupLayout.Entry{
+                    wgpu.BindGroupLayout.Entry{ // feedback buffer
                         .binding = 1,
                         .visibility = .{ .compute = true },
                         .layout = .{ .Buffer = .{
                             .type = .Storage,
                         } },
                     },
-                    wgpu.BindGroupLayout.Entry{
+                    wgpu.BindGroupLayout.Entry{ // feedback scratch
                         .binding = 2,
                         .visibility = .{ .compute = true },
                         .layout = .{ .Buffer = .{
-                            .type = .ReadOnlyStorage,
+                            .type = .Storage,
                         } },
                     },
-                    wgpu.BindGroupLayout.Entry{
+                    wgpu.BindGroupLayout.Entry{ // brickmaps
                         .binding = 3,
                         .visibility = .{ .compute = true },
                         .layout = .{ .Buffer = .{
                             .type = .ReadOnlyStorage,
                         } },
                     },
-                })[0..if (Cfg.has_tree) 4 else 3],
+                    wgpu.BindGroupLayout.Entry{ // bricktrees
+                        .binding = 4,
+                        .visibility = .{ .compute = true },
+                        .layout = .{ .Buffer = .{
+                            .type = .ReadOnlyStorage,
+                        } },
+                    },
+                })[0..if (Cfg.has_tree) 5 else 4],
             });
             errdefer map_bgl.deinit();
 
@@ -463,6 +474,8 @@ pub fn Backend(comptime Cfg: type) type {
                 self.brickgrid_texture.deinit();
                 // self.brickgrid_feedback_texture_view.deinit();
                 // self.brickgrid_feedback_texture.deinit();
+                self.brickgrid_feedback_scratch_buffer.destroy();
+                self.brickgrid_feedback_scratch_buffer.deinit();
                 self.brickmap_buffer.destroy();
                 self.brickmap_buffer.deinit();
                 if (Cfg.has_tree) {
@@ -471,6 +484,7 @@ pub fn Backend(comptime Cfg: type) type {
                 }
                 g.alloc.free(self.brickmaps);
                 g.alloc.free(self.brickgrid);
+                g.alloc.free(self.gpu_brickgrid);
             }
 
             if (config) |cfg| {
@@ -481,6 +495,9 @@ pub fn Backend(comptime Cfg: type) type {
                 const brickgrid = try g.alloc.alloc(BrickgridEntry, cfg.grid_size());
                 errdefer g.alloc.free(brickgrid);
                 @memset(brickgrid, .{ .NotChecked = {} });
+
+                const gpu_brickgrid = try g.alloc.alloc(u32, cfg.grid_size());
+                errdefer g.alloc.free(gpu_brickgrid);
 
                 const bricktree_buffer_size: ?usize = if (!@hasDecl(Cfg, "bricktree")) null else Cfg.bytes_per_bricktree_buffer * cfg.no_brickmaps;
 
@@ -530,6 +547,16 @@ pub fn Backend(comptime Cfg: type) type {
                 const brickgrid_texture_view = try brickgrid_texture.create_view(null);
                 errdefer brickgrid_texture_view.deinit();
 
+                const brickgrid_feedback_scratch_buffer = try g.device.create_buffer(.{
+                    .label = "brickgrid feedack scratch buffer",
+                    .size = cfg.grid_size() * @sizeOf(u32),
+                    .usage = .{
+                        .storage = true,
+                    },
+                    .mapped_at_creation = false,
+                });
+                errdefer brickgrid_feedback_scratch_buffer.deinit();
+
                 const map_bg = try g.device.create_bind_group(wgpu.BindGroup.Descriptor{
                     .label = "map bg",
                     .layout = self.map_bgl,
@@ -547,16 +574,22 @@ pub fn Backend(comptime Cfg: type) type {
                         wgpu.BindGroup.Entry{
                             .binding = 2,
                             .resource = .{ .Buffer = .{
-                                .buffer = brickmap_buffer,
+                                .buffer = brickgrid_feedback_scratch_buffer,
                             } },
                         },
                         wgpu.BindGroup.Entry{
                             .binding = 3,
                             .resource = .{ .Buffer = .{
+                                .buffer = brickmap_buffer,
+                            } },
+                        },
+                        wgpu.BindGroup.Entry{
+                            .binding = 4,
+                            .resource = .{ .Buffer = .{
                                 .buffer = bricktree_buffer,
                             } },
                         },
-                    })[0..if (Cfg.has_tree) 4 else 3],
+                    })[0..if (Cfg.has_tree) 5 else 4],
                 });
                 errdefer map_bg.deinit();
 
@@ -564,11 +597,13 @@ pub fn Backend(comptime Cfg: type) type {
 
                 self.brickmaps = brickmaps;
                 self.brickgrid = brickgrid;
+                self.gpu_brickgrid = gpu_brickgrid;
 
                 self.painter.already_drawn = .{.{0} ** 3} ** 2;
 
                 self.brickgrid_texture = brickgrid_texture;
                 self.brickgrid_texture_view = brickgrid_texture_view;
+                self.brickgrid_feedback_scratch_buffer = brickgrid_feedback_scratch_buffer;
                 self.bricktree_buffer = bricktree_buffer;
                 self.brickmap_buffer = brickmap_buffer;
 
@@ -633,39 +668,44 @@ pub fn Backend(comptime Cfg: type) type {
         }
 
         pub fn render(self: *Self, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
-            std.mem.sort(u32, self.feedback_buffer.data[0..], {}, struct {
-                pub fn aufruf(_: void, lhs: u32, rhs: u32) bool {
-                    return lhs < rhs;
-                }
-            }.aufruf);
+            //std.mem.sort(u32, self.feedback_buffer.data[0..], {}, struct {
+            //    pub fn aufruf(_: void, lhs: u32, rhs: u32) bool {
+            //        return lhs < rhs;
+            //    }
+            //}.aufruf);
 
-            const no_unique: usize = blk: {
-                var last: u32 = std.math.maxInt(u32);
-                var no_unique: usize = 0;
-                for (self.feedback_buffer.data) |v| {
-                    if (v == std.math.maxInt(u32)) break;
-                    if (v == last) continue;
-                    last = v;
+            // const no_unique: usize = blk: {
+            //     var last: u32 = std.math.maxInt(u32);
+            //     var no_unique: usize = 0;
+            //     for (self.feedback_buffer.data) |v| {
+            //         if (v == std.math.maxInt(u32)) break;
+            //         if (v == last) continue;
+            //         last = v;
 
-                    self.feedback_buffer.data[no_unique] = v;
-                    no_unique += 1;
-                }
-                break :blk no_unique;
-            };
+            //         self.feedback_buffer.data[no_unique] = v;
+            //         no_unique += 1;
+            //     }
+            //     break :blk no_unique;
+            // };
 
             const fb_to_write: FBuffer = .{ .data = .{std.math.maxInt(u32)} ** 256 };
             g.queue.write_buffer(self.brickgrid_feedback_buffer, 0, std.mem.asBytes(&fb_to_write));
 
-            try self.painter.render(self.feedback_buffer.data[0..no_unique]);
+            try self.painter.render(if (g.get_thing("camera").?.get_concrete(CameraThing).do_recenter)
+                self.feedback_buffer.data[0..@min(
+                    self.feedback_buffer.next_idx,
+                    self.feedback_buffer.data.len,
+                )]
+            else
+                &.{} //
+            );
 
-            const local_brickgrid = g.frame_alloc.alloc(u32, self.config.?.grid_size()) catch @panic("OOM");
-
-            self.translate_brickgrid(local_brickgrid);
+            self.translate_brickgrid(self.gpu_brickgrid);
             g.queue.write_texture(
                 wgpu.ImageCopyTexture{
                     .texture = self.brickgrid_texture,
                 },
-                std.mem.sliceAsBytes(local_brickgrid),
+                std.mem.sliceAsBytes(self.gpu_brickgrid),
                 wgpu.Extent3D{
                     .width = @intCast(self.config.?.grid_dimensions[0]),
                     .height = @intCast(self.config.?.grid_dimensions[1]),

@@ -21,7 +21,7 @@ pub fn init() !Self {
 
 pub fn should_draw_voxels(_: *Self, range: [2][3]isize) bool {
     _ = range;
-    return true;
+    return false;
 }
 
 pub fn should_redraw_voxels(_: *Self, range: [2][3]isize) bool {

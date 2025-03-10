@@ -93,11 +93,14 @@ pub fn Painter(comptime Cfg: type) type {
                 const the_bricktree = &result.bricktree;
 
                 if (result.is_empty) {
-                    std.log.debug("removing the empty brickmap at {any}", .{absolute_bm_coords});
+                    // std.log.debug("removing the empty brickmap at {any}", .{absolute_bm_coords});
                     _ = self.backend.remove_brickmap(absolute_bm_coords);
                 } else {
-                    std.log.debug("uploading the brickmap at {any}", .{absolute_bm_coords});
-                    _ = self.backend.upload_brickmap(absolute_bm_coords, the_brickmap, the_bricktree);
+                    // std.log.debug("uploading the brickmap at {any}", .{absolute_bm_coords});
+                    const managed_to_upload = self.backend.upload_brickmap(absolute_bm_coords, the_brickmap, the_bricktree);
+                    if (!managed_to_upload) {
+                        _ = self.backend.remove_brickmap(absolute_bm_coords);
+                    }
                 }
             }
         }

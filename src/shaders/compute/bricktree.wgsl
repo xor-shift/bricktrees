@@ -1,6 +1,6 @@
 {{#use_bricktrees}}
 
-@group(2) @binding(3) var<storage, read> bricktrees: array<u32>;
+@group(2) @binding(4) var<storage, read> bricktrees: array<u32>;
 
 const bricktree_level_depth = {{bricktree_width_log2}}u / 3u;
 

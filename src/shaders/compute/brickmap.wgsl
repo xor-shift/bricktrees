@@ -7,7 +7,8 @@ struct FeedbackData {
 
 @group(2) @binding(0) var brickgrid: texture_3d<u32>;
 @group(2) @binding(1) var<storage, read_write> feedback_buffer: FeedbackData;
-@group(2) @binding(2) var<storage, read> brickmaps: array<u32>;
+@group(2) @binding(2) var<storage, read_write> feedback_scratch: array<atomic<u32>>;
+@group(2) @binding(3) var<storage, read> brickmaps: array<u32>;
 
 // X_dims can index into an array X
 // X_size is a real quantity representing X_dims * X_element_size
@@ -258,14 +259,19 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level:
         if (brickmap == k_bm_unoccupied) {
             return false;
         } else if (brickmap == k_bm_not_loaded) {
-            let idx = atomicAdd(&feedback_buffer.next_index, 1u);
             let bg_idx = u32(
                 frame.coords.x + 
                 frame.coords.y * brickgrid_dims.x +
                 frame.coords.z * brickgrid_dims.x * brickgrid_dims.y
             );
-            atomicStore(&feedback_buffer.data[bg_idx % 256], bg_idx);
-            // g_give_feedback = false;
+
+            let result = atomicCompareExchangeWeak(&feedback_scratch[bg_idx], 0u, 1u);
+            if (result.exchanged) {
+                let idx = atomicAdd(&feedback_buffer.next_index, 1u);
+                atomicStore(&feedback_buffer.data[idx], bg_idx);
+                g_give_feedback = false;
+            }
+
             return false;
         }
 

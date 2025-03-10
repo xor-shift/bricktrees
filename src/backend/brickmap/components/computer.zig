@@ -83,6 +83,7 @@ pub fn Computer(comptime Cfg: type) type {
         storage: *Storage = undefined,
 
         compute_shader: wgpu.ShaderModule,
+        scratch_reset_shader: wgpu.ShaderModule,
 
         uniform_bgl: wgpu.BindGroupLayout,
         uniform_bg: wgpu.BindGroup,
@@ -100,8 +101,25 @@ pub fn Computer(comptime Cfg: type) type {
 
         compute_pipeline_layout: wgpu.PipelineLayout,
         compute_pipeline: wgpu.ComputePipeline,
+        scratch_reset_pipeline: wgpu.ComputePipeline,
 
         pub fn init(map_bgl: wgpu.BindGroupLayout) !Self {
+            const scratch_reset_shader_code: [:0]const u8 =
+                \\ @group(2) @binding(2)
+                \\ var<storage, read_write> feedback_scratch: array<u32>;
+                \\
+                \\ @compute
+                \\ @workgroup_size(64, 1, 1)
+                \\ fn cs_main(
+                \\     @builtin(global_invocation_id) global_id: vec3<u32>,
+                \\ ) {
+                \\     feedback_scratch[global_id.x] = 0u;
+                \\ }
+            ;
+
+            const scratch_reset_shader = try g.device.create_shader_module_wgsl("scratch reset shader", scratch_reset_shader_code);
+            errdefer scratch_reset_shader.deinit();
+
             const compute_shader = try make_shader(g.alloc, Cfg);
             errdefer compute_shader.deinit();
 
@@ -180,8 +198,20 @@ pub fn Computer(comptime Cfg: type) type {
             });
             errdefer compute_pipeline.deinit();
 
+            const scratch_reset_pipeline = try g.device.create_compute_pipeline(.{
+                .label = "scratch reset pipeline",
+                .layout = compute_pipeline_layout,
+                .compute = .{
+                    .module = scratch_reset_shader,
+                    .entry_point = "cs_main",
+                    .constants = &.{},
+                },
+            });
+            errdefer scratch_reset_pipeline.deinit();
+
             var ret: Self = .{
                 .compute_shader = compute_shader,
+                .scratch_reset_shader = scratch_reset_shader,
 
                 .uniform_bgl = uniform_bgl,
                 .uniform_bg = uniform_bg,
@@ -193,6 +223,7 @@ pub fn Computer(comptime Cfg: type) type {
 
                 .compute_pipeline_layout = compute_pipeline_layout,
                 .compute_pipeline = compute_pipeline,
+                .scratch_reset_pipeline = scratch_reset_pipeline,
             };
             errdefer ret.deinit();
 
@@ -253,31 +284,57 @@ pub fn Computer(comptime Cfg: type) type {
 
             g.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&self.uniforms));
 
-            const compute_pass = try encoder.begin_compute_pass(wgpu.ComputePass.Descriptor{
-                .label = "compute pass",
-            });
+            {
+                const scratch_reset_pass = try encoder.begin_compute_pass(.{
+                    .label = "scratch reset pass",
+                });
+                defer scratch_reset_pass.deinit();
 
-            compute_pass.set_pipeline(self.compute_pipeline);
-            compute_pass.set_bind_group(0, self.uniform_bg, null);
-            compute_pass.set_bind_group(1, self.compute_textures_bg, null);
-            compute_pass.set_bind_group(2, self.backend.map_bg, null);
+                scratch_reset_pass.set_pipeline(self.scratch_reset_pipeline);
+                scratch_reset_pass.set_bind_group(0, self.uniform_bg, null);
+                scratch_reset_pass.set_bind_group(1, self.compute_textures_bg, null);
+                scratch_reset_pass.set_bind_group(2, self.backend.map_bg, null);
 
-            const wg_sz: [2]usize = .{ 8, 8 };
-            const wg_count = wgm.div(
-                wgm.sub(
-                    wgm.add(dims, wg_sz),
-                    [2]usize{ 1, 1 },
-                ),
-                wg_sz,
-            );
-            compute_pass.dispatch_workgroups(.{
-                @intCast(wg_count[0]),
-                @intCast(wg_count[1]),
-                1,
-            });
+                const gs = self.backend.config.?.grid_size();
+                const wg_sz = 64;
+                const wg_ct: [3]u32 = .{
+                    @intCast((gs + wg_sz - 1) / wg_sz),
+                    1,
+                    1,
+                };
+                // std.log.debug("{any}, {d}", .{wg_ct, gs});
+                scratch_reset_pass.dispatch_workgroups(wg_ct);
 
-            compute_pass.end();
-            compute_pass.deinit();
+                scratch_reset_pass.end();
+            }
+
+            {
+                const compute_pass = try encoder.begin_compute_pass(wgpu.ComputePass.Descriptor{
+                    .label = "compute pass",
+                });
+                defer compute_pass.deinit();
+
+                compute_pass.set_pipeline(self.compute_pipeline);
+                compute_pass.set_bind_group(0, self.uniform_bg, null);
+                compute_pass.set_bind_group(1, self.compute_textures_bg, null);
+                compute_pass.set_bind_group(2, self.backend.map_bg, null);
+
+                const wg_sz: [2]usize = .{ 8, 8 };
+                const wg_count = wgm.div(
+                    wgm.sub(
+                        wgm.add(dims, wg_sz),
+                        [2]usize{ 1, 1 },
+                    ),
+                    wg_sz,
+                );
+                compute_pass.dispatch_workgroups(.{
+                    @intCast(wg_count[0]),
+                    @intCast(wg_count[1]),
+                    1,
+                });
+
+                compute_pass.end();
+            }
         }
     };
 }
