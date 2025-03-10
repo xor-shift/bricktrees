@@ -44,8 +44,10 @@ pub fn Painter(comptime Cfg: type) type {
             g.alloc.destroy(self.brickmap_gen_pool);
         }
 
-        pub fn render(self: *Self, feedback_buffer: Backend.FBuffer) !void {
-            std.log.debug("{d} entries in the feedback buffer", .{feedback_buffer.next_idx});
+        pub fn render(self: *Self, to_load: []const u32) !void {
+            if (to_load.len != 0) {
+                std.log.debug("going to load {d} brickmaps", .{to_load.len});
+            }
 
             const voxel_providers: []dyn.Fat(*IVoxelProvider) = blk: {
                 var list = std.ArrayList(dyn.Fat(*IVoxelProvider)).init(g.frame_alloc);
@@ -74,9 +76,10 @@ pub fn Painter(comptime Cfg: type) type {
                 .self = self,
                 .voxel_providers = voxel_providers,
 
-                .curve = .{
-                    .dims = self.backend.config.?.grid_dimensions,
-                },
+                .to_load = to_load,
+                // .curve = .{
+                //     .dims = self.backend.config.?.grid_dimensions,
+                // },
 
                 .already_drawn_range = already_drawn_range,
             };
@@ -90,8 +93,10 @@ pub fn Painter(comptime Cfg: type) type {
                 const the_bricktree = &result.bricktree;
 
                 if (result.is_empty) {
+                    std.log.debug("removing the empty brickmap at {any}", .{absolute_bm_coords});
                     _ = self.backend.remove_brickmap(absolute_bm_coords);
                 } else {
+                    std.log.debug("uploading the brickmap at {any}", .{absolute_bm_coords});
                     _ = self.backend.upload_brickmap(absolute_bm_coords, the_brickmap, the_bricktree);
                 }
             }
@@ -118,7 +123,9 @@ pub fn Painter(comptime Cfg: type) type {
             self: *Self,
             voxel_providers: []dyn.Fat(*IVoxelProvider) = &.{},
 
-            curve: Curve,
+            idx: usize = 0,
+            to_load: []const u32,
+            //curve: Curve,
 
             already_drawn_range: [2][3]isize,
         };
@@ -163,26 +170,54 @@ pub fn Painter(comptime Cfg: type) type {
         }
 
         fn pool_producer_fn(ctx: *PoolContext) ?PoolWork {
-            while (true) {
-                const vv_local_coords = ctx.curve.next() orelse return null;
-                const abs_coords = wgm.add(wgm.cast(isize, vv_local_coords).?, ctx.self.backend.origin_brickmap);
-
-                const voxel_coords = wgm.mulew(abs_coords, Cfg.Brickmap.side_length_i);
-                const range = [_][3]isize{
-                    voxel_coords,
-                    wgm.add(voxel_coords, Cfg.Brickmap.side_length_i),
-                };
-
-                if (!should_draw(ctx, range)) {
-                    continue;
-                }
-
-                return PoolWork{
-                    .brickmap_coords = abs_coords,
-                    .range = range,
-                };
+            if (ctx.idx >= ctx.to_load.len) {
+                return null;
             }
+
+            const v = ctx.to_load[ctx.idx];
+            ctx.idx += 1;
+
+            const cfg = ctx.self.backend.config.?;
+            const dims = wgm.cast(u32, cfg.grid_dimensions).?;
+            const vv_local_coords = [_]u32{
+                v % dims[0],
+                (v / dims[0]) % dims[1],
+                v / (dims[0] * dims[1]),
+            };
+
+            const abs_coords = wgm.add(wgm.cast(isize, vv_local_coords).?, ctx.self.backend.origin_brickmap);
+            const abs_vox_coords = wgm.mulew(abs_coords, Cfg.Brickmap.side_length_i);
+
+            return PoolWork{
+                .brickmap_coords = abs_coords,
+                .range = [2][3]isize{
+                    abs_vox_coords,
+                    wgm.add(abs_vox_coords, Cfg.Brickmap.side_length_i),
+                },
+            };
         }
+
+        // fn pool_producer_fn(ctx: *PoolContext) ?PoolWork {
+        //     while (true) {
+        //         const vv_local_coords = ctx.curve.next() orelse return null;
+        //         const abs_coords = wgm.add(wgm.cast(isize, vv_local_coords).?, ctx.self.backend.origin_brickmap);
+
+        //         const voxel_coords = wgm.mulew(abs_coords, Cfg.Brickmap.side_length_i);
+        //         const range = [_][3]isize{
+        //             voxel_coords,
+        //             wgm.add(voxel_coords, Cfg.Brickmap.side_length_i),
+        //         };
+
+        //         if (!should_draw(ctx, range)) {
+        //             continue;
+        //         }
+
+        //         return PoolWork{
+        //             .brickmap_coords = abs_coords,
+        //             .range = range,
+        //         };
+        //     }
+        // }
 
         fn pool_worker_fn(ctx: *PoolContext, out_result: *PoolResult, work: PoolWork) void {
             const voxel_storage = out_result.brickmap.flat()[0..];

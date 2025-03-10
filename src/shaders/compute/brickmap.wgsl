@@ -2,7 +2,7 @@
 
 struct FeedbackData {
     next_index: atomic<u32>,
-    data: array<vec4<u32>>,
+    data: array<atomic<u32>>,
 };
 
 @group(2) @binding(0) var brickgrid: texture_3d<u32>;
@@ -33,7 +33,6 @@ const nudge_factor = 1.00001;
 
 const k_bm_not_loaded: u32 = 0xFFFFFFFFu;
 const k_bm_unoccupied: u32 = 0xFFFFFFFEu;
-const k_bm_want_load: u32 = 0xFFFFFFFDu;
 
 var<private> g_give_feedback: bool = true;
 
@@ -157,6 +156,7 @@ fn get_level_props(level: u32) -> LevelProps {
 }
 
 struct Iterator {
+    pixel: vec2<u32>,
     ray: Ray,
 
     level: u32,
@@ -168,7 +168,7 @@ struct Iterator {
     stats: Statistics,
 };
 
-fn new_iterator(ray_arg: Ray, out_iterator: ptr<function, Iterator>) -> bool {
+fn new_iterator(pixel: vec2<u32>, ray_arg: Ray, out_iterator: ptr<function, Iterator>) -> bool {
     let brickgrid_dims = vec3<i32>(textureDimensions(brickgrid));
     let brickgrid_size = vec3<f32>(brickgrid_dims) * brickmap_size;
 
@@ -202,6 +202,7 @@ fn new_iterator(ray_arg: Ray, out_iterator: ptr<function, Iterator>) -> bool {
     stack[0].coords = vec3<i32>(ray.origin / brickmap_size);
 
     *out_iterator = Iterator(
+        /* pix */ pixel,
         /* ray */ ray,
         /* lvl */ 0u,
         /* mat */ 0u,
@@ -254,16 +255,17 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level:
     if ((*it).level == 0u) {
         let brickmap = textureLoad(brickgrid, frame.coords, 0).r;
 
-        if (brickmap >= k_bm_want_load) {
-            if (brickmap == k_bm_want_load) {
-                g_give_feedback = false; // don't want to overwhelm the host
-            } else if (brickmap == k_bm_not_loaded && g_give_feedback) {
-                let idx = atomicAdd(&feedback_buffer.next_index, 1u);
-                if (idx < 256) {
-                    feedback_buffer.data[idx] = vec4<u32>(vec3<u32>(frame.coords), 0xB1FF3D17u);
-                }
-                g_give_feedback = false;
-            }
+        if (brickmap == k_bm_unoccupied) {
+            return false;
+        } else if (brickmap == k_bm_not_loaded) {
+            let idx = atomicAdd(&feedback_buffer.next_index, 1u);
+            let bg_idx = u32(
+                frame.coords.x + 
+                frame.coords.y * brickgrid_dims.x +
+                frame.coords.z * brickgrid_dims.x * brickgrid_dims.y
+            );
+            atomicStore(&feedback_buffer.data[bg_idx % 256], bg_idx);
+            // g_give_feedback = false;
             return false;
         }
 
@@ -393,11 +395,11 @@ fn iterator_iterate(it: ptr<function, Iterator>, i: u32) -> bool {
     return true;
 }
 
-fn trace(ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
+fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
     let tree_length = power_sum(brickmap_depth, 3u) / 8 / 4;
 
     var iterator: Iterator;
-    if (!new_iterator(ray_arg, &iterator)) { return false; }
+    if (!new_iterator(pixel, ray_arg, &iterator)) { return false; }
 
     for (var i = 2u;; i++) {
         let should_continue = iterator_iterate(&iterator, i);
@@ -437,7 +439,7 @@ fn hit_check_coarse(
         let bml_voxel_coords = voxel_coords - brickmap_coords * vec3<i32>(brickmap_dims);
 
         let brickmap = textureLoad(brickgrid, brickmap_coords, 0).r;
-        if (brickmap >= k_bm_want_load) {
+        if (brickmap >= k_bm_unoccupied) {
             continue;
         }
 

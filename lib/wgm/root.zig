@@ -551,3 +551,14 @@ pub fn trunc(m: anytype) @TypeOf(m) {
 
     return ret;
 }
+
+pub fn abs(comptime T: type, m: anytype) Canonical(Matrix(T, He(@TypeOf(m)).rows, He(@TypeOf(m)).cols)) {
+    // TODO: im being lazy here, deduce the result type
+    const HM = He(@TypeOf(m));
+    const Ret = Canonical(Matrix(T, He(@TypeOf(m)).rows, He(@TypeOf(m)).cols));
+    const H = He(Ret);
+    var ret: Ret = undefined;
+    for (0..H.rows * H.cols) |i| H.fp(&ret)[i] = @abs(HM.cfp(&m)[i]);
+
+    return ret;
+}

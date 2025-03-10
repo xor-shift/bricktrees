@@ -23,7 +23,6 @@ const g = &@import("../../main.zig").g;
 
 pub const BrickgridEntry = union(enum) {
     NotChecked: void,
-    WantLoad: void,
 
     Unoccupied: void,
     Occupied: usize,
@@ -33,7 +32,6 @@ pub const BrickgridEntry = union(enum) {
             .Occupied => |v| @intCast(v),
             .NotChecked => 0xFFFF_FFFF,
             .Unoccupied => 0xFFFF_FFFE,
-            .WantLoad => 0xFFFF_FFFD,
         };
     }
 
@@ -41,7 +39,6 @@ pub const BrickgridEntry = union(enum) {
         switch (self) {
             0xFFFF_FFFF => .{ .NotChecked = {} },
             0xFFFF_FFFE => .{ .Unoccupied = {} },
-            0xFFFF_FFFD => .{ .WantLoad = {} },
             else => {},
         }
     }
@@ -50,7 +47,7 @@ pub const BrickgridEntry = union(enum) {
 pub fn FeedbackBuffer(comptime no_entries: usize) type {
     return extern struct {
         next_idx: u32 = 0,
-        data: [no_entries][4]u32,
+        data: [no_entries]u32,
     };
 }
 
@@ -58,7 +55,7 @@ pub fn Backend(comptime Cfg: type) type {
     return struct {
         const Self = @This();
 
-        pub const FBuffer = FeedbackBuffer(128);
+        pub const FBuffer = FeedbackBuffer(256);
 
         const Painter = @import("components/painter.zig").Painter(Cfg);
         const Storage = @import("components/storage.zig").Storage(Cfg);
@@ -293,8 +290,33 @@ pub fn Backend(comptime Cfg: type) type {
                 _ = self.remove_brickmap(w);
             };
 
+            const bm_delta = wgm.sub(origin, self.origin_brickmap);
+            const gd = self.config.?.grid_dimensions;
+            for (0..gd[2]) |z| for (0..gd[1]) |y| for (0..gd[0]) |x| {
+                const out_coords = [_]usize{
+                    if (bm_delta[0] >= 0) x else gd[0] - x - 1,
+                    if (bm_delta[1] >= 0) y else gd[1] - y - 1,
+                    if (bm_delta[2] >= 0) z else gd[2] - z - 1,
+                };
+                const out_idx = self.bgl_bm_coords_to_bg_idx(out_coords);
+
+                const in_coords_sgn = wgm.add(wgm.cast(isize, out_coords).?, bm_delta);
+                const in_coords = wgm.cast(usize, in_coords_sgn) orelse {
+                    self.brickgrid[out_idx] = .{ .NotChecked = {} };
+                    continue;
+                };
+                if (wgm.compare(.some, in_coords, .greater_than_equal, gd)) {
+                    self.brickgrid[out_idx] = .{ .NotChecked = {} };
+                    continue;
+                }
+
+                const in_idx = self.bgl_bm_coords_to_bg_idx(in_coords);
+                self.brickgrid[out_idx] = self.brickgrid[in_idx];
+            };
+
             self.origin_brickmap = origin;
-            self.rememo_brickgrid();
+
+            // self.rememo_brickgrid();
 
             const already_drawn = .{
                 .{
@@ -379,20 +401,20 @@ pub fn Backend(comptime Cfg: type) type {
 
             const bg_idx = self.bgl_bm_coords_to_bg_idx(bgl_bm_coords);
 
-            switch (self.brickgrid[bg_idx]) {
-                .Occupied => |bm_idx| {
+            const ret = switch (self.brickgrid[bg_idx]) {
+                .Occupied => |bm_idx| blk: {
                     std.debug.assert(self.brickmaps[bm_idx] != null);
                     std.debug.assert(std.meta.eql(self.brickmaps[bm_idx].?, g_bm_coords));
 
                     self.brickmaps[bm_idx] = null;
 
-                    return true;
+                    break :blk true;
                 },
-                else => {},
-            }
+                else => false,
+            };
+            self.brickgrid[bg_idx] = .{ .Unoccupied = {} };
 
-            self.brickgrid[bg_idx] = .{ .NotChecked = {} };
-            return false;
+            return ret;
         }
 
         /// For IBackend
@@ -611,9 +633,30 @@ pub fn Backend(comptime Cfg: type) type {
         }
 
         pub fn render(self: *Self, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
-            g.queue.write_buffer(self.brickgrid_feedback_buffer, 0, std.mem.asBytes(&std.mem.zeroes(FBuffer)));
+            std.mem.sort(u32, self.feedback_buffer.data[0..], {}, struct {
+                pub fn aufruf(_: void, lhs: u32, rhs: u32) bool {
+                    return lhs < rhs;
+                }
+            }.aufruf);
 
-            try self.painter.render(self.feedback_buffer);
+            const no_unique: usize = blk: {
+                var last: u32 = std.math.maxInt(u32);
+                var no_unique: usize = 0;
+                for (self.feedback_buffer.data) |v| {
+                    if (v == std.math.maxInt(u32)) break;
+                    if (v == last) continue;
+                    last = v;
+
+                    self.feedback_buffer.data[no_unique] = v;
+                    no_unique += 1;
+                }
+                break :blk no_unique;
+            };
+
+            const fb_to_write: FBuffer = .{ .data = .{std.math.maxInt(u32)} ** 256 };
+            g.queue.write_buffer(self.brickgrid_feedback_buffer, 0, std.mem.asBytes(&fb_to_write));
+
+            try self.painter.render(self.feedback_buffer.data[0..no_unique]);
 
             const local_brickgrid = g.frame_alloc.alloc(u32, self.config.?.grid_size()) catch @panic("OOM");
 
