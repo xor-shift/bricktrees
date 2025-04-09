@@ -20,23 +20,23 @@ fn xoroshiro_64ss_next(sp: ptr<function, vec2<u32>>) -> u32 {
 }
 
 // LGTM
-fn init_random(pixel: vec2<u32>) {
+fn init_random(pixel: vec2<u32>, rs: array<u32, 8>) {
     var state = vec2<u32>(
-        ((pixel.x | (pixel.x << 16)) * 13) ^ uniforms.rs_6,
-        ((pixel.y | (pixel.y << 16)) * 13) ^ uniforms.rs_7,
+        ((pixel.x | (pixel.x << 16)) * 13) ^ rs[6],
+        ((pixel.y | (pixel.y << 16)) * 13) ^ rs[7],
     );
     xoroshiro_64ss_next(&state);
     xoroshiro_64ss_next(&state);
 
-    state.x ^= uniforms.rs_5;
-    state.y ^= uniforms.rs_5;
+    state.x ^= rs[5];
+    state.y ^= rs[5];
 
-    random_schedule[0] = uniforms.rs_0 ^ xoroshiro_64ss_next(&state);
-    random_schedule[1] = uniforms.rs_1 ^ xoroshiro_64ss_next(&state);
-    random_schedule[2] = uniforms.rs_2 ^ xoroshiro_64ss_next(&state);
-    random_schedule[3] = uniforms.rs_3 ^ xoroshiro_64ss_next(&state);
-    random_schedule[4] = uniforms.rs_4 ^ xoroshiro_64ss_next(&state);
-    // random_schedule[5] = uniforms.rs_5 ^ xoroshiro_64ss_next(&state);
+    random_schedule[0] = rs[0] ^ xoroshiro_64ss_next(&state);
+    random_schedule[1] = rs[1] ^ xoroshiro_64ss_next(&state);
+    random_schedule[2] = rs[2] ^ xoroshiro_64ss_next(&state);
+    random_schedule[3] = rs[3] ^ xoroshiro_64ss_next(&state);
+    random_schedule[4] = rs[4] ^ xoroshiro_64ss_next(&state);
+    // random_schedule[5] = rs[5] ^ xoroshiro_64ss_next(&state);
 }
 
 fn next_u32() -> u32 {

@@ -142,6 +142,7 @@ pub fn RotatingArena(comptime config: Config) type {
 
             for (0..arenas.len) |i| {
                 arenas[i] = try Arena.init();
+                // std.log.debug("arena {d} @ {any}", .{i, arenas[i].pool_start});
                 managed_to_allocate = i;
             }
 
@@ -163,19 +164,24 @@ pub fn RotatingArena(comptime config: Config) type {
             // });
 
             if (config.use_barriers) {
-                const next = &self.arenas[(self.no_rotations + 1) % self.arenas.len];
-                // std.log.debug("invalidating {any} ({d}, {any})", .{
-                //     @as(*anyopaque, @ptrCast(next)),
-                //     self.arenas.len,
-                //     @as(*anyopaque, @ptrCast(next.pool_start)),
-                // });
+                const idx = (self.no_rotations + 1) % self.arenas.len;
+                const next = &self.arenas[idx];
+                //std.log.debug("invalidating {any} ([{d}], {d}, {any})", .{
+                //    @as(*anyopaque, @ptrCast(next)),
+                //    idx,
+                //    self.arenas.len,
+                //    @as(*anyopaque, @ptrCast(next.pool_start)),
+                //});
                 next.invalidate();
             }
-            const cur = &self.arenas[self.no_rotations % self.arenas.len];
+
+            const idx = self.no_rotations % self.arenas.len;
+            const cur = &self.arenas[idx];
             cur.reset();
 
-            // std.log.debug("cur: {any} ({d}, {any})", .{
+            // std.log.debug("cur: {any} ([{d}] {d}, {any})", .{
             //     @as(*anyopaque, @ptrCast(cur)),
+            //     idx,
             //     self.arenas.len,
             //     @as(*anyopaque, @ptrCast(cur.pool_start)),
             // });

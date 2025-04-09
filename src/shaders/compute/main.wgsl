@@ -74,14 +74,37 @@ fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32) -> f32 {
     return f32(occlusion) / f32(16u * ray_ct);
 }
 
+fn minecraft_ao(n: vec3<f32>) -> f32 {
+    return dot(abs(n), vec3<f32>(0.5, 0.95, 0.75));
+}
+
 @compute @workgroup_size(8, 8, 1) fn cs_main(
     @builtin(global_invocation_id)   global_id: vec3<u32>,
     @builtin(workgroup_id)           workgroup_id: vec3<u32>,
     @builtin(local_invocation_id)    local_id:  vec3<u32>,
     @builtin(local_invocation_index) local_idx: u32,
 ) {
-    let pixel = global_id.xy;
-    init_random(pixel);
+    // let pixel = global_id.xy;
+    let pixel = vec2<u32>(
+        global_id.x,
+        ((textureDimensions(texture_radiance).y + 7) / 8) * 8 - global_id.y - 1,
+    );
+    init_random(pixel, array<u32, 8>(
+        uniforms.rs_0,
+        uniforms.rs_1,
+        uniforms.rs_2,
+        uniforms.rs_3,
+        uniforms.rs_4,
+        uniforms.rs_5,
+        uniforms.rs_6,
+        uniforms.rs_7,
+    ));
+
+    g_debug_mode = uniforms.debug_mode;
+    g_debug_level = uniforms.debug_level;
+
+    // if (local_idx == 0) { g_give_feedback = true; }
+    // workgroupBarrier();
 
     if (false) {
         textureStore(texture_radiance, pixel, vec4<f32>(vec3<f32>(next_f32_uniform()), 1.0));
@@ -93,9 +116,10 @@ fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32) -> f32 {
         return;
     }
 
-    let ray = generate_ray(pixel);
+    let ray = generate_ray(pixel, uniforms.dims, uniforms.inverse_transform);
     var intersection: Intersection;
     let intersected = trace(pixel, ray, &intersection);
+    intersection.material |= 0x00FF0000u;
 
     // debug_vec(0u, 0u, intersection.local_coords);
     // debug_bool(0u, 0u, intersected);
@@ -135,7 +159,8 @@ fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32) -> f32 {
     let p = vec3<f32>(intersection.voxel_coords) + intersection.local_coords + n * 0.01;
 
     //let mult = quasi_ao(p, n);
-    let mult = stochastic_ao(p, n, 5u);
+    //let mult = stochastic_ao(p, n, 5u);
+    let mult = minecraft_ao(n);
 
     textureStore(texture_radiance, pixel, vec4<f32>(mat_color * mult, 1));
     // textureStore(texture_radiance, pixel, vec4<f32>(-n, 1));

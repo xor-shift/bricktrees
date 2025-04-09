@@ -14,12 +14,14 @@ fn get_debug_color(v: u32) -> vec3<f32> {
 }
 
 const do_debug: bool = false;
+var<private> g_debug_mode: u32;
+var<private> g_debug_level: u32;
 var<private> debug_out: vec3<f32>;
 var<private> did_debug: bool = false;
 
 fn debug_vec(ident: u32, iteration: u32, value: vec3<f32>) -> bool {
-    if (uniforms.debug_mode != ident) { return false; }
-    if (uniforms.debug_level != iteration) { return false; }
+    if (g_debug_mode != ident) { return false; }
+    if (g_debug_level != iteration) { return false; }
 
     debug_out = value;
 

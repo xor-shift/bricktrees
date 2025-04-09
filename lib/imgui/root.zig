@@ -172,23 +172,53 @@ fn ig_scalar_info(comptime T: type) struct { c.ImGuiDataType, [:0]const u8 } {
         u32 => .{ c.ImGuiDataType_U32, if (is_ilp32) "%lu" else "%u" },
         i64 => .{ c.ImGuiDataType_S64, if (is_ilp32) "%lld" else "%ld" },
         u64 => .{ c.ImGuiDataType_U64, if (is_ilp32) "%llu" else "%lu" },
+        usize => .{ c.ImGuiDataType_U64, "%zu" },
+        isize => .{ c.ImGuiDataType_U64, "%z" },
         f32 => .{ c.ImGuiDataType_Float, "%f" },
         f64 => .{ c.ImGuiDataType_Double, "%f" },
         else => @compileError("unsupported type passed into input_scalar"),
     };
 }
 
-pub fn input_scalar(comptime T: type, label: [:0]const u8, v: *T, step: T, step_fast: T) bool {
+pub const InputTextFlags = packed struct {
+    chars_decimal: bool = false,
+    chars_hexadecimal: bool = false,
+    chars_scientific: bool = false,
+    chars_uppercase: bool = false,
+    chars_no_blank: bool = false,
+    allow_tab_input: bool = false,
+    enter_returnsTrue: bool = false,
+    escape_clears_all: bool = false,
+    ctrl_enter_for_new_line: bool = false,
+    read_only: bool = false,
+    password: bool = false,
+    always_overwrite: bool = false,
+    auto_select_all: bool = false,
+    parse_empty_ref_val: bool = false,
+    display_empty_ref_val: bool = false,
+    no_horizontal_scroll: bool = false,
+    no_undo_redo: bool = false,
+    elide_left: bool = false,
+    callback_completion: bool = false,
+    callback_history: bool = false,
+    callback_always: bool = false,
+    callback_charFilter: bool = false,
+    callback_resize: bool = false,
+    callback_edit: bool = false,
+    _padding: u8 = undefined,
+};
+
+pub fn input_scalar(comptime T: type, label: [:0]const u8, v: *T, step: ?T, step_fast: ?T, flags: InputTextFlags) bool {
     const info = ig_scalar_info(T);
 
     return c.igInputScalar(
         label.ptr,
         info.@"0",
         @ptrCast(v),
-        &step,
-        &step_fast,
+        if (step) |_| &step else null,
+        if (step_fast) |_| &step_fast else null,
         info.@"1",
-        0,
+        @bitCast(flags),
     );
 }
 
@@ -209,4 +239,3 @@ pub fn input_slider(comptime T: type, label: [:0]const u8, v: *T, min: T, max: T
 pub fn cformat(fmt: [:0]const u8, args: anytype) void {
     @call(.auto, c.igText, .{fmt} ++ args);
 }
-

@@ -12,3 +12,5 @@ def merge_shader [name: string] {
 
 merge_shader compute
 merge_shader visualiser
+merge_shader svo
+merge_shader voxeliser

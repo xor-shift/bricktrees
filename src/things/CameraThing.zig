@@ -2,6 +2,7 @@ const std = @import("std");
 
 const dyn = @import("dyn");
 const imgui = @import("imgui");
+const qov = @import("qov");
 const wgm = @import("wgm");
 
 const sdl = @import("gfx").sdl;
@@ -9,8 +10,8 @@ const wgpu = @import("gfx").wgpu;
 
 const IThing = @import("../IThing.zig");
 
-const PackedVoxel = @import("../voxel.zig").PackedVoxel;
-const Voxel = @import("../voxel.zig").Voxel;
+const PackedVoxel = qov.PackedVoxel;
+const Voxel = qov.Voxel;
 
 pub const Ray = @import("../rt/ray.zig").Ray(f64);
 
@@ -36,13 +37,14 @@ pub const DynStatic = dyn.ConcreteStuff(@This(), .{IThing});
 speed_slow: f64 = 4.0,
 speed_fast: f64 = 40.0,
 do_recenter: bool = true,
+do_streaming: bool = true,
 mouse_capture: bool = false,
 input_state: InputState = std.mem.zeroes(InputState),
 mouse_delta: [2]f32 = .{ 0, 0 },
 fov: f64 = 45.0,
 
 global_origin: [3]f64 = .{0} ** 3,
-global_coords: [3]f64 = .{ 0, 10, 0 },
+global_coords: [3]f64 = .{ 0, 40, 20 },
 look: [3]f64 = .{0} ** 3,
 
 cached_global_transform: wgm.Matrix(f64, 4, 4) = undefined,
@@ -195,7 +197,7 @@ pub fn render(self: *Self, delta_ns: u64, _: wgpu.CommandEncoder, _: wgpu.Textur
     const transform_base = wgm.mulmm(
         wgm.perspective_fov(
             f64,
-            0.01,
+            0.1,
             100,
             self.fov / 90.0 * std.math.pi,
             @as(f64, @floatFromInt(dims[0])) / @as(f64, @floatFromInt(dims[1])),
@@ -242,6 +244,7 @@ pub fn do_gui(self: *Self) !void {
         _ = imgui.input_slider(f64, "fov", &self.fov, 0, 90);
 
         _ = imgui.c.igCheckbox("enable recentering", &self.do_recenter);
+        _ = imgui.c.igCheckbox("enable streaming", &self.do_streaming);
 
         _ = imgui.input_slider(f64, "slow speed", &self.speed_slow, 0.0, 10.0);
         _ = imgui.input_slider(f64, "fast speed", &self.speed_fast, 10.0, 400.0);

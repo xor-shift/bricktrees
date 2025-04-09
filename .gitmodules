@@ -13,3 +13,6 @@
 [submodule "thirdparty/tracy"]
 	path = thirdparty/tracy
 	url = https://github.com/wolfpld/tracy
+[submodule "run/scenes/sponza"]
+	path = run/scenes/sponza
+	url = https://github.com/jimmiebergmann/Sponza

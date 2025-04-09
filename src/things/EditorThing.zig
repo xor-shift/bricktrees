@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const dyn = @import("dyn");
+const qov = @import("qov");
 const wgm = @import("wgm");
 
 const sdl = @import("gfx").sdl;
@@ -13,8 +14,8 @@ const IVoxelProvider = @import("../IVoxelProvider.zig");
 
 const CameraThing = @import("CameraThing.zig");
 
-const PackedVoxel = @import("../voxel.zig").PackedVoxel;
-const Voxel = @import("../voxel.zig").Voxel;
+const PackedVoxel = qov.PackedVoxel;
+const Voxel = qov.Voxel;
 
 const Ray = CameraThing.Ray;
 const Intersection = Ray.Intersection;
@@ -149,8 +150,13 @@ pub fn init(dims: [3]usize) !Self {
     errdefer gizmo_uniform_bg.deinit();
 
     const voxels = try g.alloc.alloc(PackedVoxel, dims[0] * dims[1] * dims[2]);
-    @memset(voxels, PackedVoxel.air);
-    voxels[32 * dims[1] * dims[0] + 32 * dims[0] + 32] = PackedVoxel.white;
+    //@memset(voxels, PackedVoxel.air);
+    //voxels[32 * dims[1] * dims[0] + 32 * dims[0] + 32] = PackedVoxel.white;
+    {
+        var file = try std.fs.cwd().openFile("out.bvox", .{});
+        defer file.close();
+        _ = try file.readAll(std.mem.sliceAsBytes(voxels));
+    }
 
     return .{
         .gizmo_pipeline_layout = gizmo_pipeline_layout,
@@ -285,27 +291,21 @@ pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, onto: wgpu.Text
     });
 }
 
-pub fn draw_voxels(self: *Self, range: [2][3]isize, storage: []PackedVoxel) void {
+pub fn draw_voxels(self: *Self, range: IVoxelProvider.VoxelRange, storage: []PackedVoxel) void {
     const info = IVoxelProvider.overlap_info(range, .{
-        self.origin,
-        wgm.add(self.origin, wgm.cast(isize, self.dims).?),
+        .origin = self.origin,
+        .volume = self.dims,
     }) orelse return;
 
-    for (0..info.overlap_size[2]) |z| for (0..info.overlap_size[1]) |y| for (0..info.overlap_size[0]) |x| {
+    for (0..info.volume[2]) |z| for (0..info.volume[1]) |y| for (0..info.volume[0]) |x| {
         const offset: [3]usize = .{ x, y, z };
 
-        const ml_coords = wgm.add(info.model_origin, offset);
-        const sample = self.voxels[ //
-            ml_coords[2] * self.dims[1] * self.dims[0] //
-            + ml_coords[1] * self.dims[0] //
-            + ml_coords[0]
-        ];
+        const ml_coords = wgm.add(info.local_origin, offset);
+        const ml_idx = wgm.to_idx(ml_coords, self.dims);
 
-        const rl_coords = wgm.add(info.draw_origin, offset);
-        storage[
-            rl_coords[2] * info.range_size[1] * info.range_size[0] //
-            + rl_coords[1] * info.range_size[0] //
-            + rl_coords[0]
-        ] = sample;
+        const ol_coords = wgm.add(wgm.cast(usize, wgm.sub(info.global_origin, range.origin)).?, offset);
+        const ol_idx = wgm.to_idx(ol_coords, range.volume);
+
+        storage[ol_idx] = self.voxels[ml_idx];
     };
 }

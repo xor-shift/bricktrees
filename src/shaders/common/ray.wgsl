@@ -36,8 +36,12 @@ fn intersection_normal(intersection: Intersection) -> vec3<f32> {
     return an * sign(lp);
 }
 
-fn generate_ray_transform(pixel: vec2<u32>) -> Ray {
-    let inv = uniforms.inverse_transform;
+fn generate_ray_transform(
+    pixel: vec2<u32>,
+    dims: vec2<f32>,
+    inverse_transform: mat4x4<f32>,
+) -> Ray {
+    let inv = inverse_transform;
 
     // TODO: send these 8 vectors through the uniforms
 
@@ -58,7 +62,7 @@ fn generate_ray_transform(pixel: vec2<u32>) -> Ray {
         inv * vec4<f32>(1, -1, far_z, 1),
     );
 
-    let uv = vec2<f32>(pixel) / uniforms.dims;
+    let uv = vec2<f32>(pixel) / dims;
 
     let use_bilinear = true;
 
@@ -123,8 +127,12 @@ fn generate_ray_transform(pixel: vec2<u32>) -> Ray {
     return Ray(origin, direction, vec3<f32>(), vec3<i32>());
 }
 
-fn generate_ray(pixel: vec2<u32>) -> Ray {
-    var ray = generate_ray_transform(pixel);
+fn generate_ray(
+    pixel: vec2<u32>,
+    dims: vec2<f32>,
+    inverse_transform: mat4x4<f32>,
+) -> Ray {
+    var ray = generate_ray_transform(pixel, dims, inverse_transform);
 
     ray.iter_direction = vec3<i32>(select(
         vec3<i32>(-1), vec3<i32>(1),

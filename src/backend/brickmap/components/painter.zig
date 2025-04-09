@@ -1,13 +1,14 @@
 const std = @import("std");
 
 const dyn = @import("dyn");
+const qov = @import("qov");
 const wgm = @import("wgm");
 
 const curves = @import("../bricktree/curves.zig");
-const worker_pool = @import("../../../worker_pool.zig");
+const worker_pool = @import("core").worker_pool;
 
-const PackedVoxel = @import("../../../voxel.zig").PackedVoxel;
-const Voxel = @import("../../../voxel.zig").Voxel;
+const PackedVoxel = qov.PackedVoxel;
+const Voxel = qov.Voxel;
 
 const IVoxelProvider = @import("../../../IVoxelProvider.zig");
 
@@ -46,7 +47,7 @@ pub fn Painter(comptime Cfg: type) type {
 
         pub fn render(self: *Self, to_load: []const u32) !void {
             if (to_load.len != 0) {
-                std.log.debug("going to load {d} brickmaps", .{to_load.len});
+                std.log.debug("going to load {d} brickmaps (@ {any})", .{ to_load.len, to_load.ptr });
             }
 
             const voxel_providers: []dyn.Fat(*IVoxelProvider) = blk: {
@@ -126,6 +127,9 @@ pub fn Painter(comptime Cfg: type) type {
             self: *Self,
             voxel_providers: []dyn.Fat(*IVoxelProvider) = &.{},
 
+            issued: usize = 0,
+            // relaxed atomic
+            nonempty: u32 = 0,
             idx: usize = 0,
             to_load: []const u32,
             //curve: Curve,
@@ -135,7 +139,7 @@ pub fn Painter(comptime Cfg: type) type {
 
         const PoolWork = struct {
             brickmap_coords: [3]isize,
-            range: [2][3]isize,
+            range: IVoxelProvider.VoxelRange,
         };
 
         const PoolResult = struct {
@@ -146,58 +150,53 @@ pub fn Painter(comptime Cfg: type) type {
 
         const Pool = worker_pool.WorkerPool(PoolContext, PoolWork, PoolResult);
 
-        fn should_draw(ctx: *PoolContext, range: [2][3]isize) bool {
-            const should_draw_from_scratch = //
-                wgm.compare(.some, range[0], .less_than, ctx.already_drawn_range[0]) or //
-                wgm.compare(.some, range[1], .greater_than, ctx.already_drawn_range[1]);
-
-            const someone_wants_to_draw = if (should_draw_from_scratch) blk: {
-                for (ctx.voxel_providers) |p| {
-                    if (p.d("should_draw_voxels", .{range})) {
-                        break :blk true;
-                    }
-                }
-                break :blk false;
-            } else false;
-
-            const someone_wants_to_redraw = if (!should_draw_from_scratch) blk: {
-                for (ctx.voxel_providers) |p| {
-                    if (p.d("should_redraw_voxels", .{range})) {
-                        break :blk true;
-                    }
-                }
-                break :blk false;
-            } else false;
-
-            return someone_wants_to_redraw or someone_wants_to_draw;
-        }
-
         fn pool_producer_fn(ctx: *PoolContext) ?PoolWork {
-            if (ctx.idx >= ctx.to_load.len) {
-                return null;
+            while (true) {
+                if (ctx.idx >= ctx.to_load.len or @atomicLoad(u32, &ctx.nonempty, .seq_cst) >= 256) { // or ctx.issued >= 256
+                    return null;
+                }
+
+                const v = ctx.to_load[ctx.idx];
+                ctx.idx += 1;
+
+                const cfg = ctx.self.backend.config.?;
+                const dims = wgm.cast(u32, cfg.grid_dimensions).?;
+                const vv_local_coords = [_]u32{
+                    v % dims[0],
+                    (v / dims[0]) % dims[1],
+                    v / (dims[0] * dims[1]),
+                };
+
+                const abs_coords = wgm.add(wgm.cast(isize, vv_local_coords).?, ctx.self.backend.origin_brickmap);
+                const abs_vox_coords = wgm.mulew(abs_coords, Cfg.Brickmap.side_length_i);
+
+                const range: IVoxelProvider.VoxelRange = .{
+                    .origin = abs_vox_coords,
+                    .volume = .{Cfg.Brickmap.side_length} ** 3,
+                };
+
+                const should_draw_from_scratch = true; // TODO
+                const should_draw = blk: {
+                    for (ctx.voxel_providers) |p| {
+                        const status = p.d("status_for_region", .{range});
+                        if (status == .empty) continue;
+                        if (status == .want_redraw) break :blk true;
+
+                        if (should_draw_from_scratch and status == .want_draw) break :blk true;
+                    }
+
+                    break :blk false;
+                };
+
+                if (!should_draw) continue;
+
+                ctx.issued += 1;
+
+                return PoolWork{
+                    .brickmap_coords = abs_coords,
+                    .range = range,
+                };
             }
-
-            const v = ctx.to_load[ctx.idx];
-            ctx.idx += 1;
-
-            const cfg = ctx.self.backend.config.?;
-            const dims = wgm.cast(u32, cfg.grid_dimensions).?;
-            const vv_local_coords = [_]u32{
-                v % dims[0],
-                (v / dims[0]) % dims[1],
-                v / (dims[0] * dims[1]),
-            };
-
-            const abs_coords = wgm.add(wgm.cast(isize, vv_local_coords).?, ctx.self.backend.origin_brickmap);
-            const abs_vox_coords = wgm.mulew(abs_coords, Cfg.Brickmap.side_length_i);
-
-            return PoolWork{
-                .brickmap_coords = abs_coords,
-                .range = [2][3]isize{
-                    abs_vox_coords,
-                    wgm.add(abs_vox_coords, Cfg.Brickmap.side_length_i),
-                },
-            };
         }
 
         // fn pool_producer_fn(ctx: *PoolContext) ?PoolWork {
@@ -250,6 +249,7 @@ pub fn Painter(comptime Cfg: type) type {
                 break :blk out_result.bricktree[0] == 0;
             };
 
+            if (!is_empty) _ = @atomicRmw(u32, &ctx.nonempty, .Add, 1, .seq_cst);
             out_result.is_empty = is_empty;
         }
     };

@@ -1,10 +1,11 @@
 const std = @import("std");
 
 const dyn = @import("dyn");
+const qov = @import("qov");
 const wgm = @import("wgm");
 
-const PackedVoxel = @import("../voxel.zig").PackedVoxel;
-const Voxel = @import("../voxel.zig").Voxel;
+const PackedVoxel = qov.PackedVoxel;
+const Voxel = qov.Voxel;
 
 const IThing = @import("../IThing.zig");
 const IVoxelProvider = @import("../IVoxelProvider.zig");
@@ -19,42 +20,39 @@ pub fn init() !Self {
     return .{};
 }
 
-pub fn should_draw_voxels(_: *Self, range: [2][3]isize) bool {
-    _ = range;
-    return false;
+pub fn status_for_region(_: *Self, range: IVoxelProvider.VoxelRange) IVoxelProvider.RegionStatus {
+    const min = range.origin[0];
+    const max = range.origin[1] + @as(isize, @intCast(range.volume[1]));
+
+    if (min >= 10 and min <= 30 or //
+        max >= 10 and max <= 30)
+    {
+        return .want_redraw;
+    }
+
+    return .want_draw;
 }
 
-pub fn should_redraw_voxels(_: *Self, range: [2][3]isize) bool {
-    if (true) return false;
-    return range[0][1] >= 10 and range[0][1] <= 30 or range[1][1] >= 10 and range[1][1] <= 30;
-}
-
-pub fn draw_voxels(_: *Self, range: [2][3]isize, storage: []PackedVoxel) void {
-    if (true) return;
-    const volume = wgm.cast(usize, wgm.sub(range[1], range[0])).?;
-    const base_coords = range[0];
+pub fn draw_voxels(_: *Self, range: IVoxelProvider.VoxelRange, storage: []PackedVoxel) void {
+    if (false) return;
 
     // const t = @as(f64, @floatFromInt(g.time())) / std.time.ns_per_s;
     const t: f64 = 1.0;
 
-    for (0..volume[2]) |bml_z| for (0..volume[0]) |bml_x| {
+    for (0..range.volume[2]) |bml_z| for (0..range.volume[0]) |bml_x| {
         const bml_xz = [2]usize{ bml_x, bml_z };
         const g_xz = wgm.add(wgm.cast(isize, bml_xz).?, [_]isize{
-            base_coords[0],
-            base_coords[2],
+            range.origin[0],
+            range.origin[2],
         });
         const dist = wgm.length(wgm.lossy_cast(f64, g_xz));
         const height: isize = @intFromFloat(20 + 10 * @sin(dist / 10 - t));
-        const remaining_height: isize = height - base_coords[1];
+        const remaining_height: isize = height - range.origin[1];
 
         if (remaining_height < 0) continue;
 
-        for (0..@min(volume[1], @as(usize, @intCast(remaining_height)))) |bml_y| {
-            storage[
-                bml_x //
-                + bml_y * volume[0] //
-                + bml_z * volume[0] * volume[1]
-            ] = (Voxel{
+        for (0..@min(range.volume[1], @as(usize, @intCast(remaining_height)))) |bml_y| {
+            storage[wgm.to_idx([_]usize{ bml_x, bml_y, bml_z }, range.volume)] = (Voxel{
                 .Normal = .{
                     .rougness = 1.0,
                     .rgb = .{ 0.1, 0.2, 0.3 },

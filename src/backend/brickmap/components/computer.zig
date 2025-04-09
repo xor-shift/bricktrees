@@ -10,6 +10,9 @@ const imgui = @import("imgui");
 const CameraThing = @import("../../../things/CameraThing.zig");
 const VisualiserThing = @import("../../../things/VisualiserThing.zig");
 
+const Common = @import("../../Common.zig");
+const Uniforms = @import("../../uniforms.zig").Uniforms;
+
 const g = &@import("../../../main.zig").g;
 
 fn make_shader(alloc: std.mem.Allocator, comptime Cfg: type) !wgpu.ShaderModule {
@@ -50,26 +53,6 @@ fn make_shader(alloc: std.mem.Allocator, comptime Cfg: type) !wgpu.ShaderModule 
     return shader;
 }
 
-/// Be careful: the vecN<T> of WGSL and the [N]T of C/Zig may not have the same alignment!
-const Uniforms = extern struct {
-    random_seed: [8]u32 = .{0} ** 8,
-
-    transform: [4][4]f32 = wgm.identity(f32, 4),
-    inverse_transform: [4][4]f32 = wgm.identity(f32, 4),
-
-    brickgrid_origin: [3]i32 = .{0} ** 3,
-    _padding_0: u32 = undefined,
-
-    dims: [2]f32 = .{ 0, 0 },
-    _padding_1: u32 = undefined,
-    _padding_2: u32 = undefined,
-
-    debug_variable_0: u32 = 0,
-    debug_variable_1: u32 = 0,
-    debug_mode: u32 = 0,
-    debug_level: u32 = 0,
-};
-
 pub fn Computer(comptime Cfg: type) type {
     return struct {
         const Self = @This();
@@ -84,24 +67,14 @@ pub fn Computer(comptime Cfg: type) type {
 
         compute_shader: wgpu.ShaderModule,
         scratch_reset_shader: wgpu.ShaderModule,
+        feedback_reset_shader: wgpu.ShaderModule,
 
-        uniform_bgl: wgpu.BindGroupLayout,
-        uniform_bg: wgpu.BindGroup,
-        uniform_buffer: wgpu.Buffer,
-        uniforms: Uniforms = .{
-            .dims = .{
-                @floatFromInt(@TypeOf(g.*).default_resolution[0]),
-                @floatFromInt(@TypeOf(g.*).default_resolution[1]),
-            },
-        },
-        rand: std.Random.Xoshiro256,
-
-        compute_textures_bgl: wgpu.BindGroupLayout,
-        compute_textures_bg: wgpu.BindGroup,
+        common: Common,
 
         compute_pipeline_layout: wgpu.PipelineLayout,
         compute_pipeline: wgpu.ComputePipeline,
         scratch_reset_pipeline: wgpu.ComputePipeline,
+        feedback_reset_pipeline: wgpu.ComputePipeline,
 
         pub fn init(map_bgl: wgpu.BindGroupLayout) !Self {
             const scratch_reset_shader_code: [:0]const u8 =
@@ -127,70 +100,30 @@ pub fn Computer(comptime Cfg: type) type {
             const scratch_reset_shader = try g.device.create_shader_module_wgsl("scratch reset shader", scratch_reset_shader_code);
             errdefer scratch_reset_shader.deinit();
 
+            const feedback_reset_shader_code: [:0]const u8 =
+                \\ @group(2) @binding(1)
+                \\ var<storage, read_write> feedback_buffer: array<u32>;
+                \\
+                \\ @compute
+                \\ @workgroup_size(4, 4, 4)
+                \\ fn cs_main(
+                \\     @builtin(global_invocation_id) global_id: vec3<u32>,
+                \\ ) {
+                \\     feedback_buffer[global_id.x] = 0u;
+                \\ }
+            ;
+
+            const feedback_reset_shader = try g.device.create_shader_module_wgsl("feedback buffer reset shader", feedback_reset_shader_code);
+            errdefer feedback_reset_shader.deinit();
+
             const compute_shader = try make_shader(g.alloc, Cfg);
             errdefer compute_shader.deinit();
 
-            const uniform_buffer = try g.device.create_buffer(wgpu.Buffer.Descriptor{
-                .label = "uniform buffer",
-                .usage = .{
-                    .uniform = true,
-                    .copy_dst = true,
-                },
-                .size = @sizeOf(Uniforms),
-            });
-            errdefer uniform_buffer.deinit();
-
-            const uniform_bgl = try g.device.create_bind_group_layout(wgpu.BindGroupLayout.Descriptor{
-                .label = "uniform bgl",
-                .entries = &.{
-                    wgpu.BindGroupLayout.Entry{
-                        .binding = 0,
-                        .visibility = .{ .compute = true, .vertex = true, .fragment = true },
-                        .layout = .{ .Buffer = .{
-                            .type = .Uniform,
-                        } },
-                    },
-                },
-            });
-            errdefer uniform_bgl.deinit();
-
-            const uniform_bg = try g.device.create_bind_group(wgpu.BindGroup.Descriptor{
-                .label = "compute uniform bg",
-                .layout = uniform_bgl,
-                .entries = &.{
-                    wgpu.BindGroup.Entry{
-                        .binding = 0,
-                        .resource = .{
-                            .Buffer = .{
-                                .buffer = uniform_buffer,
-                                .offset = 0,
-                                .size = @sizeOf(Uniforms),
-                            },
-                        },
-                    },
-                },
-            });
-            errdefer uniform_bg.deinit();
-
-            const compute_textures_bgl = try g.device.create_bind_group_layout(wgpu.BindGroupLayout.Descriptor{
-                .label = "compute textures' BGL",
-                .entries = &.{
-                    wgpu.BindGroupLayout.Entry{
-                        .binding = 0,
-                        .visibility = .{ .compute = true },
-                        .layout = .{ .StorageTexture = .{
-                            .view_dimension = .D2,
-                            .access = .WriteOnly,
-                            .format = .BGRA8Unorm,
-                        } },
-                    },
-                },
-            });
-            errdefer compute_textures_bgl.deinit();
+            const common = try Common.init();
 
             const compute_pipeline_layout = try g.device.create_pipeline_layout(wgpu.PipelineLayout.Descriptor{
                 .label = "compute pipeline layout",
-                .bind_group_layouts = &.{ uniform_bgl, compute_textures_bgl, map_bgl },
+                .bind_group_layouts = &.{ common.uniform_bgl, common.compute_textures_bgl, map_bgl },
             });
             errdefer compute_pipeline_layout.deinit();
 
@@ -216,21 +149,28 @@ pub fn Computer(comptime Cfg: type) type {
             });
             errdefer scratch_reset_pipeline.deinit();
 
+            const feedback_reset_pipeline = try g.device.create_compute_pipeline(.{
+                .label = "scratch reset pipeline",
+                .layout = compute_pipeline_layout,
+                .compute = .{
+                    .module = feedback_reset_shader,
+                    .entry_point = "cs_main",
+                    .constants = &.{},
+                },
+            });
+            errdefer feedback_reset_pipeline.deinit();
+
             var ret: Self = .{
                 .compute_shader = compute_shader,
                 .scratch_reset_shader = scratch_reset_shader,
+                .feedback_reset_shader = feedback_reset_shader,
 
-                .uniform_bgl = uniform_bgl,
-                .uniform_bg = uniform_bg,
-                .uniform_buffer = uniform_buffer,
-                .rand = std.Random.Xoshiro256.init(std.crypto.random.int(u64)),
-
-                .compute_textures_bgl = compute_textures_bgl,
-                .compute_textures_bg = .{},
+                .common = common,
 
                 .compute_pipeline_layout = compute_pipeline_layout,
                 .compute_pipeline = compute_pipeline,
                 .scratch_reset_pipeline = scratch_reset_pipeline,
+                .feedback_reset_pipeline = feedback_reset_pipeline,
             };
             errdefer ret.deinit();
 
@@ -244,52 +184,49 @@ pub fn Computer(comptime Cfg: type) type {
         }
 
         pub fn resize(self: *Self, dims: [2]usize) !void {
-            self.uniforms.dims = .{
-                @floatFromInt(dims[0]),
-                @floatFromInt(dims[1]),
-            };
-
-            const visualiser = g.get_thing("visualiser").? //
-                .get_concrete(VisualiserThing);
-
-            const compute_textures_bg = try g.device.create_bind_group(wgpu.BindGroup.Descriptor{
-                .label = "compute textures' BG",
-                .layout = self.compute_textures_bgl,
-                .entries = &.{
-                    wgpu.BindGroup.Entry{
-                        .binding = 0,
-                        .resource = .{ .TextureView = visualiser.visualisation_texture.view },
-                    },
-                },
-            });
-            errdefer compute_textures_bg.deinit();
-
-            self.compute_textures_bg.deinit();
-            self.compute_textures_bg = compute_textures_bg;
+            try self.common.resize(dims);
         }
 
-        pub fn do_gui(self: *Self) void {
-            if (imgui.begin("asd", null, .{})) {
-                _ = imgui.button("asdf", null);
+        pub fn do_options_ui(self: *Self) void {
+            self.common.do_options_ui();
+        }
 
-                _ = imgui.input_scalar(u32, "debug mode", &self.uniforms.debug_mode, 1, 1);
-                _ = imgui.input_scalar(u32, "debug level", &self.uniforms.debug_level, 1, 1);
-                _ = imgui.input_scalar(u32, "debug variable 0", &self.uniforms.debug_variable_0, 1, 1);
-                _ = imgui.input_scalar(u32, "debug variable 1", &self.uniforms.debug_variable_1, 1, 1);
+        pub fn render(self: *Self, delta_ns: u64, encoder: wgpu.CommandEncoder, onto: wgpu.TextureView) !void {
+            {
+                const origin = wgm.cast(i32, self.backend.origin_brickmap).?;
+                self.common.uniforms.custom = .{
+                    @bitCast(origin[0]),
+                    @bitCast(origin[1]),
+                    @bitCast(origin[2]),
+                    undefined,
+                };
             }
-            imgui.end();
-        }
+            try self.common.render(delta_ns, encoder, onto);
 
-        pub fn render(self: *Self, _: u64, encoder: wgpu.CommandEncoder, _: wgpu.TextureView) !void {
             const dims = g.window.get_size() catch @panic("g.window.get_size()");
 
-            const camera = g.get_thing("camera").?.get_concrete(CameraThing);
+            {
+                const feedback_reset_pass = try encoder.begin_compute_pass(.{
+                    .label = "feedback buffer reset pass",
+                });
+                defer feedback_reset_pass.deinit();
 
-            self.rand.fill(std.mem.asBytes(&self.uniforms.random_seed));
-            self.uniforms.transform = wgm.lossy_cast(f32, camera.cached_transform);
-            self.uniforms.inverse_transform = wgm.lossy_cast(f32, camera.cached_transform_inverse);
+                feedback_reset_pass.set_pipeline(self.feedback_reset_pipeline);
+                feedback_reset_pass.set_bind_group(0, self.common.uniform_bg, null);
+                feedback_reset_pass.set_bind_group(1, self.common.compute_textures_bg, null);
+                feedback_reset_pass.set_bind_group(2, self.backend.map_bg, null);
 
-            g.queue.write_buffer(self.uniform_buffer, 0, std.mem.asBytes(&self.uniforms));
+                const bytes: u32 = @intCast((self.backend.config.?.feedback_sz + 1) * @sizeOf(u32));
+                const wg_sz = 64;
+                const wg_ct = .{
+                    (bytes + wg_sz - 1) / wg_sz,
+                    1,
+                    1,
+                };
+                feedback_reset_pass.dispatch_workgroups(wg_ct);
+
+                feedback_reset_pass.end();
+            }
 
             {
                 const scratch_reset_pass = try encoder.begin_compute_pass(.{
@@ -298,8 +235,8 @@ pub fn Computer(comptime Cfg: type) type {
                 defer scratch_reset_pass.deinit();
 
                 scratch_reset_pass.set_pipeline(self.scratch_reset_pipeline);
-                scratch_reset_pass.set_bind_group(0, self.uniform_bg, null);
-                scratch_reset_pass.set_bind_group(1, self.compute_textures_bg, null);
+                scratch_reset_pass.set_bind_group(0, self.common.uniform_bg, null);
+                scratch_reset_pass.set_bind_group(1, self.common.compute_textures_bg, null);
                 scratch_reset_pass.set_bind_group(2, self.backend.map_bg, null);
 
                 const gd = wgm.cast(u32, self.backend.config.?.grid_dimensions).?;
@@ -322,8 +259,8 @@ pub fn Computer(comptime Cfg: type) type {
                 defer compute_pass.deinit();
 
                 compute_pass.set_pipeline(self.compute_pipeline);
-                compute_pass.set_bind_group(0, self.uniform_bg, null);
-                compute_pass.set_bind_group(1, self.compute_textures_bg, null);
+                compute_pass.set_bind_group(0, self.common.uniform_bg, null);
+                compute_pass.set_bind_group(1, self.common.compute_textures_bg, null);
                 compute_pass.set_bind_group(2, self.backend.map_bg, null);
 
                 const wg_sz: [2]usize = .{ 8, 8 };

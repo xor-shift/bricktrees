@@ -286,13 +286,6 @@ pub fn Fat(comptime IFaceArg: type) type {
         else => .{ IFaceArg, true, false },
     };
 
-    switch (@typeInfo(_IFace)) {
-        .Struct => if (!@hasDecl(_IFace, "DynStatic")) {
-            @compileError(std.fmt.comptimePrint("{any} is not a virtual type", .{_IFace}));
-        },
-        else => @compileError(std.fmt.comptimePrint("{any} is not a supported type", .{_IFace})),
-    }
-
     _ = _is_ptr;
 
     return struct {
@@ -307,6 +300,13 @@ pub fn Fat(comptime IFaceArg: type) type {
         vtable_ptr: [*]const VTableEntry,
 
         pub fn init(arg: anytype) Self {
+            switch (@typeInfo(_IFace)) {
+                .Struct => if (!@hasDecl(_IFace, "DynStatic")) {
+                    @compileError(std.fmt.comptimePrint("{any} is not a virtual type", .{_IFace}));
+                },
+                else => @compileError(std.fmt.comptimePrint("{any} is not a supported type", .{_IFace})),
+            }
+
             const T = @TypeOf(arg);
             if (@typeInfo(T) != .Pointer) {
                 @compileError("fat pointers must be initialized by pointers to concrete types");

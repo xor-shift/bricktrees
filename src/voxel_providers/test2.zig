@@ -1,10 +1,11 @@
 const std = @import("std");
 
 const qoi = @import("qoi");
+const qov = @import("qov");
 const wgm = @import("wgm");
 
-const PackedVoxel = @import("../voxel.zig").PackedVoxel;
-const Voxel = @import("../voxel.zig").Voxel;
+const PackedVoxel = qov.PackedVoxel;
+const Voxel = qov.Voxel;
 
 const VoxelProvider = @import("../VoxelProvider.zig");
 

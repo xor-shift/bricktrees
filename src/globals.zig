@@ -63,10 +63,11 @@ tick_alloc: std.mem.Allocator = undefined,
 thing_store: Things,
 
 backend_config: IBackend.BackendConfig = .{
-    .desied_view_volume_size = .{ 2048, 2048, 2048 },
+    .desied_view_volume_size = .{ 1024, 256, 1024 },
 },
 selected_backend: usize = std.math.maxInt(usize),
 queued_backend_selection: usize = 17,
+//queued_backend_selection: usize = 0,
 
 const Self = @This();
 
@@ -194,14 +195,14 @@ pub fn time(self: *Self) u64 {
 pub fn new_frame(self: *Self) void {
     defer self.frame_no += 1;
 
+    self.frame_alloc = self.frame_ra.rotate();
+    self.biframe_alloc = self.biframe_ra.rotate();
+
     if (self.queued_backend_selection != self.selected_backend) {
         self.selected_backend = self.queued_backend_selection;
         self.set_backend(self.queued_backend_selection);
         self.backend().?.d("configure", .{self.backend_config}) catch @panic("");
     }
-
-    self.frame_alloc = self.frame_ra.rotate();
-    self.biframe_alloc = self.biframe_ra.rotate();
 }
 
 pub fn do_resize(self: *Self, dims: [2]usize) !void {
@@ -226,7 +227,9 @@ pub fn backend(self: *Self) ?dyn.Fat(*IBackend) {
 }
 
 const backend_names: []const [:0]const u8 = &.{
-    // 0
+    "SVOs",
+
+    // 0 + 1
     "3bpa brickmap",
     "4bpa brickmap",
     "5bpa brickmap",
@@ -298,31 +301,33 @@ fn set_backend(self: *Self, no: usize) void {
     }.aufruf;
 
     const the_backend = switch (no) {
-        0 => mk_vanilla(3),
-        1 => mk_vanilla(4),
-        2 => mk_vanilla(5),
-        3 => mk_vanilla(6),
+        0 => dyn.Fat(*IThing).init(@import("backend/svo/Backend.zig").init() catch @panic("")),
 
-        4 => mk_tree(u8, 3, .raster, false),
-        5 => mk_tree(u8, 4, .raster, false),
-        6 => mk_tree(u8, 5, .raster, false),
-        7 => mk_tree(u8, 6, .raster, false),
+        1 => mk_vanilla(3),
+        2 => mk_vanilla(4),
+        3 => mk_vanilla(5),
+        4 => mk_vanilla(6),
 
-        8 => mk_tree(u8, 3, .llm1, false),
-        9 => mk_tree(u8, 4, .llm1, false),
-        10 => mk_tree(u8, 5, .llm1, false),
-        11 => mk_tree(u8, 6, .llm1, false),
-        12 => mk_tree(u8, 3, .llm1, true),
-        13 => mk_tree(u8, 4, .llm1, true),
-        14 => mk_tree(u8, 5, .llm1, true),
-        15 => mk_tree(u8, 6, .llm1, true),
+        5 => mk_tree(u8, 3, .raster, false),
+        6 => mk_tree(u8, 4, .raster, false),
+        7 => mk_tree(u8, 5, .raster, false),
+        8 => mk_tree(u8, 6, .raster, false),
 
-        16 => mk_tree(u64, 4, .raster, false),
-        17 => mk_tree(u64, 6, .raster, false),
-        18 => mk_tree(u64, 8, .raster, false),
-        19 => mk_tree(u64, 4, .llm1, false),
-        20 => mk_tree(u64, 6, .llm1, false),
-        21 => mk_tree(u64, 8, .llm1, false),
+        9 => mk_tree(u8, 3, .llm1, false),
+        10 => mk_tree(u8, 4, .llm1, false),
+        11 => mk_tree(u8, 5, .llm1, false),
+        12 => mk_tree(u8, 6, .llm1, false),
+        13 => mk_tree(u8, 3, .llm1, true),
+        14 => mk_tree(u8, 4, .llm1, true),
+        15 => mk_tree(u8, 5, .llm1, true),
+        16 => mk_tree(u8, 6, .llm1, true),
+
+        17 => mk_tree(u64, 4, .raster, false),
+        18 => mk_tree(u64, 6, .raster, false),
+        19 => mk_tree(u64, 8, .raster, false),
+        20 => mk_tree(u64, 4, .llm1, false),
+        21 => mk_tree(u64, 6, .llm1, false),
+        22 => mk_tree(u64, 8, .llm1, false),
 
         else => @panic(""),
     };
@@ -348,7 +353,7 @@ pub fn resize(self: *Self, dims: [2]usize) !void {
 pub fn do_gui(self: *Self) !void {
     imgui.c.igShowMetricsWindow(null);
 
-    if (imgui.begin("backend", null, .{})) {
+    if (imgui.begin("backend", null, .{})) outer: {
         if (imgui.c.igBeginCombo("backend selector", backend_names[self.selected_backend], 0)) {
             for (backend_names, 0..) |backend_name, i| {
                 if (!imgui.c.igSelectable_Bool(
@@ -363,6 +368,26 @@ pub fn do_gui(self: *Self) !void {
             }
             imgui.c.igEndCombo();
         }
+
+        const backend_thing = if (self.get_thing("backend")) |v| v else break :outer;
+        const cur_backend = if (backend_thing.sideways_cast(IBackend)) |v| v else break :outer;
+
+        _ = imgui.input_scalar(usize, "max buffer bytes", &self.backend_config.buffer_size, 1024, 1024 * 1024, .{});
+
+        imgui.c.igText("viewport dims");
+        imgui.c.igPushItemWidth(96);
+        _ = imgui.input_scalar(usize, "##viewport_width", &self.backend_config.desied_view_volume_size[0], 8, 64, .{});
+        imgui.c.igSameLine(0, 2);
+        _ = imgui.input_scalar(usize, "##viewport_height", &self.backend_config.desied_view_volume_size[1], 8, 64, .{});
+        imgui.c.igSameLine(0, 2);
+        _ = imgui.input_scalar(usize, "##viewport_depth", &self.backend_config.desied_view_volume_size[2], 8, 64, .{});
+        imgui.c.igPopItemWidth();
+
+        if (imgui.button("reconfigure", null)) {
+            cur_backend.d("configure", .{self.backend_config}) catch @panic("");
+        }
+
+        cur_backend.d("options_ui", .{});
     }
     imgui.end();
 }

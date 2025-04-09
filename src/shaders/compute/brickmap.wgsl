@@ -7,7 +7,7 @@ struct FeedbackData {
 
 @group(2) @binding(0) var brickgrid: texture_3d<u32>;
 @group(2) @binding(1) var<storage, read_write> feedback_buffer: FeedbackData;
-@group(2) @binding(2) var<storage, read_write> feedback_scratch: array<atomic<u32>>;
+@group(2) @binding(2) var<storage, read_write> visibility_map: array<atomic<u32>>;
 @group(2) @binding(3) var<storage, read> brickmaps: array<u32>;
 
 // X_dims can index into an array X
@@ -34,6 +34,10 @@ const nudge_factor = 1.00001;
 
 const k_bm_not_loaded: u32 = 0xFFFFFFFFu;
 const k_bm_unoccupied: u32 = 0xFFFFFFFEu;
+
+const k_vis_occluded: u32 = 0;
+const k_vis_visible: u32 = 1;
+const k_vis_requested_load: u32 = 2;
 
 var<private> g_give_feedback: bool = true;
 
@@ -249,30 +253,46 @@ fn iterator_check_oob(it: ptr<function, Iterator>) -> u32 {
 
 const voxel_level = {{no_levels}}u - 1u;
 
+fn euclidean_mod(v: i32, b: i32) -> i32 {
+    return (v + (-(v / b - 1)) * b) % b;
+}
+
 fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level: bool) -> bool {
     let brickgrid_dims = vec3<i32>(textureDimensions(brickgrid));
     let frame = iterator_cur_frame(it);
 
     if ((*it).level == 0u) {
-        let brickmap = textureLoad(brickgrid, frame.coords, 0).r;
+        let frame_coords_abs = frame.coords + uniforms.brickgrid_origin;
+        let brickgrid_dims_mod = vec3<i32>(
+            euclidean_mod(frame_coords_abs.x, brickgrid_dims.x),
+            euclidean_mod(frame_coords_abs.y, brickgrid_dims.y),
+            euclidean_mod(frame_coords_abs.z, brickgrid_dims.z),
+        );
+        let brickmap = textureLoad(brickgrid, brickgrid_dims_mod, 0).r;
+
+        let bg_idx = u32(
+            frame.coords.x +
+            frame.coords.y * brickgrid_dims.x +
+            frame.coords.z * brickgrid_dims.x * brickgrid_dims.y
+        );
 
         if (brickmap == k_bm_unoccupied) {
             return false;
         } else if (brickmap == k_bm_not_loaded) {
-            let bg_idx = u32(
-                frame.coords.x + 
-                frame.coords.y * brickgrid_dims.x +
-                frame.coords.z * brickgrid_dims.x * brickgrid_dims.y
+            let result = atomicCompareExchangeWeak(
+                &visibility_map[bg_idx],
+                k_vis_occluded,
+                k_vis_requested_load
             );
-
-            let result = atomicCompareExchangeWeak(&feedback_scratch[bg_idx], 0u, 1u);
-            if (result.exchanged) {
+            if (g_give_feedback && result.exchanged) {
                 let idx = atomicAdd(&feedback_buffer.next_index, 1u);
                 atomicStore(&feedback_buffer.data[idx], bg_idx);
                 g_give_feedback = false;
             }
 
             return false;
+        } else {
+            atomicStore(&visibility_map[bg_idx], k_vis_visible);
         }
 
         (*it).current_brickmap = brickmap;

@@ -177,6 +177,26 @@ fn ArithmeticResult(comptime Lhs: type, comptime Rhs: type) type {
 
 // glorified macros
 const binary_ops = struct {
+    const max = struct {
+        inline fn scalar(lhs: anytype, rhs: anytype) @TypeOf(@max(lhs, rhs)) {
+            return @max(lhs, rhs);
+        }
+
+        inline fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
+            return @max(lhs, rhs);
+        }
+    };
+
+    const min = struct {
+        inline fn scalar(lhs: anytype, rhs: anytype) @TypeOf(@min(lhs, rhs)) {
+            return @min(lhs, rhs);
+        }
+
+        inline fn simd(comptime T: type, comptime w: usize, lhs: @Vector(w, T), rhs: @Vector(w, T)) @Vector(w, T) {
+            return @min(lhs, rhs);
+        }
+    };
+
     const add = struct {
         inline fn scalar(lhs: anytype, rhs: anytype) @TypeOf(lhs + rhs) {
             return lhs + rhs;
@@ -296,6 +316,14 @@ fn bop(comptime Op: type, lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(l
     return bopvs(Op, H, vector, @as(H.T, scalar));
 }
 
+pub fn min(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
+    return bop(binary_ops.min, lhs, rhs);
+}
+
+pub fn max(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
+    return bop(binary_ops.max, lhs, rhs);
+}
+
 pub fn add(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
     return bop(binary_ops.add, lhs, rhs);
 }
@@ -313,6 +341,14 @@ pub fn mulew(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(
 /// division.
 pub fn div(lhs: anytype, rhs: anytype) ArithmeticResult(@TypeOf(lhs), @TypeOf(rhs)) {
     return bop(binary_ops.div, lhs, rhs);
+}
+
+pub fn divide_round_up(v: anytype, align_to: anytype) ArithmeticResult(@TypeOf(v), @TypeOf(align_to)) {
+    return div(sub(add(v, align_to), 1), align_to);
+}
+
+pub fn align_up(v: anytype, align_to: anytype) ArithmeticResult(@TypeOf(v), @TypeOf(align_to)) {
+    return mulew(divide_round_up(v, align_to), align_to);
 }
 
 test div {
@@ -561,4 +597,52 @@ pub fn abs(comptime T: type, m: anytype) Canonical(Matrix(T, He(@TypeOf(m)).rows
     for (0..H.rows * H.cols) |i| H.fp(&ret)[i] = @abs(HM.cfp(&m)[i]);
 
     return ret;
+}
+
+pub fn to_idx(coords: anytype, dims: @TypeOf(coords)) He(@TypeOf(coords)).T {
+    const T = @TypeOf(coords);
+    const H = He(T);
+
+    if (H.cols != 1) {
+        @compileError("to_idx can only be used on vectors");
+    }
+
+    switch (@typeInfo(H.T)) {
+        .Int => |v| if (v.signedness != .unsigned) {
+            @compileError("to_idx can only be used on vectors consisting of unsigned integers");
+        },
+        else => @compileError("to_idx can only be used on integer vectors"),
+    }
+
+    var mult: H.T = 1;
+    var ret: H.T = 0;
+    for (0..H.rows) |i| {
+        ret += mult * H.get(&coords, i, 0);
+        mult *= H.get(&dims, i, 0);
+    }
+
+    return ret;
+}
+
+test to_idx {
+    try std.testing.expectEqual(1, to_idx(@as(usize, 1), 1));
+    try std.testing.expectEqual(2 + 3 * 7 + 5 * 7 * 11, to_idx([_]usize{ 2, 3, 5 }, [_]usize{ 7, 11, 13 }));
+}
+
+pub fn from_idx(idx: anytype, dims: anytype) @TypeOf(dims) {
+    const T = @TypeOf(dims);
+    const H = He(T);
+
+    var ret: T = undefined;
+    var v: H.T = idx;
+    for (0..H.rows) |i| {
+        ret[i] = v % dims[i];
+        v /= dims[i];
+    }
+
+    return ret;
+}
+
+test from_idx {
+    try std.testing.expectEqual([_]usize{ 2, 3, 5 }, from_idx(2 + 3 * 7 + 5 * 7 * 11, [_]usize{ 7, 11, 13 }));
 }

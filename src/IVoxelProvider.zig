@@ -3,11 +3,24 @@ const std = @import("std");
 const dyn = @import("dyn");
 const wgm = @import("wgm");
 
-const PackedVoxel = @import("voxel.zig").PackedVoxel;
+const wgpu = @import("gfx").wgpu;
+
+const PackedVoxel = @import("qov").PackedVoxel;
 
 const Self = @This();
 
 pub const DynStatic = dyn.IFaceStuff(Self);
+
+pub const RegionStatus = enum {
+    empty,
+    want_draw,
+    want_redraw,
+};
+
+pub const DrawKind = enum {
+    cpu,
+    gpu,
+};
 
 /// Guaranteed to be called from the render thread.
 ///
@@ -17,59 +30,61 @@ pub fn voxel_draw_start(_: dyn.Fat(*Self)) void {}
 
 pub fn voxel_draw_end(_: dyn.Fat(*Self)) void {}
 
-/// Might be called concurrently
-///
-/// This function should return true in the following circumstances:
-/// - The given range is _currently_ occupied by the object or objects this provider represents
-pub fn should_draw_voxels(_: dyn.Fat(*Self), range: [2][3]isize) bool {
+pub fn status_for_region(_: dyn.Fat(*Self), range: VoxelRange) RegionStatus {
     _ = range;
-    return true;
+    return .want_draw;
 }
 
-/// Might be called concurrently
-///
-/// This function should return true in the following circumstances:
-/// - The given range is currently occupied _AND_ used not to be occupied during the previous render
-/// - The given range is not occupied _AND_ used to be occupied during the previous render
-/// - The given range was occupied, is occupied, and the contents of it changed since the previous render
-pub fn should_redraw_voxels(_: dyn.Fat(*Self), range: [2][3]isize) bool {
+pub fn draw_kind(_: dyn.Fat(*Self), range: VoxelRange) DrawKind {
     _ = range;
-    return false;
+    return .cpu;
 }
 
-/// Might be called concurrently
-pub const draw_voxels = fn (_: dyn.Fat(*Self), range: [2][3]isize, storage: []PackedVoxel) void;
+pub const VoxelRange = struct {
+    origin: [3]isize,
+    volume: [3]usize,
+};
 
-pub fn overlap_info(draw_range: [2][3]isize, model_range: [2][3]isize) ?struct {
-    overlap_size: [3]usize,
-    range_size: [3]usize,
-    model_origin: [3]usize,
-    draw_origin: [3]usize,
-} {
-    const range_size = wgm.cast(usize, wgm.sub(draw_range[1], draw_range[0])).?;
+/// Might be called concurrently.
+/// Range is inclusive.
+pub const draw_voxels = fn (_: dyn.Fat(*Self), range: VoxelRange, storage: []PackedVoxel) void;
 
-    const overlapping_range: [2][3]isize = .{
-        .{
-            @max(draw_range[0][0], model_range[0][0]),
-            @max(draw_range[0][1], model_range[0][1]),
-            @max(draw_range[0][2], model_range[0][2]),
-        },
-        .{
-            @min(draw_range[1][0], model_range[1][0]),
-            @min(draw_range[1][1], model_range[1][1]),
-            @min(draw_range[1][2], model_range[1][2]),
-        },
-    };
+pub const OverlapInfo = struct {
+    local_origin: [3]usize,
+    global_origin: [3]isize,
+    volume: [3]usize,
+};
 
-    const overlap_size = wgm.cast(usize, wgm.sub(overlapping_range[1], overlapping_range[0])) orelse return null;
+pub fn overlap_info(draw_range: VoxelRange, model_range: VoxelRange) ?OverlapInfo {
+    if (wgm.compare(.some, draw_range.volume, .equal, [_]usize{0} ** 3)) return null;
+    if (wgm.compare(.some, model_range.volume, .equal, [_]usize{0} ** 3)) return null;
 
-    const model_offset = wgm.cast(usize, wgm.sub(overlapping_range[0], model_range[0])).?;
-    const in_region_offset = wgm.cast(usize, wgm.sub(overlapping_range[0], draw_range[0])).?;
+    const global_origin = wgm.max(draw_range.origin, model_range.origin);
+
+    const draw_max = wgm.add(draw_range.origin, wgm.cast(isize, wgm.sub(draw_range.volume, 1)).?);
+    const model_max = wgm.add(model_range.origin, wgm.cast(isize, wgm.sub(model_range.volume, 1)).?);
+    const true_max = wgm.min(draw_max, model_max);
+    const volume = wgm.cast(usize, wgm.add(wgm.sub(true_max, global_origin), 1)) orelse return null;
+
+    if (wgm.compare(.some, volume, .equal, [_]usize{0} ** 3)) return null;
 
     return .{
-        .overlap_size = overlap_size,
-        .range_size = range_size,
-        .model_origin = model_offset,
-        .draw_origin = in_region_offset,
+        .local_origin = wgm.cast(usize, wgm.sub(global_origin, model_range.origin)).?,
+        .global_origin = global_origin,
+        .volume = volume,
     };
+}
+
+test overlap_info {
+    try std.testing.expectEqual(OverlapInfo{
+        .local_origin = .{ 0, 0, 2 },
+        .global_origin = .{ 1, 2, 3 },
+        .volume = .{ 2, 3, 1 }, // 2 4 3 incl.
+    }, overlap_info(.{
+        .origin = .{ 1, 2, 3 },
+        .volume = .{ 2, 3, 5 }, // 2 4 7 incl.
+    }, .{
+        .origin = .{ 1, 2, 1 },
+        .volume = .{ 5, 3, 3 }, // 5 4 3 incl.
+    }));
 }

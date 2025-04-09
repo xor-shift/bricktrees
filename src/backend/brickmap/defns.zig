@@ -1,53 +1,5 @@
 const scene_config = @import("scene_config");
 
-pub const Config = struct {
-    sc: scene_config.SceneConfig,
-
-    Brickmap: type,
-    BricktreeStorage: type,
-    bricktree: type,
-
-    bytes_per_bricktree_buffer: usize,
-
-    pub fn from_scene_config(maybe_config: ?scene_config.SceneConfig) Config {
-        const c = if (maybe_config) |v| v else scene_config.scene_config;
-
-        const Brickmap = switch (c) {
-            .brickmap => |config| @import("brickmap.zig").Brickmap(config.bml_coordinate_bits),
-            .brickmap_u8_bricktree => |config| @import("brickmap.zig").Brickmap(config.base_config.bml_coordinate_bits),
-            .brickmap_u64_bricktree => |config| @import("brickmap.zig").Brickmap(config.base_config.bml_coordinate_bits),
-        };
-
-        const bricktree = switch (c) {
-            .brickmap => void,
-            .brickmap_u8_bricktree => @import("bricktree/u8.zig"),
-            .brickmap_u64_bricktree => @import("bricktree/u64.zig"),
-        };
-
-        const BricktreeStorage = switch (c) {
-            .brickmap => void,
-            .brickmap_u8_bricktree => [bricktree.tree_bits(Brickmap.depth) / 8]u8,
-            .brickmap_u64_bricktree => [bricktree.tree_bits(Brickmap.depth) / 64]u64,
-            // else => @compileError("scene type not supported"),
-        };
-
-        const bytes_per_bricktree_buffer: usize = switch (c) {
-            .brickmap => undefined,
-            .brickmap_u8_bricktree => bricktree.tree_bits(Brickmap.depth) / 8 + 3,
-            .brickmap_u64_bricktree => bricktree.tree_bits(Brickmap.depth) / 8,
-            // else => @compileError("scene type not supported"),
-        };
-
-        return .{
-            .sc = c,
-            .Brickmap = Brickmap,
-            .bricktree = bricktree,
-            .BricktreeStorage = BricktreeStorage,
-            .bytes_per_bricktree_buffer = bytes_per_bricktree_buffer,
-        };
-    }
-};
-
 pub const ConfigArgs = union(enum) {
     pub const CurveKind = enum {
         raster,

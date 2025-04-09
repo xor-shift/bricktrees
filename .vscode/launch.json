@@ -1,0 +1,11 @@
+{
+   "configurations": [
+       {
+           "type": "lldb",
+           "request": "launch",
+           "name": "debug",
+           "program": "${workspaceFolder}/zig-out/bin/vktest",
+           "cwd": "${workspaceFolder}/run/"
+       }
+   ]
+}

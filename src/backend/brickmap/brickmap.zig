@@ -1,7 +1,9 @@
 const std = @import("std");
 
-const Voxel = @import("../../voxel.zig").Voxel;
-const PackedVoxel = @import("../../voxel.zig").PackedVoxel;
+const qov = @import("qov");
+
+const Voxel = qov.Voxel;
+const PackedVoxel = qov.PackedVoxel;
 
 pub fn Brickmap(comptime depth_arg: usize) type {
     return struct {

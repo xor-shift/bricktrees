@@ -2,7 +2,7 @@ const std = @import("std");
 
 const root = @import("root");
 
-const SGR = @import("core").SGR;
+const SGR = @import("sgr");
 
 fn printf(comptime fmt: []const u8, args: anytype) void {
     std.fmt.format(std.io.getStdOut().writer(), fmt, args) catch {};

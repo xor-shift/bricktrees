@@ -11,6 +11,7 @@ fn link_to_wgpu_and_sdl(b: *std.Build, c: *std.Build.Step.Compile) void {
     c.addLibraryPath(b.path("thirdparty/wgpu-native/target/release/"));
     c.linkSystemLibrary("wgpu_native");
     c.linkLibC();
+    c.linkLibCpp();
 }
 
 // fuck you, ZLS
@@ -97,6 +98,8 @@ pub fn build(b: *std.Build) void {
         });
 
         ret.addIncludePath(b.path("thirdparty/tracy/public"));
+        ret.link_libc = true;
+        ret.link_libcpp = true;
 
         break :blk ret;
     };
@@ -107,14 +110,15 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const core = b.addModule("core", .{
-        .root_source_file = b.path("lib/core/root.zig"),
+    // don't ask
+    const sgr = b.addModule("sgr", .{
+        .root_source_file = b.path("lib/sgr/root.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    const qov = b.addModule("qov", .{
-        .root_source_file = b.path("lib/qov/root.zig"),
+    const core = b.addModule("core", .{
+        .root_source_file = b.path("lib/core/root.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -130,6 +134,18 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+
+    const qov = blk: {
+        const module = b.addModule("qov", .{
+            .root_source_file = b.path("lib/qov/root.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        module.addImport("core", core);
+        module.addImport("wgm", wgm);
+
+        break :blk module;
+    };
 
     const gfx = blk: {
         const gfx = b.addModule("gfx", .{
@@ -193,8 +209,57 @@ pub fn build(b: *std.Build) void {
         break :blk imgui;
     };
 
-    // executable
-    {
+    const ToBuild = packed struct {
+        tracer: bool,
+        voxeliser_sw: bool,
+        voxeliser_hw: bool,
+        tracer_tests: bool,
+        voxeliser_tests: bool,
+        lib_tests: bool,
+    };
+
+    const to_build: ToBuild = .{
+        // .tracer = optimize == .Debug,
+        .tracer = true,
+        .voxeliser_sw = true,
+        .voxeliser_hw = true,
+        .tracer_tests = optimize == .Debug,
+        .voxeliser_tests = true,
+        .lib_tests = true,
+    };
+
+    if (to_build.voxeliser_sw) {
+        const exe = b.addExecutable(.{
+            .name = "voxeliser_sw",
+            .root_source_file = b.path("voxeliser/software.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        exe.root_module.addImport("core", core);
+        exe.root_module.addImport("qov", qov);
+        exe.root_module.addImport("wgm", wgm);
+
+        b.installArtifact(exe);
+    }
+
+    if (to_build.voxeliser_hw) {
+        const exe = b.addExecutable(.{
+            .name = "voxeliser_hw",
+            .root_source_file = b.path("voxeliser/hardware.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        exe.root_module.addImport("core", core);
+        exe.root_module.addImport("qov", qov);
+        exe.root_module.addImport("wgm", wgm);
+        exe.root_module.addImport("gfx", gfx);
+
+        add_include_paths_for_zls(b, exe);
+
+        b.installArtifact(exe);
+    }
+
+    if (to_build.tracer) {
         const exe = b.addExecutable(.{
             .name = "vktest",
             .root_source_file = b.path("src/main.zig"),
@@ -229,14 +294,36 @@ pub fn build(b: *std.Build) void {
         run_step.dependOn(&run_cmd.step);
     }
 
-    // executable's tests
-    if (false) {
+    if (to_build.voxeliser_tests) {
+        const tests = b.addTest(.{
+            .root_source_file = b.path("voxeliser/software.zig"),
+            .test_runner = b.path("test_runner.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+
+        tests.root_module.addImport("sgr", sgr);
+
+        tests.root_module.addImport("core", core);
+        tests.root_module.addImport("qov", qov);
+        tests.root_module.addImport("wgm", wgm);
+
+        var run_tests = b.addRunArtifact(tests);
+        run_tests.has_side_effects = true;
+
+        test_step.dependOn(&run_tests.step);
+    }
+
+    if (to_build.tracer_tests) {
         const exe_tests = b.addTest(.{
             .root_source_file = b.path("src/main.zig"),
             .test_runner = b.path("test_runner.zig"),
             .target = target,
             .optimize = optimize,
         });
+
+        exe_tests.root_module.addImport("sgr", sgr);
+
         exe_tests.root_module.addImport("tracy", tracy);
         exe_tests.root_module.addImport("dyn", dyn);
         exe_tests.root_module.addImport("core", core);
@@ -255,25 +342,35 @@ pub fn build(b: *std.Build) void {
         test_step.dependOn(&run_exe_tests.step);
     }
 
-    // basic tests
-    inline for (.{ "dyn" }) |lib_name| {
+    const lib_list = .{
+        .{ "core", core },
+        .{ "dyn", dyn },
+        .{ "gfx", gfx },
+        .{ "imgui", imgui },
+        .{ "qoi", qoi },
+        .{ "qov", qov },
+        .{ "sgr", sgr },
+        .{ "tracy", tracy },
+        .{ "wgm", wgm },
+    };
+
+    if (to_build.lib_tests) inline for (lib_list) |lib_tuple| {
+        const lib_name = lib_tuple.@"0";
+
         const tests = b.addTest(.{
             .root_source_file = b.path(std.fmt.comptimePrint("lib/{s}/root.zig", .{lib_name})),
-            .test_runner = if (!std.mem.eql(u8, lib_name, "core")) b.path("test_runner.zig") else null,
+            .test_runner = if (!std.mem.eql(u8, lib_name, "sgr")) b.path("test_runner.zig") else null,
             .target = target,
             .optimize = optimize,
         });
 
-        if (!std.mem.eql(u8, lib_name, "core")) {
-            tests.root_module.addImport("core", core);
-        }
+        inline for (lib_list) |pair| if (!std.mem.eql(u8, lib_name, pair.@"0")) {
+            tests.root_module.addImport(pair.@"0", pair.@"1");
+        };
 
         var run_tests = b.addRunArtifact(tests);
         run_tests.has_side_effects = true;
 
         test_step.dependOn(&run_tests.step);
-    }
-
-    // inline for (library_names) |library_name| {
-    // }
+    };
 }
