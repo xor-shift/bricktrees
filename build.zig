@@ -225,7 +225,7 @@ pub fn build(b: *std.Build) void {
         .voxeliser_hw = true,
         .tracer_tests = optimize == .Debug,
         .voxeliser_tests = true,
-        .lib_tests = true,
+        .lib_tests = false,
     };
 
     if (to_build.voxeliser_sw) {

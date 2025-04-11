@@ -261,8 +261,10 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level:
     let brickgrid_dims = vec3<i32>(textureDimensions(brickgrid));
     let frame = iterator_cur_frame(it);
 
+    let brickgrid_origin = bitcast<vec4<i32>>(uniforms.custom).xyz;
+
     if ((*it).level == 0u) {
-        let frame_coords_abs = frame.coords + uniforms.brickgrid_origin;
+        let frame_coords_abs = frame.coords + brickgrid_origin;
         let brickgrid_dims_mod = vec3<i32>(
             euclidean_mod(frame_coords_abs.x, brickgrid_dims.x),
             euclidean_mod(frame_coords_abs.y, brickgrid_dims.y),

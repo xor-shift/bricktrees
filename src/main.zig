@@ -41,13 +41,23 @@ fn initialize_things(alloc: std.mem.Allocator) void {
     _ = g.thing_store.add_new_thing(VisualiserThing, "visualiser", .{});
 
     const EditorThing = @import("things/EditorThing.zig");
-    const sizes = .{
-        .{ 1024, 1024, 1024 }, // hariball 1024
-        .{ 1024, 246, 650 }, // conference
-        .{ 2048, 496, 1300 }, // conference
-        .{ 1860, 778, 1144 }, // sponza
-    };
-    _ = g.thing_store.add_new_thing(EditorThing, "editor", .{sizes[3]});
+    _ = g.thing_store.add_new_thing(EditorThing, "editor", .{.{ 64, 64, 64 }});
+
+    const BVoxProvider = @import("voxel_providers/BVoxProvider.zig");
+    const conv = struct{
+        fn aufruf(str: [*:0]const u8) []const u8 {
+            const idx = std.mem.indexOfSentinel(u8, 0, str);
+            return str[0..idx];
+        }
+    }.aufruf;
+    _ = g.thing_store.add_new_thing(BVoxProvider, "bvox voxel provider", .{
+        conv(std.os.argv[1]),
+        .{
+            std.fmt.parseInt(usize, conv(std.os.argv[2]), 10) catch unreachable,
+            std.fmt.parseInt(usize, conv(std.os.argv[3]), 10) catch unreachable,
+            std.fmt.parseInt(usize, conv(std.os.argv[4]), 10) catch unreachable,
+        },
+    });
 
     // const DemoProvider = @import("voxel_providers/test.zig");
     // _ = g.thing_store.add_new_thing(DemoProvider, "test voxel provider", .{});
@@ -245,4 +255,6 @@ test {
     std.testing.refAllDecls(@import("DependencyGraph.zig"));
 
     std.testing.refAllDecls(@import("IVoxelProvider.zig"));
+
+    std.testing.refAllDecls(@import("backend/svo/Backend.zig"));
 }

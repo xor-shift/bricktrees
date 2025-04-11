@@ -219,7 +219,7 @@ test "intersection regression" {
         const res = intersects_adjusted(f32, triangle);
         try std.testing.expectEqual(expected.isSet(i), res);
 
-        const fast_res = intersects_adjusted_fast(f32, triangle);
+        const fast_res = intersects_adjusted_fast(f32, triangle, false);
         try std.testing.expectEqual(res, fast_res);
 
         if (res) got.set(i);

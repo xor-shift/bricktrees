@@ -150,9 +150,9 @@ pub fn init(dims: [3]usize) !Self {
     errdefer gizmo_uniform_bg.deinit();
 
     const voxels = try g.alloc.alloc(PackedVoxel, dims[0] * dims[1] * dims[2]);
-    //@memset(voxels, PackedVoxel.air);
-    //voxels[32 * dims[1] * dims[0] + 32 * dims[0] + 32] = PackedVoxel.white;
-    {
+    @memset(voxels, PackedVoxel.air);
+    voxels[32 * dims[1] * dims[0] + 32 * dims[0] + 32] = PackedVoxel.white;
+    if (false) {
         var file = try std.fs.cwd().openFile("out.bvox", .{});
         defer file.close();
         _ = try file.readAll(std.mem.sliceAsBytes(voxels));

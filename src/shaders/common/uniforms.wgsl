@@ -20,6 +20,6 @@ struct Uniforms {
     debug_mode: u32,
     debug_level: u32,
 
-    brickgrid_origin: vec3<i32>,
-    _padding_0: u32,
+    custom: vec4<u32>,
 }
+

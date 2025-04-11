@@ -140,7 +140,7 @@ fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersectio
     var stack_ptr = 1u;
     stack[0u] = StackElement(
         /* node               */ 0u,
-        /* extents            */ VoxelExtents(vec3<u32>(0), vec3<u32>(1023)),
+        /* extents            */ VoxelExtents(vec3<u32>(0), vec3<u32>((1u << uniforms.custom[0]) - 1)),
         /* processed_bits     */ 0u,
         /* processed_children */ 0u,
     );
@@ -178,9 +178,6 @@ fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersectio
         debug_u32(3u, i, geo_child_idx);
         let is_leaf = ((leaf_mask >> geo_child_idx) & 1u) == 1u;
 
-        stack[stack_ptr - 1].processed_bits = geo_child_idx + 1u;
-        stack[stack_ptr - 1].processed_children += 1u;
-
         let split_for_child = get_split(frame.extents, geo_child_idx);
         var t_for_child: f32;
         let child_intersection = slab(
@@ -190,6 +187,16 @@ fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersectio
             vec3<f32>(split_for_child.last + vec3<u32>(1)),
             &t_for_child,
         );
+
+        let first_child_word = get_node(children_start + frame.processed_children);
+        let child_size = select(
+            select(1u, 2u, (first_child_word >> 16) == 0xFFFF),
+            1u,
+            is_leaf,
+        );
+
+        stack[stack_ptr - 1].processed_bits = geo_child_idx + 1u;
+        stack[stack_ptr - 1].processed_children += child_size;
 
         if (!child_intersection) {
             continue;
@@ -211,7 +218,7 @@ fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersectio
                 Statistics(),
             );
             continue;
-            // return true;
+            //return true;
         }
 
         stack[stack_ptr] = StackElement(
