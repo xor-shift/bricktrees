@@ -61,10 +61,10 @@ pub fn overlap_info(draw_range: VoxelRange, model_range: VoxelRange) ?OverlapInf
 
     const global_origin = wgm.max(draw_range.origin, model_range.origin);
 
-    const draw_max = wgm.add(draw_range.origin, wgm.cast(isize, wgm.sub(draw_range.volume, 1)).?);
-    const model_max = wgm.add(model_range.origin, wgm.cast(isize, wgm.sub(model_range.volume, 1)).?);
-    const true_max = wgm.min(draw_max, model_max);
-    const volume = wgm.cast(usize, wgm.add(wgm.sub(true_max, global_origin), 1)) orelse return null;
+    const draw_oote = wgm.add(draw_range.origin, wgm.cast(isize, draw_range.volume).?);
+    const model_oote = wgm.add(model_range.origin, wgm.cast(isize, model_range.volume).?);
+    const true_oote = wgm.min(draw_oote, model_oote);
+    const volume = wgm.cast(usize, wgm.sub(true_oote, global_origin)) orelse return null;
 
     if (wgm.compare(.some, volume, .equal, [_]usize{0} ** 3)) return null;
 

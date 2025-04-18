@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const OBJFile = @import("qov").OBJFile;
+const OBJFile = @import("obj").OBJFile;
 
 pub fn progress(elapsed_ns: u64, done: u64, total: u64) void {
     std.fmt.format(std.io.getStdOut().writer(), "{d}/{d} {d}s elapsed, {d}s remaining        \r", .{

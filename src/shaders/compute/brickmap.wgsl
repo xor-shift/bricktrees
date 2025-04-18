@@ -454,6 +454,7 @@ fn hit_check_coarse(
 ) -> u32 {
     var origin = origin_arg;
 
+    let brickgrid_origin = bitcast<vec4<i32>>(uniforms.custom).xyz;
     let brickgrid_dims = vec3<i32>(textureDimensions(brickgrid));
     let voxel_dims = vec3<i32>(brickmap_dims) * brickgrid_dims;
 
@@ -464,9 +465,15 @@ fn hit_check_coarse(
         }
 
         let brickmap_coords = voxel_coords / vec3<i32>(brickmap_dims);
+        let brickmap_coords_mod = vec3<i32>(
+            euclidean_mod(brickmap_coords.x + brickgrid_origin.x, brickgrid_dims.x),
+            euclidean_mod(brickmap_coords.y + brickgrid_origin.y, brickgrid_dims.y),
+            euclidean_mod(brickmap_coords.z + brickgrid_origin.z, brickgrid_dims.z),
+        );
+
         let bml_voxel_coords = voxel_coords - brickmap_coords * vec3<i32>(brickmap_dims);
 
-        let brickmap = textureLoad(brickgrid, brickmap_coords, 0).r;
+        let brickmap = textureLoad(brickgrid, brickmap_coords_mod, 0).r;
         if (brickmap >= k_bm_unoccupied) {
             continue;
         }

@@ -59,7 +59,7 @@ fn quasi_ao(p: vec3<f32>, n: vec3<f32>) -> f32 {
     return f32(occlusion) / (16 * 8);
 }
 
-fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32) -> f32 {
+fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32, step_ct: u32, step: f32) -> f32 {
     var occlusion: u32 = 0;
     for (var i = 0u; i < ray_ct; i++) {
         let direction_base = next_unit_vector();
@@ -68,10 +68,10 @@ fn stochastic_ao(p: vec3<f32>, n: vec3<f32>, ray_ct: u32) -> f32 {
             -direction_base,
             dot(direction_base, n) < 0,
         );
-        occlusion += hit_check_coarse(p, direction, 16u, 0.65);
+        occlusion += hit_check_coarse(p, direction, step_ct, step);
     }
 
-    return f32(occlusion) / f32(16u * ray_ct);
+    return f32(occlusion) / f32(step_ct * ray_ct);
 }
 
 fn minecraft_ao(n: vec3<f32>) -> f32 {
@@ -158,11 +158,12 @@ fn minecraft_ao(n: vec3<f32>) -> f32 {
     let c = -dot(n, ray.direction);
     let p = vec3<f32>(intersection.voxel_coords) + intersection.local_coords + n * 0.01;
 
-    //let mult = quasi_ao(p, n);
-    //let mult = stochastic_ao(p, n, 5u);
-    let mult = minecraft_ao(n);
+    // let mult = quasi_ao(p, n);
+    let mult = stochastic_ao(p, n, 5u, 16u, 0.65);
+    // let mult = minecraft_ao(n);
 
-    textureStore(texture_radiance, pixel, vec4<f32>(mat_color * mult, 1));
-    // textureStore(texture_radiance, pixel, vec4<f32>(-n, 1));
+    // textureStore(texture_radiance, pixel, vec4<f32>(vec3<f32>(0.8) * mult, 1));
+    textureStore(texture_radiance, pixel, vec4<f32>(vec3<f32>(0.8) * mult, 1));
+    // textureStore(texture_radiance, pixel, vec4<f32>(-n * 0.8, 1));
 }
 

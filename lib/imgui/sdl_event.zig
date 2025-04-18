@@ -82,6 +82,10 @@ pub fn translate_event(context: *c.ImGuiContext, ev: sdl.c.SDL_Event) void {
         sdl.c.SDL_EVENT_MOUSE_BUTTON_UP => if (translate_button(ev.button.button)) |b| c.ImGuiIO_AddMouseButtonEvent(io, b, false),
         sdl.c.SDL_EVENT_KEY_DOWN => if (translate_key(ev.key.scancode)) |k| c.ImGuiIO_AddKeyEvent(io, k, true),
         sdl.c.SDL_EVENT_KEY_UP => if (translate_key(ev.key.scancode)) |k| c.ImGuiIO_AddKeyEvent(io, k, false),
+        sdl.c.SDL_EVENT_TEXT_INPUT => {
+            std.log.debug("text: {s}", .{ev.text.text});
+            c.ImGuiIO_AddInputCharactersUTF8(io, ev.text.text);
+        },
 
         else => {},
     }

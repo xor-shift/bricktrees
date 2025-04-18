@@ -44,19 +44,19 @@ frame_no: usize = 0,
 
 frame_ra: RotatingArena(.{
     .no_pools = 1,
-    .bytes_per_pool = 32 * 1024 * 1024,
+    .bytes_per_pool = 8 * 1024 * 1024,
 }),
 frame_alloc: std.mem.Allocator = undefined,
 
 biframe_ra: RotatingArena(.{
     .no_pools = 2,
-    .bytes_per_pool = 128 * 1024 * 1024,
+    .bytes_per_pool = 8 * 1024 * 1024,
 }),
 biframe_alloc: std.mem.Allocator,
 
 tick_ra: RotatingArena(.{
     .no_pools = 1,
-    .bytes_per_pool = 16 * 1024 * 1024,
+    .bytes_per_pool = 8 * 1024 * 1024,
 }),
 tick_alloc: std.mem.Allocator = undefined,
 
@@ -66,8 +66,8 @@ backend_config: IBackend.BackendConfig = .{
     .desied_view_volume_size = .{ 1024, 256, 1024 },
 },
 selected_backend: usize = std.math.maxInt(usize),
-queued_backend_selection: usize = 17,
-// queued_backend_selection: usize = 0,
+// queued_backend_selection: usize = 17,
+queued_backend_selection: usize = 0,
 
 const Self = @This();
 
@@ -87,6 +87,7 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
     const window = try sdl.Window.init("test", dims);
     errdefer window.deinit();
     std.log.debug("window: {p}", .{window.handle});
+    _ = sdl.c.SDL_StartTextInput(window.handle);
 
     const surface = try window.get_surface(instance);
     errdefer surface.deinit();
@@ -376,7 +377,7 @@ pub fn do_gui(self: *Self) !void {
 
         imgui.c.igText("viewport dims");
         imgui.c.igPushItemWidth(96);
-        _ = imgui.input_scalar(usize, "##viewport_width", &self.backend_config.desied_view_volume_size[0], 8, 64, .{});
+        _ = imgui.input_scalar(usize, "##viewport_width", &self.backend_config.desied_view_volume_size[0], 8, 64, .{.chars_decimal = true});
         imgui.c.igSameLine(0, 2);
         _ = imgui.input_scalar(usize, "##viewport_height", &self.backend_config.desied_view_volume_size[1], 8, 64, .{});
         imgui.c.igSameLine(0, 2);

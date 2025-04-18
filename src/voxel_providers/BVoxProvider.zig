@@ -16,21 +16,43 @@ const Self = @This();
 
 pub const DynStatic = dyn.ConcreteStuff(@This(), .{ IThing, IVoxelProvider });
 
+const use_mmap = true;
+
 dims: [3]usize,
+
+mutex: std.Thread.Mutex = .{},
 file: std.fs.File,
+
+mapped: []align(std.mem.page_size) const u8,
 
 pub fn init(filename: []const u8, dims: [3]usize) !Self {
     const file = try std.fs.cwd().openFile(filename, .{});
 
+    const mapped_bytes: []align(std.mem.page_size) const u8 = if (use_mmap) try std.posix.mmap(
+        null,
+        dims[2] * dims[1] * dims[0] * 4,
+        std.posix.PROT.READ,
+        std.posix.system.MAP{ .TYPE = .PRIVATE, .ANONYMOUS = false },
+        file.handle,
+        0,
+    ) else &.{};
+    std.log.debug("{d}", .{mapped_bytes.len});
+
     return .{
         .dims = dims,
         .file = file,
+        .mapped = mapped_bytes,
     };
+}
+
+pub fn deinit(self: *Self) void {
+    if (use_mmap) std.posix.munmap(self.mapped);
+    self.file.close();
 }
 
 pub fn draw_voxels(self: *Self, range: IVoxelProvider.VoxelRange, storage: []PackedVoxel) void {
     const info = IVoxelProvider.overlap_info(range, .{
-        .origin = .{0} ** 3,
+        .origin = .{64} ** 3,
         .volume = self.dims,
     }) orelse return;
 
@@ -48,10 +70,20 @@ pub fn draw_voxels(self: *Self, range: IVoxelProvider.VoxelRange, storage: []Pac
         );
         const sl_idx = wgm.to_idx(sl_coords, range.volume);
 
-        self.file.seekTo(ml_idx * 4) catch unreachable;
         const output_to = storage[sl_idx .. sl_idx + words_to_read];
-        const read_bytes = self.file.readAll(std.mem.sliceAsBytes(output_to)) catch unreachable;
-        _ = read_bytes;
-        //if (read_bytes != words_to_read * 4) unreachable;
+
+        if (use_mmap) {
+            @memcpy(
+                std.mem.sliceAsBytes(output_to),
+                self.mapped[ml_idx * 4 .. (ml_idx + words_to_read) * 4],
+            );
+        } else {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+
+            self.file.seekTo(ml_idx * 4) catch unreachable;
+            const read_bytes = self.file.readAll(std.mem.sliceAsBytes(output_to)) catch unreachable;
+            _ = read_bytes;
+        }
     };
 }

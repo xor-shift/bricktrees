@@ -5,7 +5,7 @@ const wgm = @import("wgm");
 
 const common = @import("common.zig");
 
-const OBJFile = @import("qov").OBJFile;
+const OBJFile = @import("obj").OBJFile;
 
 test {
     std.testing.refAllDecls(common);

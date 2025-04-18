@@ -59,8 +59,8 @@ fn initialize_things(alloc: std.mem.Allocator) void {
         },
     });
 
-    // const DemoProvider = @import("voxel_providers/test.zig");
-    // _ = g.thing_store.add_new_thing(DemoProvider, "test voxel provider", .{});
+    const DemoProvider = @import("voxel_providers/test.zig");
+    _ = g.thing_store.add_new_thing(DemoProvider, "test voxel provider", .{});
 
     // const ObjProvider = @import("voxel_providers/ObjLoader.zig");
     // _ = g.thing_store.add_new_thing(ObjProvider, "obj voxeliser", .{"scenes/hairball/hairball.obj", .{0} ** 3});

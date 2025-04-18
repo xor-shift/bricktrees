@@ -147,6 +147,20 @@ pub fn build(b: *std.Build) void {
         break :blk module;
     };
 
+    const obj = blk: {
+        const module = b.addModule("obj", .{
+            .root_source_file = b.path("lib/obj/root.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        module.addImport("core", core);
+        module.addImport("wgm", wgm);
+        module.addImport("qov", qov);
+
+        break :blk module;
+    };
+
+
     const gfx = blk: {
         const gfx = b.addModule("gfx", .{
             .root_source_file = b.path("lib/gfx/root.zig"),
@@ -237,6 +251,7 @@ pub fn build(b: *std.Build) void {
         });
         exe.root_module.addImport("core", core);
         exe.root_module.addImport("qov", qov);
+        exe.root_module.addImport("obj", obj);
         exe.root_module.addImport("wgm", wgm);
 
         b.installArtifact(exe);
@@ -250,9 +265,10 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         });
         exe.root_module.addImport("core", core);
-        exe.root_module.addImport("qov", qov);
-        exe.root_module.addImport("wgm", wgm);
         exe.root_module.addImport("gfx", gfx);
+        exe.root_module.addImport("qov", qov);
+        exe.root_module.addImport("obj", obj);
+        exe.root_module.addImport("wgm", wgm);
 
         add_include_paths_for_zls(b, exe);
 
@@ -266,14 +282,15 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         });
-        exe.root_module.addImport("tracy", tracy);
-        exe.root_module.addImport("dyn", dyn);
         exe.root_module.addImport("core", core);
+        exe.root_module.addImport("dyn", dyn);
+        exe.root_module.addImport("gfx", gfx);
+        exe.root_module.addImport("imgui", imgui);
+        exe.root_module.addImport("obj", obj);
         exe.root_module.addImport("qoi", qoi);
         exe.root_module.addImport("qov", qov);
+        exe.root_module.addImport("tracy", tracy);
         exe.root_module.addImport("wgm", wgm);
-        exe.root_module.addImport("imgui", imgui);
-        exe.root_module.addImport("gfx", gfx);
         // link_to_wgpu_and_sdl(b, exe);
 
         exe.root_module.addImport("mustache", mustache_module);

@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const core = @import("core");
-const qov = @import("root.zig");
+const qov = @import("qov");
 const wgm = @import("wgm");
 
 const PackedVoxel = qov.PackedVoxel;
