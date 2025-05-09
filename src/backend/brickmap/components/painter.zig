@@ -1,10 +1,11 @@
 const std = @import("std");
 
+const core = @import("core");
 const dyn = @import("dyn");
 const qov = @import("qov");
 const wgm = @import("wgm");
 
-const curves = @import("../bricktree/curves.zig");
+const curves = core.curves;
 const worker_pool = @import("core").worker_pool;
 
 const PackedVoxel = qov.PackedVoxel;

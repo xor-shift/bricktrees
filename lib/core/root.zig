@@ -1,6 +1,7 @@
 const std = @import("std");
 
 pub const bit_utils = @import("bit_utils.zig");
+pub const curves = @import("curves.zig");
 const future = @import("future.zig");
 const rotating_arena = @import("rotating_arena.zig");
 pub const worker_pool = @import("worker_pool.zig");
@@ -14,6 +15,7 @@ pub const Ticker = @import("Ticker.zig");
 
 test {
     std.testing.refAllDecls(bit_utils);
+    std.testing.refAllDecls(curves);
     std.testing.refAllDecls(future);
     std.testing.refAllDecls(rotating_arena);
     std.testing.refAllDecls(worker_pool);

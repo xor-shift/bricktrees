@@ -44,7 +44,7 @@ fn initialize_things(alloc: std.mem.Allocator) void {
     _ = g.thing_store.add_new_thing(EditorThing, "editor", .{.{ 64, 64, 64 }});
 
     const BVoxProvider = @import("voxel_providers/BVoxProvider.zig");
-    const conv = struct{
+    const conv = struct {
         fn aufruf(str: [*:0]const u8) []const u8 {
             const idx = std.mem.indexOfSentinel(u8, 0, str);
             return str[0..idx];
@@ -117,6 +117,50 @@ fn deinitialize_things() void {
     g.do_deinit();
 }
 
+/// There are better approaches than this. I needed this and I needed it fast
+/// so here we are.
+pub const MedianThing = struct {
+    alloc: std.mem.Allocator,
+    window: []f64,
+    scratch: []f64,
+    ptr: usize = 0,
+
+    pub fn init(alloc: std.mem.Allocator, window_size: usize) !MedianThing {
+        const window = try alloc.alloc(f64, window_size);
+        errdefer alloc.free(window);
+
+        const scratch = try alloc.alloc(f64, window_size);
+        errdefer alloc.free(scratch);
+
+        return .{
+            .alloc = alloc,
+            .window = window,
+            .scratch = scratch,
+        };
+    }
+
+    pub fn deinit(self: MedianThing) void {
+        self.alloc.free(self.window);
+    }
+
+    pub fn median(self: MedianThing) f64 {
+        @memcpy(self.scratch, self.window);
+        std.mem.sort(f64, self.scratch, {}, std.sort.asc(f64));
+        return self.scratch[self.scratch.len / 2];
+    }
+
+    pub fn average(self: MedianThing) f64 {
+        var tally: f64 = 0;
+        for (self.window) |v| tally += v;
+        return tally / @as(f64, @floatFromInt(self.window.len));
+    }
+
+    pub fn add(self: *MedianThing, v: f64) void {
+        self.window[self.ptr % self.window.len] = v;
+        self.ptr += 1;
+    }
+};
+
 pub fn main() !void {
     tracy.thread_name("main");
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
@@ -185,6 +229,9 @@ pub fn main() !void {
     // );
     // defer ticker.stop();
 
+    var last_ft_out: u64 = g.time();
+    var ft_tracker = try MedianThing.init(alloc, 1024);
+
     var last_frame_start = g.time() - 16_500_000;
     outer: while (true) {
         while (try sdl.poll_event()) |ev| {
@@ -195,6 +242,8 @@ pub fn main() !void {
                 else => {},
             }
         }
+
+        try g.pre_frame();
 
         const current_texture = g.surface.get_current_texture() catch |e| {
             if (e == wgpu.Error.Outdated) {
@@ -213,8 +262,15 @@ pub fn main() !void {
         defer last_frame_start = frame_start;
 
         const frametime_ms = @as(f64, @floatFromInt(frametime_ns)) / std.time.ns_per_ms;
+        ft_tracker.add(frametime_ms);
+        if ((g.time() - last_ft_out) >= std.time.ns_per_s) {
+            last_ft_out = g.time();
+            //std.log.debug("{d}ms", .{ft_tracker.median()});
+        }
+        if ((ft_tracker.ptr % ft_tracker.window.len) == 0) {
+            std.fmt.format(std.io.getStdOut().writer(), "{d}ms\n", .{ft_tracker.average()}) catch {};
+        }
 
-        _ = frametime_ms;
         // std.log.debug("new frame after {d} ms", .{frametime_ms});
         g.new_frame();
 

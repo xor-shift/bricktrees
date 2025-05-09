@@ -1,10 +1,10 @@
-//! If, for any `n`, the bit depth of `coords[n]` exceeds `depth`, the behaviour
-//! is undefined. Likewise, if the bit depth of `index` exceeds `depth * 3`,
-//! the behaviour is undefined.
+//! If, for any `n`, the bit depth of `coords[n]` exceeds `depth`, the
+//! behaviour is undefined. Likewise, if the bit depth of `index` exceeds
+//! `depth * 3`, the behaviour is undefined.
 
 const std = @import("std");
 
-const bit_utils = @import("core").bit_utils;
+const bit_utils = @import("root.zig").bit_utils;
 
 pub const raster = struct {
     pub inline fn forward(comptime depth: usize, coords: [3]usize) usize {

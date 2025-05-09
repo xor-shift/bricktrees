@@ -47,6 +47,9 @@ global_origin: [3]f64 = .{0} ** 3,
 global_coords: [3]f64 = .{ 0, 40, 20 },
 look: [3]f64 = .{0} ** 3,
 
+gui_set_global_coords: [3]f64 = .{ 0, 40, 20 },
+gui_set_look: [3]f64 = .{0} ** 3,
+
 cached_global_transform: wgm.Matrix(f64, 4, 4) = undefined,
 cached_transform: wgm.Matrix(f64, 4, 4) = undefined,
 cached_transform_inverse: wgm.Matrix(f64, 4, 4) = undefined,
@@ -236,11 +239,6 @@ pub fn do_gui(self: *Self) !void {
             self.look[2],
         });
 
-        if (imgui.button("reset (fix NaNs)", null)) {
-            self.global_coords = .{0} ** 3;
-            self.look = .{0} ** 3;
-        }
-
         _ = imgui.input_slider(f64, "fov", &self.fov, 0, 90);
 
         _ = imgui.c.igCheckbox("enable recentering", &self.do_recenter);
@@ -248,6 +246,36 @@ pub fn do_gui(self: *Self) !void {
 
         _ = imgui.input_slider(f64, "slow speed", &self.speed_slow, 0.0, 10.0);
         _ = imgui.input_slider(f64, "fast speed", &self.speed_fast, 10.0, 400.0);
+
+        imgui.c.igPushItemWidth(64);
+        _ = imgui.input_scalar(f64, "##goto x", &self.gui_set_global_coords[0], null, null, .{});
+        imgui.c.igSameLine(0, 4);
+        _ = imgui.input_scalar(f64, "##goto y", &self.gui_set_global_coords[1], null, null, .{});
+        imgui.c.igSameLine(0, 4);
+        _ = imgui.input_scalar(f64, "##goto z", &self.gui_set_global_coords[2], null, null, .{});
+        imgui.c.igPopItemWidth();
+        if (imgui.button("set position", null)) {
+            self.global_coords = self.gui_set_global_coords;
+        }
+        imgui.c.igSameLine(0, 4);
+        if (imgui.button("copy from camera##copy_position", null)) {
+            self.gui_set_global_coords = self.global_coords;
+        }
+
+        imgui.c.igPushItemWidth(64);
+        _ = imgui.input_scalar(f64, "##set yaw", &self.gui_set_look[0], null, null, .{});
+        imgui.c.igSameLine(0, 4);
+        _ = imgui.input_scalar(f64, "##set pitch", &self.gui_set_look[1], null, null, .{});
+        imgui.c.igSameLine(0, 4);
+        _ = imgui.input_scalar(f64, "##set roll", &self.gui_set_look[1], null, null, .{});
+        imgui.c.igPopItemWidth();
+        if (imgui.button("set look", null)) {
+            self.look = self.gui_set_look;
+        }
+        imgui.c.igSameLine(0, 4);
+        if (imgui.button("copy from camera##copy_look", null)) {
+            self.gui_set_look = self.look;
+        }
     }
     imgui.end();
 }

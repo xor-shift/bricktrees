@@ -39,7 +39,7 @@ const k_vis_occluded: u32 = 0;
 const k_vis_visible: u32 = 1;
 const k_vis_requested_load: u32 = 2;
 
-var<private> g_give_feedback: bool = true;
+var<workgroup> g_give_feedback: bool;
 
 fn get_material(brickmap: u32, bl_coords: vec3<u32>) -> u32 {
     let g_offset = brickmap * brickmap_words;
@@ -142,16 +142,31 @@ struct LevelProps {
 fn get_level_props(level: u32) -> LevelProps {
     let brickgrid_dims = vec3<i32>(textureDimensions(brickgrid));
 
-{{#use_bricktrees}}
     // for 6:
     // 0: 64, brickgrid_dims * 1 ,  // brickgrid
     // 1: 16, brickgrid_dims * 4 , // tree level 0
     // 2: 4 , brickgrid_dims * 16, // tree level 1
     // 3: 1 , brickgrid_dims * 64  // voxel
-    return LevelProps(
-        i32(1) << (brickmap_depth - level * bricktree_level_depth),
-        brickgrid_dims * (i32(1) << (level * bricktree_level_depth)),
-    );
+{{#use_bricktrees}}
+    if (false) { // seems to be equally as fast
+        var arr1 = array<i32, 8>(1, 2, 4, 8, 16, 32, 64, 128);
+        var arr2 = array<i32, 8>(1, 4, 16, 64, 256, 1024, 4096, 16384);
+
+        let no_levels = 1u + brickmap_depth / bricktree_level_depth;
+
+        if ({{bricktree_width_log2}}u == 3u) {
+            return LevelProps(arr1[no_levels - level - 1], brickgrid_dims * arr1[level]);
+        } else if ({{bricktree_width_log2}}u == 6u) {
+            return LevelProps(arr2[no_levels - level - 1], brickgrid_dims * arr2[level]);
+        }
+
+        return LevelProps();
+    } else {
+        return LevelProps(
+            i32(1) << (brickmap_depth - level * bricktree_level_depth),
+            brickgrid_dims * (i32(1) << (level * bricktree_level_depth)),
+        );
+    }
 {{/use_bricktrees}}
 
 {{^use_bricktrees}}
@@ -424,6 +439,8 @@ fn iterator_iterate(it: ptr<function, Iterator>, i: u32) -> bool {
 }
 
 fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
+    g_give_feedback = true;
+
     let tree_length = power_sum(brickmap_depth, 3u) / 8 / 4;
 
     var iterator: Iterator;

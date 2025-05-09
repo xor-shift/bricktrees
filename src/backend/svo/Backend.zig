@@ -2,12 +2,10 @@ const std = @import("std");
 
 const dyn = @import("dyn");
 const qov = @import("qov");
+const svo = @import("svo");
 const wgm = @import("wgm");
 
 const wgpu = @import("gfx").wgpu;
-
-const svo = @import("old.zig");
-const util = @import("util.zig");
 
 const VisualiserThing = @import("../../things/VisualiserThing.zig");
 
@@ -50,7 +48,7 @@ origin: [3]f64 = .{0} ** 3,
 pub fn init() !*Self {
     const common = try Common.init();
 
-    const compute_shader = try g.device.create_shader_module_wgsl_from_file("SVO shader", "shaders/svo.wgsl", g.alloc);
+    const compute_shader = try g.device.create_shader_module_wgsl_from_file("SVO shader", "shaders/svo_variant.wgsl", g.alloc);
     errdefer compute_shader.deinit();
 
     const svo_bgl = try g.device.create_bind_group_layout(.{
@@ -66,35 +64,6 @@ pub fn init() !*Self {
         },
     });
     errdefer svo_bgl.deinit();
-
-    // const data = try make_sphere(g.alloc, 7, 16);
-    // defer g.alloc.free(data);
-    // const svo = try create_svo(u32, 7, data, 0, g.alloc);
-    // defer g.alloc.free(svo);
-
-    // const svo_buffer = try g.device.create_buffer(.{
-    //     .label = "SVO buffer",
-    //     .size = svo.len * @sizeOf(u32),
-    //     .usage = .{
-    //         .copy_dst = true,
-    //         .storage = true,
-    //     },
-    //     .mapped_at_creation = false,
-    // });
-    // errdefer svo_buffer.deinit();
-    // g.queue.write_buffer(svo_buffer, 0, std.mem.sliceAsBytes(svo));
-
-    // const svo_bg = try g.device.create_bind_group(.{
-    //     .label = "SVO bind group",
-    //     .layout = svo_bgl,
-    //     .entries = &.{
-    //         wgpu.BindGroup.Entry{
-    //             .binding = 0,
-    //             .resource = .{ .Buffer = .{ .buffer = svo_buffer } },
-    //         },
-    //     },
-    // });
-    // errdefer svo_bg.deinit();
 
     const compute_pipeline_layout = try g.device.create_pipeline_layout(.{
         .label = "compute pipeline layout",
@@ -194,27 +163,49 @@ fn regenerate_svo(self: *Self) !void {
     self.svo_bg.deinit();
     self.svo_buffer.deinit();
 
-    std.log.debug("a", .{});
-    const data = try util.make_sphere(g.alloc, 8, 64);
-    defer g.alloc.free(data);
-    std.log.debug("b", .{});
-    const svo_data = try svo.create_svo(u32, 8, data, 0, g.alloc);
-    defer g.alloc.free(svo_data);
-    std.log.debug("c", .{});
+    // const context: svo.misc.SphereGenerator = .{
+    //     .center = .{256} ** 3,
+    //     .radius = 256,
+    //     .material = PackedVoxel.white,
+    // };
 
-    const svo_buffer = try g.device.create_buffer(.{
-        .label = "SVO buffer",
-        .size = svo_data.len * @sizeOf(u32),
-        .usage = .{
-            .copy_dst = true,
-            .storage = true,
-        },
-        .mapped_at_creation = false,
-    });
-    errdefer svo_buffer.deinit();
+    // const svo_data = try svo.create_svo(
+    //     9,
+    //     4,
+    //     g.alloc,
+    //     context,
+    //     svo.misc.SphereGenerator.fun,
+    // );
+    // defer g.alloc.free(svo_data);
 
-    // g.queue.write_buffer(svo_buffer, 0, std.mem.sliceAsBytes(&[_]i32{0}));
-    g.queue.write_buffer(svo_buffer, 0, std.mem.sliceAsBytes(svo_data));
+    const svo_buffer = outer: {
+        const file = try std.fs.cwd().openFile("out.svo", .{});
+        defer file.close();
+
+        const svo_data = try std.posix.mmap(null, blk: {
+            const stat = try file.stat();
+            break :blk stat.size;
+        }, std.posix.PROT.READ, std.posix.system.MAP{
+            .TYPE = .PRIVATE,
+        }, file.handle, 0);
+        defer std.posix.munmap(svo_data);
+
+        const svo_buffer = try g.device.create_buffer(.{
+            .label = "SVO buffer",
+            .size = svo_data.len,
+            .usage = .{
+                .copy_dst = true,
+                .storage = true,
+            },
+            .mapped_at_creation = false,
+        });
+        errdefer svo_buffer.deinit();
+
+        // g.queue.write_buffer(svo_buffer, 0, std.mem.sliceAsBytes(&[_]i32{0}));
+        g.queue.write_buffer(svo_buffer, 0, std.mem.sliceAsBytes(svo_data));
+
+        break :outer svo_buffer;
+    };
 
     const svo_bg = try g.device.create_bind_group(.{
         .label = "SVO bind group",

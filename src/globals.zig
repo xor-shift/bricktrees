@@ -63,11 +63,16 @@ tick_alloc: std.mem.Allocator = undefined,
 thing_store: Things,
 
 backend_config: IBackend.BackendConfig = .{
-    .desied_view_volume_size = .{ 1024, 256, 1024 },
+    .desied_view_volume_size = .{ 2048 + 128, 1024 + 512, 2048 + 128 },
 },
 selected_backend: usize = std.math.maxInt(usize),
-// queued_backend_selection: usize = 17,
-queued_backend_selection: usize = 0,
+queued_backend_selection: usize = 17,
+//queued_backend_selection: usize = 0,
+
+resize_queued: bool = false,
+gui_resolution: [2]usize = .{ 0, 0 },
+
+screenshot_queued: bool = false,
 
 const Self = @This();
 
@@ -193,6 +198,17 @@ pub fn time(self: *Self) u64 {
     return self.clock.read();
 }
 
+pub fn pre_frame(self: *Self) !void {
+    if (self.resize_queued) {
+        self.resize_queued = false;
+        self.do_resize(self.gui_resolution) catch |e| {
+            std.log.err("got error while trying to process the queued resize: {s}", .{
+                @errorName(e),
+            });
+        };
+    }
+}
+
 pub fn new_frame(self: *Self) void {
     defer self.frame_no += 1;
 
@@ -207,6 +223,7 @@ pub fn new_frame(self: *Self) void {
 }
 
 pub fn do_resize(self: *Self, dims: [2]usize) !void {
+    try self.window.resize(dims);
     self.thing_store.process_graph("event_graph", "resize", .{dims});
 }
 
@@ -339,6 +356,7 @@ fn set_backend(self: *Self, no: usize) void {
 /// From IThing
 /// DO NOT CALL DIRECTLY
 pub fn resize(self: *Self, dims: [2]usize) !void {
+    self.gui_resolution = dims;
     try self.surface.configure(.{
         .device = self.device,
         .format = .BGRA8Unorm,
@@ -355,6 +373,25 @@ pub fn do_gui(self: *Self) !void {
     imgui.c.igShowMetricsWindow(null);
 
     if (imgui.begin("backend", null, .{})) outer: {
+        if (imgui.button("take screenshot", null)) {
+            self.screenshot_queued = true;
+
+            const VisualiserThing = @import("things/VisualiserThing.zig");
+            const visualiser = self.get_thing("visualiser").?.get_concrete(VisualiserThing);
+
+            _ = visualiser;
+        }
+
+        imgui.c.igPushItemWidth(96);
+        _ = imgui.input_scalar(usize, "##window width input", &self.gui_resolution[0], null, null, .{});
+        imgui.c.igSameLine(0, 2);
+        _ = imgui.input_scalar(usize, "##window height input", &self.gui_resolution[1], null, null, .{});
+        imgui.c.igPopItemWidth();
+        imgui.c.igSameLine(0, 2);
+        if (imgui.button("resize", null)) {
+            self.resize_queued = true;
+        }
+
         if (imgui.c.igBeginCombo("backend selector", backend_names[self.selected_backend], 0)) {
             for (backend_names, 0..) |backend_name, i| {
                 if (!imgui.c.igSelectable_Bool(
@@ -377,7 +414,7 @@ pub fn do_gui(self: *Self) !void {
 
         imgui.c.igText("viewport dims");
         imgui.c.igPushItemWidth(96);
-        _ = imgui.input_scalar(usize, "##viewport_width", &self.backend_config.desied_view_volume_size[0], 8, 64, .{.chars_decimal = true});
+        _ = imgui.input_scalar(usize, "##viewport_width", &self.backend_config.desied_view_volume_size[0], 8, 64, .{ .chars_decimal = true });
         imgui.c.igSameLine(0, 2);
         _ = imgui.input_scalar(usize, "##viewport_height", &self.backend_config.desied_view_volume_size[1], 8, 64, .{});
         imgui.c.igSameLine(0, 2);

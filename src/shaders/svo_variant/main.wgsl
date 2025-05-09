@@ -15,6 +15,8 @@ struct StackElement {
 
     children_start: u32,
     child_offsets: u32,
+
+    processed_children: u32,
 };
 
 fn make_stack_element(node_idx: u32, extents: VoxelExtents) -> StackElement {
@@ -30,8 +32,8 @@ fn make_stack_element(node_idx: u32, extents: VoxelExtents) -> StackElement {
         is_far,
     );
 
-    var offset_tracker = 0u;
     var child_offsets = 0u;
+    var offset_tracker = 0u;
 
     for (var i = 0u; i < 8u; i++) {
         let child_is_valid = ((valid >> i) & 1) != 0;
@@ -63,6 +65,8 @@ fn make_stack_element(node_idx: u32, extents: VoxelExtents) -> StackElement {
 
       children_start,
       child_offsets,
+
+      0,
     );
 }
 
@@ -182,29 +186,15 @@ fn get_node(idx: u32) -> u32 {
     return svo_buffer[idx];
 }
 
+var<private> g_traversal_order: array<u32, 8>;
+
 fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersection>) -> bool {
-    let svo_depth = uniforms.custom[0];
-    let root_extents = VoxelExtents(vec3<u32>(0), vec3<u32>((1u << svo_depth) - 1));
-
     var ray = ray_arg;
-    var t: f32;
-
-    {
-        let main_intersection = slab(
-            ray.origin,
-            ray.direction_reciprocals,
-            vec3<f32>(root_extents.first),
-            vec3<f32>(root_extents.last) + vec3<f32>(1),
-            &t,
-        );
-
-        if (!main_intersection) { return false; }
-
-        ray.origin += ray.direction + (t + 1.0001) * ray.direction;
-    }
+    var t = 0.0;
 
     var stack = array<StackElement, 16>();
     var stack_ptr = 1u;
+    let root_extents = VoxelExtents(vec3<u32>(0), vec3<u32>((1u << uniforms.custom[0]) - 1));
     stack[0u] = make_stack_element(0, root_extents);
 
     var i = 1u;
@@ -218,7 +208,7 @@ fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersectio
         if (frame.processed_children == 8) { stack_ptr -= 1u; continue; }
 
         stack[stack_ptr - 1].processed_children += 1u;
-        let child_no = frame.processed_children;
+        let child_no = g_traversal_order[frame.processed_children];
 
         let is_leaf = ((frame.flags >> (0 + child_no)) & 1) != 0;
         let is_valid = ((frame.flags >> (8 + child_no)) & 1) != 0;
@@ -263,6 +253,38 @@ fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersectio
     return false;
 }
 
+fn cbox(i: u32) -> vec3<f32> {
+    var hi = (vec3<u32>(i) & vec3<u32>(1u, 2u, 4u)) != vec3<u32>(0u);
+
+    return select(
+        vec3<f32>(-1.0),
+        vec3<f32>(1.0),
+        hi,
+    );
+}
+
+fn sort_swap(
+    values: ptr<function, array<f32, 8>>,
+    indices: ptr<function, array<u32, 8>>,
+    lhs: u32, rhs: u32
+) -> bool {
+    let lhsi = (*indices)[lhs];
+    let rhsi = (*indices)[rhs];
+
+    let lhsv = (*values)[lhsi];
+    let rhsv = (*values)[rhsi];
+
+    let do_swap = lhsv < rhsv;
+
+    let mini = select(lhsi, rhsi, do_swap);
+    let maxi = select(rhsi, lhsi, do_swap);
+
+    (*indices)[lhs] = mini;
+    (*indices)[rhs] = maxi;
+
+    return do_swap;
+}
+
 @compute @workgroup_size(8, 8, 1) fn cs_main(
     @builtin(global_invocation_id)   global_id: vec3<u32>,
     @builtin(workgroup_id)           workgroup_id: vec3<u32>,
@@ -288,6 +310,30 @@ fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersectio
     g_debug_level = uniforms.debug_level;
 
     let ray = generate_ray(pixel, uniforms.dims, uniforms.inverse_transform);
+    var distances: array<f32, 8>;
+    for (var i = 0u; i < 8u; i++) { distances[i] = -dot(cbox(i), ray.direction); }
+    var order = array<u32, 8>(5, 6, 2, 4, 1, 3, 7, 0);
+    // layer 0
+    sort_swap(&distances, &order, 0, 2); sort_swap(&distances, &order, 1, 3);
+    sort_swap(&distances, &order, 4, 6); sort_swap(&distances, &order, 5, 7);
+    // layer 1
+    sort_swap(&distances, &order, 0, 4); sort_swap(&distances, &order, 1, 5);
+    sort_swap(&distances, &order, 2, 6); sort_swap(&distances, &order, 3, 7);
+    // layer 2
+    sort_swap(&distances, &order, 0, 1); sort_swap(&distances, &order, 2, 3);
+    sort_swap(&distances, &order, 4, 5); sort_swap(&distances, &order, 6, 7);
+    // layer 3
+    sort_swap(&distances, &order, 2, 4); sort_swap(&distances, &order, 3, 5);
+    // layer 4
+    sort_swap(&distances, &order, 1, 4); sort_swap(&distances, &order, 3, 6);
+    // layer 5
+    sort_swap(&distances, &order, 1, 2); sort_swap(&distances, &order, 3, 4);
+    sort_swap(&distances, &order, 5, 6);
+    // ^ thanks, knuth
+
+    debug_u32(1u, 0u, order[uniforms.debug_variable_0]);
+    debug_f32(2u, 0u, distances[uniforms.debug_variable_0]);
+    g_traversal_order = order;
 
     var intersection: Intersection;
     let intersected = trace(pixel, ray, &intersection);

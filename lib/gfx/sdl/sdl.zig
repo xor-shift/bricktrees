@@ -92,7 +92,7 @@ pub const Window = struct {
     }
 
     pub fn resize(self: Window, dims: [2]usize) !void {
-        if (!c.SDL_SetWindowSize(self.handle, @intCast(dims.width()), @intCast(dims.height()))) {
+        if (!c.SDL_SetWindowSize(self.handle, @intCast(dims[0]), @intCast(dims[1]))) {
             log_error("SDL_SetWindowSize");
             return Error.Failed;
         }

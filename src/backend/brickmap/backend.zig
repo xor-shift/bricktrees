@@ -867,7 +867,6 @@ pub fn Backend(comptime Cfg: type) type {
         test {
             std.testing.refAllDecls(@import("bricktree/u8.zig"));
             std.testing.refAllDecls(@import("bricktree/u64.zig"));
-            std.testing.refAllDecls(@import("bricktree/curves.zig"));
         }
     };
 }

@@ -253,3 +253,120 @@ test unstuff_3_zeroes_left {
     try std.testing.expectEqual(0b100000000, f(@as(u27, 0b001000000000000000000000000)));
     try std.testing.expectEqual(0b100000000, f(@as(u27, 0b001110110110110110110110110)));
 }
+
+fn num_zeroes(values: []const u32) usize {
+    const vec_size = std.simd.suggestVectorLength(u32) orelse return std.mem.count(u32, values, &.{0});
+    const vec_align = vec_size * @sizeOf(u32);
+
+    var ret: usize = 0;
+
+    const start_excess = vec_size - (@intFromPtr(values.ptr) % vec_align) / @sizeOf(u32);
+    for (0..start_excess) |i| {
+        if (values[i] == 0) ret += 1;
+    }
+
+    const aligned: []align(vec_size * @sizeOf(u32)) const u32 = @alignCast(values[start_excess..]);
+    const no_vectors = aligned.len / vec_size;
+    const end_excess = aligned.len - (no_vectors * vec_size);
+
+    for (0..no_vectors) |i| {
+        const vec: *const @Vector(vec_size, u32) = @ptrCast(@alignCast(&aligned[i * vec_size]));
+
+        const all_zeroes: @Vector(vec_size, u32) = @splat(0);
+        const all_ones: @Vector(vec_size, u32) = @splat(1);
+
+        const zeroes = vec.* == all_zeroes;
+        const to_reduce = @select(u32, zeroes, all_ones, all_zeroes);
+        ret += @reduce(.Add, to_reduce);
+    }
+
+    for (0..end_excess) |i| {
+        if (values[no_vectors * vec_size + i] == 0) ret += 1;
+    }
+
+    return ret;
+}
+
+test num_zeroes {
+    var asd = [_]u32{1} ** 64;
+    asd[0] = 0;
+    asd[15] = 0;
+    asd[16] = 0;
+    asd[17] = 0;
+    asd[18] = 0;
+    asd[19] = 0;
+    asd[20] = 0;
+    asd[30] = 0;
+    try std.testing.expectEqual(8, num_zeroes(&asd));
+}
+
+// fn compress_lut_elem(mask: u8) u32 {
+//     var ret: u32 = 0;
+//     for (0..8) |j| {
+//         const i: u3 = @intCast(7 - j);
+//         if (((mask >> i) & 1) == 0) continue;
+//         ret <<= 4;
+//         ret |= @intCast(i);
+//     }
+//
+//     return ret;
+// }
+//
+// test compress_lut_elem {
+//     try std.testing.expectEqual(0x00007641, compress_lut_elem(0b11010010));
+// }
+//
+// const compress_lut = blk: {
+//     @setEvalBranchQuota(32768);
+//     var lut = [_]u32{undefined} ** 256;
+//     for (0..256) |i| lut[i] = compress_lut_elem(@intCast(i));
+//     break :blk lut;
+// };
+//
+// fn compress(comptime T: type, vec: @Vector(8, T), mask: u8) @Vector(8, T) {
+//     const lut_word = compress_lut[mask];
+//
+//     const t0: @Vector(8, u32) = @splat(lut_word);
+//     const t1: @Vector(8, u32) = .{
+//         0x0000000F,
+//         0x000000F0,
+//         0x00000F00,
+//         0x0000F000,
+//         0x000F0000,
+//         0x00F00000,
+//         0x0F000000,
+//         0xF0000000,
+//     };
+//     const t2 = t0 & t1;
+//     const t3: @Vector(8, u5) = .{ 0, 4, 8, 12, 16, 20, 24, 28 };
+//     const t4 = (t2 >> t3) & @as(@Vector(8, u32), @splat(7));
+//     const t5: @Vector(8, i32) = @intCast(t4);
+//
+//     return @shuffle(T, vec, undefined, t5);
+// }
+
+pub fn compress(comptime T: type, vec: @Vector(8, T), mask: u8) @Vector(8, T) {
+    // TODO: make this more efficient
+
+    var ret: @Vector(8, T) = @splat(undefined);
+    for (0..8) |i| {
+        const j: u3 = @intCast(7 - i);
+        if (((mask >> j) & 1) == 0) continue;
+        ret = @shuffle(T, ret, undefined, @Vector(8, i32){ 0, 0, 1, 2, 3, 4, 5, 6 });
+        ret[0] = vec[@intCast(j)];
+    }
+
+    return ret;
+}
+
+test compress {
+    try std.testing.expectEqual(
+        .{ 7, 2, 3, 4, 0, 0, 0, 0 },
+        @select(
+            u32,
+            [8]bool{ true, true, true, true, false, false, false, false },
+            compress(u32, .{ 0, 7, 1, 6, 2, 5, 3, 4 }, 0b11010010),
+            @as(@Vector(8, u32), @splat(0)),
+        ),
+    );
+}

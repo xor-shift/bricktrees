@@ -103,9 +103,6 @@ fn minecraft_ao(n: vec3<f32>) -> f32 {
     g_debug_mode = uniforms.debug_mode;
     g_debug_level = uniforms.debug_level;
 
-    // if (local_idx == 0) { g_give_feedback = true; }
-    // workgroupBarrier();
-
     if (false) {
         textureStore(texture_radiance, pixel, vec4<f32>(vec3<f32>(next_f32_uniform()), 1.0));
         return;
@@ -159,11 +156,12 @@ fn minecraft_ao(n: vec3<f32>) -> f32 {
     let p = vec3<f32>(intersection.voxel_coords) + intersection.local_coords + n * 0.01;
 
     // let mult = quasi_ao(p, n);
-    let mult = stochastic_ao(p, n, 5u, 16u, 0.65);
-    // let mult = minecraft_ao(n);
+    // let mult = stochastic_ao(p, n, 5u, 16u, 0.65);
+    let mult = minecraft_ao(n);
 
     // textureStore(texture_radiance, pixel, vec4<f32>(vec3<f32>(0.8) * mult, 1));
     textureStore(texture_radiance, pixel, vec4<f32>(vec3<f32>(0.8) * mult, 1));
+    textureStore(texture_radiance, pixel, vec4<f32>(mat_color * mult, 1));
     // textureStore(texture_radiance, pixel, vec4<f32>(-n * 0.8, 1));
 }
 

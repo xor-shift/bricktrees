@@ -147,6 +147,19 @@ pub fn build(b: *std.Build) void {
         break :blk module;
     };
 
+    const svo = blk: {
+        const module = b.addModule("svo", .{
+            .root_source_file = b.path("lib/svo/root.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        module.addImport("core", core);
+        module.addImport("qov", qov);
+        module.addImport("wgm", wgm);
+
+        break :blk module;
+    };
+
     const obj = blk: {
         const module = b.addModule("obj", .{
             .root_source_file = b.path("lib/obj/root.zig"),
@@ -159,7 +172,6 @@ pub fn build(b: *std.Build) void {
 
         break :blk module;
     };
-
 
     const gfx = blk: {
         const gfx = b.addModule("gfx", .{
@@ -227,6 +239,7 @@ pub fn build(b: *std.Build) void {
         tracer: bool,
         voxeliser_sw: bool,
         voxeliser_hw: bool,
+        svo_builder: bool,
         tracer_tests: bool,
         voxeliser_tests: bool,
         lib_tests: bool,
@@ -237,10 +250,26 @@ pub fn build(b: *std.Build) void {
         .tracer = true,
         .voxeliser_sw = true,
         .voxeliser_hw = true,
+        .svo_builder = true,
         .tracer_tests = optimize == .Debug,
         .voxeliser_tests = true,
-        .lib_tests = false,
+        .lib_tests = true,
     };
+
+    if (to_build.svo_builder) {
+        const exe = b.addExecutable(.{
+            .name = "svo_builder",
+            .root_source_file = b.path("voxeliser/svo_builder.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        exe.root_module.addImport("core", core);
+        exe.root_module.addImport("qov", qov);
+        exe.root_module.addImport("svo", svo);
+        exe.root_module.addImport("wgm", wgm);
+
+        b.installArtifact(exe);
+    }
 
     if (to_build.voxeliser_sw) {
         const exe = b.addExecutable(.{
@@ -289,6 +318,7 @@ pub fn build(b: *std.Build) void {
         exe.root_module.addImport("obj", obj);
         exe.root_module.addImport("qoi", qoi);
         exe.root_module.addImport("qov", qov);
+        exe.root_module.addImport("svo", svo);
         exe.root_module.addImport("tracy", tracy);
         exe.root_module.addImport("wgm", wgm);
         // link_to_wgpu_and_sdl(b, exe);
@@ -341,14 +371,16 @@ pub fn build(b: *std.Build) void {
 
         exe_tests.root_module.addImport("sgr", sgr);
 
-        exe_tests.root_module.addImport("tracy", tracy);
-        exe_tests.root_module.addImport("dyn", dyn);
         exe_tests.root_module.addImport("core", core);
+        exe_tests.root_module.addImport("dyn", dyn);
+        exe_tests.root_module.addImport("gfx", gfx);
+        exe_tests.root_module.addImport("imgui", imgui);
+        exe_tests.root_module.addImport("obj", obj);
         exe_tests.root_module.addImport("qoi", qoi);
         exe_tests.root_module.addImport("qov", qov);
+        exe_tests.root_module.addImport("svo", svo);
+        exe_tests.root_module.addImport("tracy", tracy);
         exe_tests.root_module.addImport("wgm", wgm);
-        exe_tests.root_module.addImport("imgui", imgui);
-        exe_tests.root_module.addImport("gfx", gfx);
         // link_to_wgpu_and_sdl(b, exe_tests);
 
         exe_tests.root_module.addImport("mustache", mustache_module);
@@ -369,6 +401,7 @@ pub fn build(b: *std.Build) void {
         .{ "sgr", sgr },
         .{ "tracy", tracy },
         .{ "wgm", wgm },
+        .{ "svo", svo },
     };
 
     if (to_build.lib_tests) inline for (lib_list) |lib_tuple| {

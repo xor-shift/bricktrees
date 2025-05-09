@@ -1,8 +1,9 @@
 const std = @import("std");
 
-const bit_utils = @import("core").bit_utils;
+const core = @import("core");
 
-const curves = @import("curves.zig");
+const bit_utils = core.bit_utils;
+const curves = core.curves;
 
 const Brickmap = @import("../brickmap.zig").Brickmap;
 
