@@ -36,7 +36,7 @@ pub const DynStatic = dyn.ConcreteStuff(@This(), .{IThing});
 
 speed_slow: f64 = 4.0,
 speed_fast: f64 = 40.0,
-do_recenter: bool = true,
+do_recenter: bool = false,
 do_streaming: bool = true,
 mouse_capture: bool = false,
 input_state: InputState = std.mem.zeroes(InputState),
@@ -260,6 +260,7 @@ pub fn do_gui(self: *Self) !void {
         imgui.c.igSameLine(0, 4);
         if (imgui.button("copy from camera##copy_position", null)) {
             self.gui_set_global_coords = self.global_coords;
+            std.log.err("{any}", .{self.gui_set_global_coords});
         }
 
         imgui.c.igPushItemWidth(64);
@@ -271,6 +272,7 @@ pub fn do_gui(self: *Self) !void {
         imgui.c.igPopItemWidth();
         if (imgui.button("set look", null)) {
             self.look = self.gui_set_look;
+            std.log.err("{any}", .{self.gui_set_look});
         }
         imgui.c.igSameLine(0, 4);
         if (imgui.button("copy from camera##copy_look", null)) {

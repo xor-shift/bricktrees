@@ -26,6 +26,23 @@ pub const default_resolution: [2]usize = .{ 1280, 720 };
 
 pub const DynStatic = dyn.ConcreteStuff(@This(), .{IThing});
 
+pub const TestSettings = struct {
+    resolution: [2]usize,
+    backend: usize,
+
+    filename: []const u8,
+    file_dims: [3]usize,
+
+    volume_center: [3]f64,
+    volume_dims: [3]usize,
+
+    camera_pos: [3]f64,
+    camera_look: [3]f64,
+};
+
+test_settings_parsed: std.json.Parsed(TestSettings),
+test_settings: TestSettings,
+
 clock_mutex: std.Thread.Mutex,
 clock: std.time.Timer,
 
@@ -63,11 +80,11 @@ tick_alloc: std.mem.Allocator = undefined,
 thing_store: Things,
 
 backend_config: IBackend.BackendConfig = .{
-    .desied_view_volume_size = .{ 2048 + 128, 1024 + 512, 2048 + 128 },
+    .desied_view_volume_size = .{ 2048, 1024 + 256, 2048 },
 },
 selected_backend: usize = std.math.maxInt(usize),
-queued_backend_selection: usize = 17,
-//queued_backend_selection: usize = 0,
+// queued_backend_selection: usize = 17,
+queued_backend_selection: usize = 0,
 
 resize_queued: bool = false,
 gui_resolution: [2]usize = .{ 0, 0 },
@@ -79,6 +96,10 @@ const Self = @This();
 /// Initializes just the WebGPU stuff.
 /// Assign to `g.gui` and then call `g.resize` after calling this.
 pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
+    var test_settings_reader = std.json.reader(alloc, std.io.getStdIn().reader());
+    defer test_settings_reader.deinit();
+    const test_settings_parsed = try std.json.parseFromTokenSource(TestSettings, alloc, &test_settings_reader, .{});
+
     try sdl.init(.{ .video = true });
     errdefer sdl.deinit();
 
@@ -145,6 +166,9 @@ pub fn init(dims: [2]usize, alloc: std.mem.Allocator) !Self {
     errdefer tick_ra.deinit();
 
     return .{
+        .test_settings_parsed = test_settings_parsed,
+        .test_settings = test_settings_parsed.value,
+
         .clock_mutex = .{},
         .clock = try std.time.Timer.start(),
 
@@ -218,7 +242,13 @@ pub fn new_frame(self: *Self) void {
     if (self.queued_backend_selection != self.selected_backend) {
         self.selected_backend = self.queued_backend_selection;
         self.set_backend(self.queued_backend_selection);
-        self.backend().?.d("configure", .{self.backend_config}) catch @panic("");
+
+        //self.backend().?.d("configure", .{self.backend_config}) catch @panic("");
+        self.backend().?.d("configure", .{IBackend.BackendConfig{
+            .desied_view_volume_size = self.test_settings.volume_dims,
+        }}) catch @panic("");
+
+        self.backend().?.d("recenter", .{self.test_settings.volume_center});
     }
 }
 

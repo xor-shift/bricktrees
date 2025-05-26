@@ -246,7 +246,7 @@ pub fn build(b: *std.Build) void {
     };
 
     const to_build: ToBuild = .{
-        // .tracer = optimize == .Debug,
+        //.tracer = optimize == .Debug,
         .tracer = true,
         .voxeliser_sw = true,
         .voxeliser_hw = true,

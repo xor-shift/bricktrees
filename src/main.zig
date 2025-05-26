@@ -28,6 +28,7 @@ pub var g: Globals = undefined;
 
 fn initialize_things(alloc: std.mem.Allocator) void {
     g = Globals.init(Globals.default_resolution, alloc) catch @panic("Globals.init");
+    g.queued_backend_selection = g.test_settings.backend;
 
     g.thing_store.add_thing(dyn.Fat(*IThing).init(&g), "globals", &.{});
 
@@ -35,7 +36,9 @@ fn initialize_things(alloc: std.mem.Allocator) void {
     _ = g.thing_store.add_new_thing(GuiThing, "gui", .{});
 
     const CameraThing = @import("things/CameraThing.zig");
-    _ = g.thing_store.add_new_thing(CameraThing, "camera", .{});
+    const camera_thing = g.thing_store.add_new_thing(CameraThing, "camera", .{});
+    camera_thing.global_coords = g.test_settings.camera_pos;
+    camera_thing.look = g.test_settings.camera_look;
 
     const VisualiserThing = @import("things/VisualiserThing.zig");
     _ = g.thing_store.add_new_thing(VisualiserThing, "visualiser", .{});
@@ -44,23 +47,13 @@ fn initialize_things(alloc: std.mem.Allocator) void {
     _ = g.thing_store.add_new_thing(EditorThing, "editor", .{.{ 64, 64, 64 }});
 
     const BVoxProvider = @import("voxel_providers/BVoxProvider.zig");
-    const conv = struct {
-        fn aufruf(str: [*:0]const u8) []const u8 {
-            const idx = std.mem.indexOfSentinel(u8, 0, str);
-            return str[0..idx];
-        }
-    }.aufruf;
     _ = g.thing_store.add_new_thing(BVoxProvider, "bvox voxel provider", .{
-        conv(std.os.argv[1]),
-        .{
-            std.fmt.parseInt(usize, conv(std.os.argv[2]), 10) catch unreachable,
-            std.fmt.parseInt(usize, conv(std.os.argv[3]), 10) catch unreachable,
-            std.fmt.parseInt(usize, conv(std.os.argv[4]), 10) catch unreachable,
-        },
+        g.test_settings.filename,
+        g.test_settings.file_dims,
     });
 
-    const DemoProvider = @import("voxel_providers/test.zig");
-    _ = g.thing_store.add_new_thing(DemoProvider, "test voxel provider", .{});
+    // const DemoProvider = @import("voxel_providers/test.zig");
+    // _ = g.thing_store.add_new_thing(DemoProvider, "test voxel provider", .{});
 
     // const ObjProvider = @import("voxel_providers/ObjLoader.zig");
     // _ = g.thing_store.add_new_thing(ObjProvider, "obj voxeliser", .{"scenes/hairball/hairball.obj", .{0} ** 3});
@@ -110,7 +103,8 @@ fn initialize_things(alloc: std.mem.Allocator) void {
         p.@"1",
     ) catch @panic("");
 
-    g.do_resize(Globals.default_resolution) catch @panic("");
+    //g.do_resize(Globals.default_resolution) catch @panic("");
+    g.do_resize(g.test_settings.resolution) catch @panic("");
 }
 
 fn deinitialize_things() void {
@@ -231,6 +225,7 @@ pub fn main() !void {
 
     var last_ft_out: u64 = g.time();
     var ft_tracker = try MedianThing.init(alloc, 1024);
+    var print_ct: usize = 0;
 
     var last_frame_start = g.time() - 16_500_000;
     outer: while (true) {
@@ -268,7 +263,11 @@ pub fn main() !void {
             //std.log.debug("{d}ms", .{ft_tracker.median()});
         }
         if ((ft_tracker.ptr % ft_tracker.window.len) == 0) {
+            defer print_ct += 1;
             std.fmt.format(std.io.getStdOut().writer(), "{d}ms\n", .{ft_tracker.average()}) catch {};
+            // if (print_ct >= 2) {
+            //     break;
+            // }
         }
 
         // std.log.debug("new frame after {d} ms", .{frametime_ms});

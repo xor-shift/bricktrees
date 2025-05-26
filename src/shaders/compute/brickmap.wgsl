@@ -296,15 +296,24 @@ fn iterator_detect_hit(it: ptr<function, Iterator>, i: u32, first_time_on_level:
         if (brickmap == k_bm_unoccupied) {
             return false;
         } else if (brickmap == k_bm_not_loaded) {
-            let result = atomicCompareExchangeWeak(
-                &visibility_map[bg_idx],
-                k_vis_occluded,
-                k_vis_requested_load
-            );
-            if (g_give_feedback && result.exchanged) {
-                let idx = atomicAdd(&feedback_buffer.next_index, 1u);
-                atomicStore(&feedback_buffer.data[idx], bg_idx);
-                g_give_feedback = false;
+            if (false) {
+              let result = atomicCompareExchangeWeak(
+                  &visibility_map[bg_idx],
+                  k_vis_occluded,
+                  k_vis_requested_load
+              );
+              if (g_give_feedback && result.exchanged) {
+                  let idx = atomicAdd(&feedback_buffer.next_index, 1u);
+                  atomicStore(&feedback_buffer.data[idx], bg_idx);
+                  g_give_feedback = false;
+              }
+            } else {
+              let result = atomicAdd(&visibility_map[bg_idx], 1u);
+              if (g_give_feedback && result == (1u << (({{brickmap_depth}}u) - 3u) * 1u)) {
+                  let idx = atomicAdd(&feedback_buffer.next_index, 1u);
+                  atomicStore(&feedback_buffer.data[idx], bg_idx);
+                  g_give_feedback = false;
+              }
             }
 
             return false;

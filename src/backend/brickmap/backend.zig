@@ -56,7 +56,7 @@ pub fn Backend(comptime Cfg: type) type {
         const Computer = @import("components/computer.zig").Computer(Cfg);
 
         pub const MapConfig = struct {
-            feedback_sz: usize = 1024,
+            feedback_sz: usize = 2048,
             no_brickmaps: usize,
             grid_dimensions: [3]usize,
 
@@ -187,6 +187,16 @@ pub fn Backend(comptime Cfg: type) type {
         pub fn deinit(self: *Self) void {
             // self.computer.deinit();
             // self.storage.deinit();
+
+            std.fmt.format(std.io.getStdOut().writer(), "{d}/{d}, {d}\n", .{
+                blk: {
+                    var acc: usize = 0;
+                    for (self.brickmaps) |v| acc += @intFromBool(v != null);
+                    break :blk acc;
+                },
+                self.brickmaps.len,
+                self.brickgrid.len,
+            }) catch unreachable;
 
             self.painter.deinit();
             g.alloc.destroy(self.painter);

@@ -50,14 +50,10 @@ fn make_stack_element(node_idx: u32, extents: VoxelExtents) -> StackElement {
             child_is_valid,
         );
 
-        child_offsets <<= 4;
-        child_offsets |= offset_tracker;
+        child_offsets >>= 4;
+        child_offsets |= (offset_tracker << 28);
         offset_tracker += child_size;
     }
-
-    child_offsets = (child_offsets >> 16) | (child_offsets << 16);
-    child_offsets = ((child_offsets >> 8) & 0x00FF00FF) | ((child_offsets << 8) & 0xFF00FF00);
-    child_offsets = ((child_offsets >> 4) & 0x0F0F0F0F) | ((child_offsets << 4) & 0xF0F0F0F0);
 
     return StackElement(
       extents,
@@ -199,7 +195,7 @@ fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersectio
 
     var i = 1u;
     while (true) {
-        if (i >= 1024) { break; }
+        if (i >= 128) { break; }
         i += 1u;
 
         if (stack_ptr == 0) { break; }
@@ -216,9 +212,11 @@ fn trace(pixel: vec2<u32>, ray_arg: Ray, out_isection: ptr<function, Intersectio
         if (!is_valid) { continue; }
 
         let child_index = frame.children_start + ((frame.child_offsets >> (4 * child_no)) & 15);
+        // let child_index = get_node(frame.node_idx + child_no + 1);
 
         let split_for_child = get_split(frame.extents, child_no);
         var t_for_child: f32;
+
         let child_intersection = slab(
             ray.origin,
             ray.direction_reciprocals,

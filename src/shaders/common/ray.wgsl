@@ -149,13 +149,31 @@ fn slab(origin: vec3<f32>, direction_reciprocals: vec3<f32>, min: vec3<f32>, max
     var t_min = 0.0;
     var t_max = 99999.0;
 
-    for (var d = 0u; d < 3u; d++) {
-        let t_1 = (min[d] - origin[d]) * direction_reciprocals[d];
-        let t_2 = (max[d] - origin[d]) * direction_reciprocals[d];
+    // for (var d = 0u; d < 3u; d++) {
+    //     let t_1 = (min[d] - origin[d]) * direction_reciprocals[d];
+    //     let t_2 = (max[d] - origin[d]) * direction_reciprocals[d];
 
-        t_min = min(max(t_1, t_min), max(t_2, t_min));
-        t_max = max(min(t_1, t_max), min(t_2, t_max));
-    }
+    //     t_min = min(max(t_1, t_min), max(t_2, t_min));
+    //     t_max = max(min(t_1, t_max), min(t_2, t_max));
+    // }
+
+    let t_1_0 = (min[0] - origin[0]) * direction_reciprocals[0];
+    let t_2_0 = (max[0] - origin[0]) * direction_reciprocals[0];
+
+    t_min = min(max(t_1_0, t_min), max(t_2_0, t_min));
+    t_max = max(min(t_1_0, t_max), min(t_2_0, t_max));
+
+    let t_1_1 = (min[1] - origin[1]) * direction_reciprocals[1];
+    let t_2_1 = (max[1] - origin[1]) * direction_reciprocals[1];
+
+    t_min = min(max(t_1_1, t_min), max(t_2_1, t_min));
+    t_max = max(min(t_1_1, t_max), min(t_2_1, t_max));
+
+    let t_1_2 = (min[2] - origin[2]) * direction_reciprocals[2];
+    let t_2_2 = (max[2] - origin[2]) * direction_reciprocals[2];
+
+    t_min = min(max(t_1_2, t_min), max(t_2_2, t_min));
+    t_max = max(min(t_1_2, t_max), min(t_2_2, t_max));
 
     *out_t = t_min;
     return t_min <= t_max;
